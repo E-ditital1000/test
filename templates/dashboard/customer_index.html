@@ -1,0 +1,31 @@
+{% extends 'partials/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+<!-- Main Content -->
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <img src="{{ user.profile.image.url }}" alt="{{ user.username }}"
+                    class="card-img-top rounded-circle mx-auto mt-3" style="width: 150px;">
+                <div class="card-body text-center">
+                    <h4 class="card-title">Name: {{ user.username }}</h4>
+                    <p class="text-secondary mb-1">ID: {{ user.profile.staff_id }}</p>
+                    <p class="text-muted font-size-sm">Address: {{ user.profile.address }}</p>
+                    <a href="{{ user.profile.website }}" class="btn btn-primary">Follow</a>
+                    <a href="{% url 'user-profile-update' %}" class="btn btn-outline-primary">Edit Profile</a>
+                    <a href="{{ user.profile.twitter }}" class="btn btn-outline-info">Twitter</a>
+                    <a href="{{ user.profile.instagram }}" class="btn btn-outline-danger">Instagram</a>
+                    <a href="{{ user.profile.facebook }}" class="btn btn-outline-primary">Facebook</a>
+                    <a href="{% url 'work-list' %}" class="btn btn-outline-danger">Work</a>
+                    <a href="{% url 'interaction-list' %}" class="btn btn-outline-primary">Follow Up</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- End of Navbar -->        
+{% endblock %}

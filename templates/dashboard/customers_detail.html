@@ -1,0 +1,78 @@
+{% extends 'partials/base.html' %}
+
+
+{% block content %}
+{% include 'partials/topside.html' %}
+<!-- Sidebar -->
+<div class="sidebar">
+    
+    <a href="#" class="logo">
+       
+    <img src="{%static 'img/download.png' %}" width="100%" height="100%" alt="">
+    <div class="A1-logo"><br><span>A1</span>Tech</div> 
+    </a>
+    
+    <ul class="side-menu">
+        <li><a href="{% url 'dashboard-index' %}"><i class='bx bxs-dashboard'></i>Dashboard</a></li>
+        <li><a href="#"><i class='bx bx-store-alt'></i>Shop</a></li>
+        <li class="active"><a href="#"><i class='bx bx-analyse'></i>Analytics</a></li>
+        <li><a href="#"><i class='bx bx-group'></i>Employee</a></li>
+        <li><a href="{% url 'user-register' %}"><i class='bx bx-group'></i>Register</a></li>
+        <li><a href="#"><i class='bx bx-cog'></i>Settings</a></li>
+    </ul>
+    <ul class="side-menu">
+        <li>
+            <a href="{% url 'user-login' %}" class="logout">
+                <i class='bx bx-log-out-circle'></i>
+                Logout
+            </a>
+        </li>
+    </ul>
+</div>
+<!-- End of Sidebar -->
+
+<div class="row my-4">
+    <div class="col-md-4">
+
+    </div>
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                Supervisor Detail Page
+            </div>
+            <div class="row p-3">
+                <div class="col-md-8">
+                    <table class="table table-borderless">
+                        <thead>
+                            <span class="h4">Porfile Information</span class="h4">
+                            <hr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th>Name</th>
+                                <td>{{ customers.username }}</td>
+                            </tr>
+                            <tr>
+                                <th>Email</th>
+                                <td>{{ customers.email }}</td>
+                            </tr>
+                            <tr>
+                                <th>Phone</th>
+                                <td>{{ customers.profile.phone }}</td>
+                            </tr>
+                            <tr>
+                                <th>Address</th>
+                                <td>{{ customers.profile.address }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="col-md-4">
+                    <img class="img-thumbnail" src="{{ customers.profile.image.url }}" alt="profile-image">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

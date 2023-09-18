@@ -1,0 +1,157 @@
+{% load crispy_forms_tags %}
+{% load static %}
+<head>
+    <style>
+
+body {
+            background-color: #F3EBF6;
+            font-family: 'Ubuntu', sans-serif;
+            background-size:cover;
+        }
+        
+        .main {
+            background-color: #FFFFFF;
+            width: 400px;
+            height: 80%;
+            margin: 7em auto;
+            border-radius: 1.5em;
+            box-shadow: 0px 15px 40px 2px rgba(0, 0, 0, 0.14);
+           
+        }
+
+        .sign {
+            padding-top: 40px;
+            color: #000000;
+            font-family: 'Ubuntu', sans-serif;
+            font-weight: bold;
+            font-size: 23px;
+        }
+
+       
+
+        form.form1 {
+            padding-top: 40px;
+        }
+
+select, textarea, input[type=text], input[type=password], input[type=datetime], input[type=datetime-local], input[type=date], input[type=month], input[type=time], input[type=week], input[type=number], input[type=email], input[type=url], input[type=search], input[type=tel], input[type=color], .uneditable-input {
+  width: 76%;
+  color: rgb(38, 50, 56);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  background: rgba(136, 126, 126, 0.04);
+  padding: 10px 20px;
+  border: 1px solid ;
+  border-radius: 20px;
+  outline: none;
+  box-sizing: border-box;
+  border: 2px solid #0c0041;
+  margin-bottom: 50px;
+  text-align: center;
+  margin-bottom: 27px;
+  font-family: 'Ubuntu', sans-serif;
+  text-align: center;
+  width: 76%;
+}
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: #ffe600; /* Change to your desired color */
+    margin: 0 auto;
+}
+
+.logo {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+input[type=text], input[type=password]:focus, input[type=text], input[type=password]:focus {
+            border: 2px solid  #0c0041;
+            color: #ffd000;
+            text-align: center;
+        }
+
+        .submit {
+            cursor: pointer;
+            border-radius: 5em;
+            color: #000000;
+            background: #ffe600;
+            color: black;
+            border: 0;
+            padding-left: 40px;
+            padding-right: 40px;
+            padding-bottom: 10px;
+            box-sizing: border-box;
+            border: 1px solid #000000;
+            padding-top: 10px;
+            font-family: 'Ubuntu', sans-serif;
+            font-size: 15px;
+            box-shadow: 0 0 20px 1px rgba(0, 0, 0, 0.04);
+            outline: none;
+        }
+
+   /* Existing styles */
+
+@media (max-width: 600px) {
+    .main {
+        width: 80%; /* Adjust as needed */
+        margin: 5em auto;
+    }
+
+    .logo-container {
+        width: 100px;
+        height: 100px;
+    }
+
+    .form1 {
+        padding-top: 20px;
+    }
+
+    input[type="text"],
+    input[type="password"] {
+        width: 76%;
+        
+    }
+}
+
+    </style>
+</head>
+
+<div class="main">
+    <p class="sign" align="center">Sign in</p>
+    <div class="logo-container">
+        <img src="{% static 'img/atech.png' %}" alt="Logo" class="logo">
+    </div>
+    <form class="form1" method="post" action="" style="text-align: center;">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type="submit" class="submit">SIGN IN</button>
+        <div style="display: flex; justify-content: center; align-items: center ">
+            <br>
+            <!--<a style="color:rgb(33, 4, 201);" href="{% url 'user-register' %}" >Don't have an account? Sign up here!!</a>-->
+        </div>
+    </form>
+</div>
+
+{% for message in messages %}
+<script>
+    window.onload = function(){
+        alert('{{message}}')
+    }
+</script>
+{% endfor %}
+
+<script>
+function myfunction(){
+    var x=document.getElementById("myinput");
+    if(x.type==="input[type=password]"){
+        x.type="text"
+    } else {
+        x.type="input[type=password]"
+    }
+}
+</script>

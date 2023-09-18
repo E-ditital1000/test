@@ -1,0 +1,49 @@
+{% extends 'partials/base.html' %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="container mt-4">
+
+    <h2>Call Log List</h2>
+        <!-- Search Form -->
+        <form method="get" class="form-inline mb-3">
+            <div class="input-group">
+                 <!--   {{ search_form.search_query.label_tag }}-->
+                <input type="text" class="form-control" name="search_query" placeholder="Search by Name" value="{{ request.GET.search_query }}">
+                <div class="input-group-append">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+            </div>
+        </form>
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Contact</th>
+                <th>Purpose</th>
+                <th>Address</th>
+                <th>Date</th> <!-- Added Date Column -->
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for calllog in calllogs %}
+            <tr>
+                <td>{{ calllog.name }}</td>
+                <td>{{ calllog.contact }}</td>
+                <td>{{ calllog.purpose }}</td>
+                <td>{{ calllog.address }}</td>
+                <td>{{ calllog.date|date:"F d, Y" }}</td> <!-- Display the date with a specific format -->
+                <td>
+                    <a href="{% url 'calllog_edit' pk=calllog.pk %}" class="btn btn-primary btn-sm">Edit</a>
+                    <a href="#" class="btn btn-danger btn-sm">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'calllog_create' %}" class="btn btn-success">Add Call Log</a>
+
+    <!-- Add PDF Generation Button -->
+    <a href="{% url 'generate_calllog_pdf' %}" class="btn btn-primary">Generate PDF</a>
+</div>
+{% endblock %}
