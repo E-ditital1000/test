@@ -9,9 +9,11 @@ https://docs.djangoproject.com/en/3.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.1/ref/settings/
 """
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
 import os
 from pathlib import Path
-import cloudinary
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -29,10 +31,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
 # Application definition
 
 INSTALLED_APPS = [
+    'cloudinary_storage',
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -44,8 +46,6 @@ INSTALLED_APPS = [
     'user.apps.UserConfig',
     'crispy_forms',
     'cloudinary',
-    'cloudinary_storage',
-    
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
@@ -54,8 +54,6 @@ TWILIO_ACCOUNT_SID = 'AC873f7bc617d951e4b76f7e07c1fcb207'
 TWILIO_AUTH_TOKEN = 'e2313adf5bc5c116495a922bf671fe9c'
 TWILIO_PHONE_NUMBER = '0778187295'
 
-
-
 # Cloudinary configuration
 cloudinary.config(
     cloud_name='dkhobecps',
@@ -63,15 +61,17 @@ cloudinary.config(
     api_secret='5fb1dAK6SU2veve8exLK7TVLXFA'
 )
 
-# Set Cloudinary as the default storage backend
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
-# Cloudinary configuration (optional if you're using DEFAULT_FILE_STORAGE)
-CLOUDINARY = {
+CLOUDINARY_STORAGE  = {
     'CLOUD_NAME': 'dkhobecps',
     'API_KEY': '657146181452448',
     'API_SECRET': '5fb1dAK6SU2veve8exLK7TVLXFA',
 }
+# Set Cloudinary as the default stordkhobecpsage backend
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+STATIC_URL = 'https://res.cloudinary.com/dkhobecps/'
+
+# Cloudinary configuration (optional if you're using DEFAULT_FILE_STORAGE)
 
 #CLOUDINARY_URL = os.getenv('CLOUDINARY_URL')  # You can set this as an environment variable
 #CLOUDINARY_STORAGE = {
@@ -79,6 +79,8 @@ CLOUDINARY = {
 #    'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
 #    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 #}
+
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
