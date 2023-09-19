@@ -80,8 +80,6 @@ STATIC_URL = 'https://res.cloudinary.com/dkhobecps/'
 #    'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 #}
 
-
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -111,8 +109,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'inventoryproject.wsgi.application'
-
-
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
