@@ -148,7 +148,7 @@ PyYAML==6.0
 qrcode==7.4.2
 rcssmin==1.1.0
 redis==4.4.0
-reportlab==4.0.4
+reportlab==3.6.13
 requests==2.31.0
 rjsmin==1.2.0
 rsa==4.9
