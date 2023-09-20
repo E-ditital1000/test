@@ -63,7 +63,6 @@ executing==1.2.0
 factory-boy==3.2.1
 Faker==18.11.2
 filelock==3.12.2
-frozenlist==1.4.0
 gevent==23.9.1
 gopay==2.0.1
 graphviz==0.14
