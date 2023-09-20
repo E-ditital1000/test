@@ -5,7 +5,7 @@ alabaster==0.7.13
 arabic-reshaper==3.0.0
 argon2-cffi==21.3.0
 argon2-cffi-bindings==21.2.0
-asgiref==3.5.0
+asgiref==3.7.2
 asn1crypto==1.5.1
 astroid==2.15.5
 asttokens==2.2.1
@@ -39,7 +39,7 @@ Django==4.2.5
 django-admin-black==1.0.8
 django-appconf==1.0.5
 django-bootstrap-form==3.4
-django-bootstrap4==4.7.0
+django-bootstrap4==23.2
 django-cleanup==8.0.0
 django-cloudinary-storage==0.3.0
 django-compressor==4.1
@@ -68,8 +68,10 @@ filelock==3.12.2
 flake8==6.0.0
 flake8-isort==5.0.3
 frozenlist==1.4.0
+gevent==23.9.1
 gopay==2.0.1
 graphviz==0.14
+greenlet==2.0.2
 gunicorn==20.1.0
 hiredis==2.1.0
 html5lib==1.1
@@ -197,4 +199,5 @@ wrapt==1.15.0
 xhtml2pdf==0.2.11
 yarl==1.9.2
 zipp==3.15.0
+zope.event==5.0
 zope.interface==6.0
