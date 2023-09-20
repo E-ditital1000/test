@@ -1,11 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from datetime import datetime
 from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter, landscape
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image
-from reportlab.lib import colors
 from django.http import HttpResponse
 from django.contrib.auth.models import User
 from django.template.loader import get_template
@@ -19,10 +14,8 @@ from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.template.loader import get_template
-from xhtml2pdf import pisa
 
 from django.http import HttpResponse
-from reportlab.pdfgen import canvas
 from io import BytesIO
 from .models import CallLog
 from .forms import CallLogForm
@@ -186,13 +179,6 @@ def generate_pdf_report(request):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="work_list_report.pdf"'
     return response
-
-from reportlab.lib.styles import getSampleStyleSheet
-
-
-
-
-
 
 @login_required(login_url='user-login')
 def generate_interaction_table_pdf(request):
@@ -944,33 +930,6 @@ def update_record(request, pk):
 	else:
 		messages.success(request, "You Must Be Logged In...")
 		return redirect('dashboard-index')
-
-
-
-from django.conf import settings
-from twilio.rest import Client
-import random
-
-def send_otp_via_sms(phone_number):
-    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-
-    # Generate a random 6-digit OTP
-    otp = ''.join(random.choice('0123456789') for _ in range(6))
-
-    # Compose the SMS message
-    message = client.messages.create(
-        body=f'Enter the code, to proceed to login: {otp}',
-        from_=settings.TWILIO_PHONE_NUMBER,
-        to=phone_number
-    )
-
-    return otp
-
-
-def verify_otp(user_otp, generated_otp):
-    return user_otp == generated_otp
-
-
 
 
 #@login_required(login_url='user-login')
