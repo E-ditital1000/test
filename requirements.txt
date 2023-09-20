@@ -130,7 +130,6 @@ snowballstemmer==2.2.0
 sqlparse==0.4.4
 twilio==8.8.0
 Twisted==22.10.0
-twisted-iocpsupport==1.0.3
 txaio==23.1.1
 types-pytz==2023.3.0.0
 types-PyYAML==6.0.12.10
