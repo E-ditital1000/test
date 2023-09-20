@@ -63,14 +63,7 @@ executing==1.2.0
 factory-boy==3.2.1
 Faker==18.11.2
 filelock==3.12.2
-gevent==23.9.1
-gopay==2.0.1
-graphviz==0.14
-greenlet==2.0.2
 gunicorn==20.1.0
-hiredis==2.1.0
-html5lib==1.1
-hyperlink==21.0.0
 identify==2.5.24
 idna==2.8
 imagesize==1.4.1
