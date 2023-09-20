@@ -114,7 +114,6 @@ pytest-sugar==0.9.6
 python-bidi==0.4.2
 python-dateutil==2.8.2
 python-decouple==3.8
-python-dotenv==1.0.0
 python-magic==0.4.27
 python-slugify==7.0.0
 pytz==2019.1
