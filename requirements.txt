@@ -127,9 +127,7 @@ rjsmin==1.2.0
 rsa==4.9
 six==1.15.0
 snowballstemmer==2.2.0
-
 sqlparse==0.4.4
-
 twilio==8.8.0
 Twisted==22.10.0
 twisted-iocpsupport==1.0.3
