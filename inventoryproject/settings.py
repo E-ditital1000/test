@@ -179,3 +179,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 LOGIN_REDIRECT_URL = 'dashboard-index'
 
 LOGIN_URL = 'user-login'
+
+# settings.py
+
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
