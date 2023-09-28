@@ -122,13 +122,14 @@ WSGI_APPLICATION = 'inventoryproject.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': ('railway'),
-        'USER': ('postgres'),
-        'PASSWORD':('oQnaWYGUfuSr33ZuUqxy'),
-        'HOST': ('containers-us-west-167.railway.app'),
-        'PORT': ('6943'),
+        'NAME': 'railway',  # Remove the parentheses around the database name
+        'USER': 'postgres',  # Remove the parentheses around the username
+        'PASSWORD': 'oQnaWYGUfuSr33ZuUqxy',  # Remove the parentheses around the password
+        'HOST': 'containers-us-west-167.railway.app',  # Remove the parentheses around the host
+        'PORT': '6943',  # Remove the parentheses around the port
     }
 }
+
 
 
 # Password validation
