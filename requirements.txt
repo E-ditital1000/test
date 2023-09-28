@@ -12,3 +12,4 @@ cloudinary==1.33.0
 django-cloudinary-storage==0.3.0
 reportlab==4.0.5
 sqlparse==0.4.4
+
