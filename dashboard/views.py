@@ -19,6 +19,7 @@ from django.http import HttpResponse
 from io import BytesIO
 from .models import CallLog
 from .forms import CallLogForm
+from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle, TA_CENTER  # Import TA_CENTER
 from reportlab.lib.units import inch
