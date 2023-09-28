@@ -6,11 +6,12 @@ django-forms-bootstrap==2.0.3.post2
 django-environ==0.9.0
 django-jazzmin==2.4.9
 gunicorn==20.0.4
-Pillow==6.2.1
-psycopg2==2.8.5
-pytz==2019.3
-whitenoise==5.1.0
+Pillow 9.3
+pytz==2023.3
+whitenoise==6.5.0
 cloudinary==1.33.0
 django-cloudinary-storage==0.3.0
+reportlab==4.0.5
 sqlparse==0.4.4
-twilio==8.8.0
+
+
