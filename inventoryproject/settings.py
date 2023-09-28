@@ -29,9 +29,9 @@ SECRET_KEY = '@ujr-e&a%8m%6!z(+ka16+(sm6cug(h6noe%#p%=6%d2nz5t+#'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['a1connect.vercel.app', '.now.sh', '127.0.0.1', 'localhost']
 # Application definition
-# ['', '.now.sh', '127.0.0.1', 'localhost']
+# 
 INSTALLED_APPS = [
     'cloudinary_storage',
     'jazzmin',
