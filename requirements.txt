@@ -6,7 +6,6 @@ django-environ==0.9.0
 django-jazzmin==2.4.9
 gunicorn==20.0.4
 importlab==0.8
-pillow
 pytz==2019.3
 psycopg2-binary==2.9.7
 whitenoise==6.5.0
