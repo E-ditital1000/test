@@ -19,12 +19,15 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from decouple import Config, Csv
+
+config = Config()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '@ujr-e&a%8m%6!z(+ka16+(sm6cug(h6noe%#p%=6%d2nz5t+#'
+SECRET_KEY = config('SECRET_KEY'),
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -49,21 +52,23 @@ INSTALLED_APPS = [
 
 
 
-TWILIO_ACCOUNT_SID = 'AC873f7bc617d951e4b76f7e07c1fcb207'
-TWILIO_AUTH_TOKEN = 'e2313adf5bc5c116495a922bf671fe9c'
-TWILIO_PHONE_NUMBER = '0778187295'
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID'),
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN'),
+TWILIO_PHONE_NUMBER = config('TWILIO_PHONE_NUMBER'),
 
-# Cloudinary configuration
+# Cloudinary Configuration
 cloudinary.config(
-    cloud_name='dkhobecps',
-    api_key='657146181452448',
-    api_secret='5fb1dAK6SU2veve8exLK7TVLXFA'
+    cloud_name=config('cloud_name'),
+    api_key=config('api_key'),
+    api_secret=config('api_secret')
 )
 
-CLOUDINARY_STORAGE  = {
-    'CLOUD_NAME': 'dkhobecps',
-    'API_KEY': '657146181452448',
-    'API_SECRET': '5fb1dAK6SU2veve8exLK7TVLXFA',
+
+# Cloudinary Storage Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('cloud_name'),
+    'API_KEY': config('api_key'),
+    'API_SECRET': config('api_secret')
 }
 # Set Cloudinary as the default stordkhobecpsage backend
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
