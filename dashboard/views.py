@@ -39,6 +39,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from .models import Work
 
+
 @login_required(login_url='user-login')
 def generate_pdf_report(request):
 
