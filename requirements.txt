@@ -15,6 +15,7 @@ idna==3.4
 importlab==0.8
 psycopg2-binary==2.9.7
 pytz==2019.3
+python-decouple==3.9
 reportlab==4.0.5
 requests==2.31.0
 six==1.16.0
