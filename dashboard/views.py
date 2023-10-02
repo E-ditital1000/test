@@ -103,7 +103,7 @@ def generate_pdf_report(request):
     elements.append(Spacer(0, 0.1 * inch))
     # Add the title
     user = request.user  # Get the current user
-    title_text = f"{user.username}'s Work List - for the month of September"
+    title_text = f"{user.username}'s Work List "
     title = Paragraph(title_text.upper(), title_style)
     elements.append(title)
 
@@ -119,7 +119,7 @@ def generate_pdf_report(request):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),  # Set a smaller font size
+        ('FONTSIZE', (0, 0), (-1, -1), 5),  # Set a smaller font size
         ('LEFTPADDING', (0, 0), (-1, -1), 6),  # Set left padding
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),  # Set right padding
         ('TOPPADDING', (0, 0), (-1, -1), 4),  # Set top padding
@@ -149,7 +149,7 @@ def generate_pdf_report(request):
     elements.append(Spacer(1, 12))  # Add some vertical space
     elements.append(table)  # Add the table
  # Add some vertical space
-    elements.append(Spacer(0, 0.1 * inch))
+    elements.append(Spacer(0, 1.2 * inch))
         # Create a signing area style
     signing_area_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
@@ -223,7 +223,7 @@ def generate_interaction_table_pdf(request):
     elements.append(Spacer(0, 0.1 * inch))
     # Add the title
     user = request.user  # Get the current user
-    title_text = f"{user.username}'s Interaction_list - for the month of September"
+    title_text = f"{user.username}'s Interaction_list"
     title = Paragraph(title_text.upper(), title_style)
     elements.append(title)
 
@@ -239,7 +239,7 @@ def generate_interaction_table_pdf(request):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),  # Set a smaller font size
+        ('FONTSIZE', (0, 0), (-1, -1), 5),  # Set a smaller font size
         ('LEFTPADDING', (0, 0), (-1, -1), 6),  # Set left padding
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),  # Set right padding
         ('TOPPADDING', (0, 0), (-1, -1), 4),  # Set top padding
@@ -274,7 +274,7 @@ def generate_interaction_table_pdf(request):
     elements.append(Spacer(1, 12))  # Add some vertical space
     elements.append(table)  # Add the table
  # Add some vertical space
-    elements.append(Spacer(0, 0.1 * inch))
+    elements.append(Spacer(0, 1.2 * inch))
         # Create a signing area style
     signing_area_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
@@ -665,7 +665,7 @@ def generate_calllog_pdf(request):
         ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
         ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
         ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('FONTSIZE', (0, 0), (-1, -1), 8),  # Set a smaller font size
+        ('FONTSIZE', (0, 0), (-1, -1), 5),  # Set a smaller font size
         ('LEFTPADDING', (0, 0), (-1, -1), 6),  # Set left padding
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),  # Set right padding
         ('TOPPADDING', (0, 0), (-1, -1), 4),  # Set top padding
@@ -674,6 +674,7 @@ def generate_calllog_pdf(request):
 
     table.setStyle(style)
     elements.append(table)
+
 
     # Build the PDF document in the buffer
     doc.build(elements)

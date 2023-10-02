@@ -1,33 +1,127 @@
 
-    <div class="container">
-        {% if user.is_authenticated %}
-       <!-- Main Content -->
-<div class="content">
-    <!-- Navbar -->
-    <nav>
-        <i class='bx bx-menu'></i>
-        <form action="#">
-            <div class="form-input">
-                <input type="search" placeholder="Search...">
-                <button class="search-btn" type="submit"><i class='bx bx-search'></i></button>
-            </div>
-        </form>
-        <input type="checkbox" id="theme-toggle" hidden>
-        <label for="theme-toggle" class="theme-toggle"></label>
-        <a href="{% url 'user-login' %}"class="notif">
-            <i class='bx bx-bell'></i>Logout
-        </a>
-        <a href="{% url 'dashboard-index' %}" class="notif">
-            <i class='bx bx-bell'></i>{{ user.username }}
-            <span class="count">1</span>
-        </a>
-        <a href="{% url 'user-profile' %}" class="profile">
-            <img src="{{ user.profile.image.url }}">
-        </a>
-    </nav>
+<head>
+    <style>
+    /* Add your CSS styling here 
+.container {
+    background-color: #f0f0f0;
+}
 
-    <!-- End of Navbar -->
+.content {
+    padding: 20px;
+}
 
-            {% endif %}
-        </div>
+nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #333;
+    color: #fff;
+    padding: 10px 20px;
+}
+
+nav i {
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.form-input {
+    display: flex;
+    align-items: center;
+}
+
+input[type="search"] {
+    border: none;
+    padding: 5px;
+    margin-right: 10px;
+    border-radius: 5px;
+}
+
+.search-btn {
+    background-color: #007BFF;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.theme-toggle {
+    margin-left: auto;
+}
+
+.notif, .profile {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #fff;
+    margin-left: 20px;
+    position: relative;
+}
+
+.count {
+    background-color: red;
+    color: #fff;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    right: -5px;
+}
+
+.profile img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    margin-left: 5px;
+}
+
+/* Media Query for Responsiveness 
+@media screen and (max-width: 768px) {
+    nav {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .notif, .profile {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+}
+*/
+</style>
+</head>
+
+<div class="container">
+    {% if user.is_authenticated %}
+    <!-- Main Content -->
+    <div class="content">
+        <!-- Navbar -->
+        <nav>
+            <i class='bx bx-menu'></i>
+            <form action="#">
+                <div class="form-input">
+                    <input type="search" placeholder="Search...">
+                    <button class="search-btn" type="submit"><i class='bx bx-search'></i></button>
+                </div>
+            </form>
+            <input type="checkbox" id="theme-toggle" hidden>
+            <label for="theme-toggle" class="theme-toggle"></label>
+            <a href="{% url 'user-logout' %}" class="notif">
+                <i class='bx bx-bell'></i>Logout
+            </a>
+            <a href="{% url 'dashboard-index' %}" class="notif">
+                <i class='bx bx-bell'></i>{{ user.username }}
+                <span class="count">1</span>
+            </a>
+            <a href="{% url 'user-profile' %}" class="profile">
+                <img src="{{ user.profile.image.url }}" alt="{{ user.username }}'s Profile Image">
+            </a>
+        </nav>
+        <!-- End of Navbar -->
     </div>
+    {% endif %}
+</div>
