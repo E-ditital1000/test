@@ -14,7 +14,8 @@ from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
 from django.template.loader import get_template
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import HttpResponse
 from io import BytesIO
 from .models import CallLog
@@ -42,28 +43,42 @@ from .models import Work
 
 @login_required(login_url='user-login')
 def generate_pdf_report(request):
-
-        # Get the selected month and year from the form
-    selected_month = request.POST.get('month')
-    selected_year = request.POST.get('year')
-
-    # Validate that both month and year are provided
-    if not selected_month or not selected_year:
-        return HttpResponse("Please select both a month and a year to generate the report.")
-
-    # Convert the selected month and year to integers
-    selected_month = int(selected_month)
-    selected_year = int(selected_year)
-
-    # Get the current user
-    user = request.user
-
-    # Filter works based on selected month and year
-    filtered_works = Work.objects.filter(
-        start_date__month=selected_month,
-        start_date__year=selected_year,
-        user=user
-    )
+#    error_message = ''  # Initialize error_message as an empty string
+#    
+#    if request.method == 'POST':
+#        # Get the selected month and year from the form
+#        selected_month = request.POST.get('month')
+#        selected_year = request.POST.get('year')
+#
+#        # Validate that both month and year are provided
+#        if not selected_month or not selected_year:
+#            error_message = 'Please select both a month and a year.'  # Set error message
+#
+#        # Convert the selected month and year to integers
+#        selected_month = int(selected_month)
+#        selected_year = int(selected_year)
+#
+#        # Get the current user
+#        user = request.user
+#
+#        # Filter works based on selected month and year
+#        filtered_works = Work.objects.filter(
+#            start_date__month=selected_month,
+#            start_date__year=selected_year,
+#            user=user
+#        )
+#        if not filtered_works.exists():
+#            error_message = 'No data found for the selected month and year.'  # Set error message
+#
+#        # If there's an error message, return it with custom styling
+#        if error_message:
+#            error_message_html = f'<div class="alert alert-danger">{error_message}</div>'
+#            return render(request, 'dashboard/work_list.html', {'error_message_html': error_message_html})
+#
+#    # Rest of your code for generating the PDF report
+#    # ...
+#    return render(request, 'dashboard/work_list.html', {'error_message': error_message})
+#
     # Create a file-like buffer to receive PDF data.
     buffer = BytesIO()
 
@@ -106,7 +121,6 @@ def generate_pdf_report(request):
     title_text = f"{user.username}'s Work List "
     title = Paragraph(title_text.upper(), title_style)
     elements.append(title)
-
     # Add some vertical space
     elements.append(Spacer(0, 0.1 * inch))
 
@@ -174,8 +188,8 @@ def generate_pdf_report(request):
     # Build the PDF document
     doc.build(elements)
 
-    # FileResponse sets the Content-Disposition header so that browsers
-    # present the option to save the file.
+        # FileResponse sets the Content-Disposition header so that browsers
+        # present the option to save the file.
     buffer.seek(0)
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="work_list_report.pdf"'
@@ -450,8 +464,6 @@ def interaction_delete(request, pk):
     }
     return render(request, 'dashboard/interaction_delete.html', context)
 
-
-
 @login_required(login_url='user-login')
 def work_list(request):
     search_query = request.GET.get('q')
@@ -507,18 +519,39 @@ def work_edit(request, pk):
 @login_required(login_url='user-login')
 def work_delete(request, pk):
     work = get_object_or_404(Work, pk=pk)
+    
+    # Check permissions for deleting work
     if not request.user.is_superuser and work.user != request.user:
         messages.error(request, 'You do not have permission to delete this work.')
         return redirect('work-list')
     
     if request.method == 'POST':
+        # Perform the work deletion inside the POST request block
         work.delete()
         messages.success(request, 'Work has been deleted')
         return redirect('work-list')
+    
+    # If it's a GET request or not a POST request, render the confirmation page
     context = {
         'work': work,
     }
     return render(request, 'dashboard/work_delete.html', context)
+
+#@login_required(login_url='user-login')
+#def work_delete(request, pk):
+#    work = get_object_or_404(Work, pk=pk)
+#    if not request.user.is_superuser and work.user != request.user:
+#        messages.error(request, 'You do not have permission to delete this work.')
+#        return redirect('work-list')
+#    
+#    if request.method == 'POST':
+#        work.delete()
+#        messages.success(request, 'Work has been deleted')
+#        return redirect('work-list')
+#    context = {
+#        'work': work,
+#    }
+#    return render(request, 'dashboard/work_delete.html', context)
 
 #@login_required(login_url='user-login')
 #def work_edit(request, pk):
@@ -614,51 +647,59 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from .models import CallLog
 from .forms import CallLogForm
 
-
+@login_required(login_url='user-login')
 def generate_calllog_pdf(request):
-    buffer = BytesIO()
-    
     calllogs = CallLog.objects.all()
-
-    # Define the image path
-    image_path = 'static/img/atech.png'
-
- 
+    
+    # Create a file-like buffer to receive PDF data.
+    buffer = BytesIO()
 
     # Create the PDF object, using the BytesIO buffer as its "file."
-    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36
+    )
+
+    # Define a list to hold the elements you want to include in the PDF
     elements = []
 
     # Add the image
-    image = Image(image_path, width=200, height=100)
+    image_path = 'static/img/atech.png'  # Replace with the actual image path
+    image = Image(image_path, width=70, height=70)
+    image._offs_x = -230
+    image._offs_y = -50
     elements.append(image)
 
-# Add the heading
+    # Create a custom style for the title
+    title_style = ParagraphStyle(
+        name='TitleStyle',
+        fontSize=14,
+        alignment=TA_CENTER,
+        fontName='Helvetica-Bold',
+    )
+
+    # Add the heading
     heading = "A1technical Engineering Solution\nNagbw's Town Junction, ELWA"
     heading_style = TableStyle([
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, -1), 12),  # Adjust font size as needed
+        ('FONTSIZE', (0, 0), (-1, -1), 14),  # Adjust font size as needed
     ])
     heading_table = Table([[heading]], style=heading_style)
     elements.append(heading_table)
 
-  
-
-    # Add a title for the PDF
-    styles = getSampleStyleSheet()
-    title = Paragraph("Call_Log Report", styles['Title'])
+    elements.append(Spacer(0, 0.1 * inch))
+    
+    # Add the title
+    title_text = "Call Log Report"
+    title = Paragraph(title_text.upper(), title_style)
     elements.append(title)
 
-    # Define the table data (you can customize this as needed)
-    data = [['Name', 'Contact', 'Purpose', 'Address', 'Date']]
-    for calllog in calllogs:
-        data.append([calllog.name, calllog.contact, calllog.purpose, calllog.address, calllog.date])
+    # Add some vertical space
+    elements.append(Spacer(0, 0.1 * inch))
 
-    # Create a table and style it
-    table = Table(data)
-    style = TableStyle([
-      ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+    # Define a custom style for the table cells with reduced font size and padding
+    table_style = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -671,26 +712,43 @@ def generate_calllog_pdf(request):
         ('TOPPADDING', (0, 0), (-1, -1), 4),  # Set top padding
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),  # Set bottom padding
     ])
+   
+    # Create a list to hold the table data
+    data = []
+    data.append(["Name", "Contact", "Purpose", "Address", "Date"])
 
-    table.setStyle(style)
-    elements.append(table)
+    # Add call log data to the table
+    for calllog in calllogs:
+        data.append([
+            calllog.name,
+            calllog.contact,
+            calllog.purpose,
+            calllog.address,
+            str(calllog.date),
+        ])
 
+    # Adjust column widths based on the available page width
+    max_table_width = letter[0] - doc.leftMargin - doc.rightMargin
+    col_widths = [max_table_width * 0.15, max_table_width * 0.15, max_table_width * 0.15,
+                  max_table_width * 0.15, max_table_width * 0.2]
 
-    # Build the PDF document in the buffer
+    # Create a table and set its style
+    table = Table(data, colWidths=col_widths)
+    table.setStyle(table_style)
+
+    # Append elements to the list
+    elements.append(Spacer(1, 12))  # Add some vertical space
+    elements.append(table)  # Add the table
+
+    # Build the PDF document
     doc.build(elements)
 
-    # Get the value of the BytesIO buffer
-    pdf_data = buffer.getvalue()
-
-    # Close the buffer
-    buffer.close()
-
-    # Create the HttpResponse with the PDF data
-    response = HttpResponse(pdf_data, content_type='application/pdf')
+    # FileResponse sets the Content-Disposition header so that browsers
+    # present the option to save the file.
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="calllog.pdf"'
-
     return response
-
 
 
 
@@ -841,7 +899,14 @@ def order(request):
     }
     return render(request, 'dashboard/order.html', context)
 
-
+# Create a signal handler to update product quantity when an order is saved
+@receiver(post_save, sender=Order)
+def update_product_quantity(sender, instance, created, **kwargs):
+    if created:
+        product = instance.name  # Get the associated product
+        product.quantity -= instance.order_quantity  # Deduct the ordered quantity from product quantity
+        product.save()  # Save the product instance
+        
 
 def edit_todo_view(request, pk):
     todo_item = get_object_or_404(TodoItem, pk=pk)

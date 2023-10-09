@@ -44,9 +44,6 @@
     }
   }
 </style>
-
-
-
 <div class="container mt-4">
   <div class="row">
       <!-- Left Column: Work Upload Form -->
@@ -71,7 +68,7 @@
 
           <form method="post" action="{% url 'generate-pdf-report' %}" class="mb-2">
               {% csrf_token %}
-              <!--<div class="form-row align-items-end">
+             <div class="form-row align-items-end">
                   <div class="col-md-3 mb-2">
                       <label for="month">Select Month</label>
                       <select id="month" name="month" class="form-control">
@@ -99,9 +96,9 @@
                         <option value="2022">2026</option>
                         <option value="2023">2027</option>
                         <option value="2022">2028</option>
-                     Add options for years as needed 
+                    <!-- Add options for years as needed -->
                     </select>
-                  </div>-->
+                  </div>
                   <div class="col-md-2 mb-2">
                       <button type="submit" class="btn btn-success">Generate Report</button>
                   </div>
@@ -165,4 +162,41 @@
        </table>
    </div>
 </div>
+
+<div id="error-popup" class="overlay" style="visibility: hidden;">
+    <div class="popup">
+        <h2>Error</h2>
+        <a class="close" href="#">&times;</a>
+        <div class="content">
+            <p id="error-message"></p>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
+<script>
+    // Function to show the error pop-up
+    function showErrorPopup(message) {
+        document.getElementById("error-message").innerHTML = message;
+        document.getElementById("error-popup").style.visibility = "visible";
+    }
+
+    // Function to hide the error pop-up
+    function hideErrorPopup() {
+        document.getElementById("error-popup").style.visibility = "hidden";
+    }
+
+    // Check if there is an error message provided by the view and show the pop-up
+    {% if error_message %}
+        showErrorPopup("{{ error_message }}");
+    {% endif %}
+
+    // Check if the work list is empty and show a message
+    var workListTable = document.querySelector(".table.table-striped.table-hover.table-bordered tbody");
+    if (!workListTable || workListTable.children.length === 0) {
+    showErrorPopup("No work list data found.");
+}
+</script>
+
+
+

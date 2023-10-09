@@ -1,3 +1,5 @@
+import uuid  # Add this import statement at the top of your file
+
 from django.db import models
 from django.contrib.auth.models import User
 
@@ -22,6 +24,11 @@ class Profile(models.Model):
     instagram = models.CharField(max_length=100, null=True, blank=True)
     facebook = models.CharField(max_length=100, null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.staff_id:
+            # Generate a unique staff_id based on username and timestamp
+            self.staff_id = f'{self.user.username}-{uuid.uuid4().hex[:8]}'
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f'{self.user.username}-Profile'
-
