@@ -120,9 +120,9 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME': 'railway',  # Remove the parentheses around the database name
         'USER': 'postgres',  # Remove the parentheses around the username
-        'PASSWORD': 'oQnaWYGUfuSr33ZuUqxy',  # Remove the parentheses around the password
-        'HOST': 'containers-us-west-167.railway.app',  # Remove the parentheses around the host
-        'PORT': '6943',  # Remove the parentheses around the port
+        'PASSWORD': 'hfvSz5SeAtep7bakD7pJ',  # Remove the parentheses around the password
+        'HOST': 'containers-us-west-174.railway.app',  # Remove the parentheses around the host
+        'PORT': '6045',  # Remove the parentheses around the port
     }
 }
 
