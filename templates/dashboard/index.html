@@ -11,8 +11,15 @@
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.0.2/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@sweetalert2/theme-dark@4/dark.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+        @import url(https://unpkg.com/@webpixels/css@1.1.5/dist/index.css);
+        /* Bootstrap Icons */
+        @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css");
 
         :root {
             --light: #f6f6f9;
@@ -720,10 +727,9 @@
         <!-- End of Insights -->
         <div class="container">
             <div class="row clearfix">
-                <!-- Chart -->
                 <div class="col-md-8 float-left">
+                    <!-- Bar Chart -->
                     <canvas id="myChart" width="400" height="250"></canvas>
-
                     <script>
                         var ctx = document.getElementById('myChart').getContext('2d');
                         var myChart = new Chart(ctx, {
@@ -732,29 +738,71 @@
                                 labels: ['Service', 'Product', 'Customer'],
                                 datasets: [{
                                     label: 'Count',
-                                    data: [{{ order_count }}, {{ product_count }}, {{ records| length }}],
-                        backgroundColor: [
-                            'rgba(255, 99, 132, 0.5)',
-                            'rgba(54, 162, 235, 0.5)',
-                            'rgba(75, 192, 192, 0.5)'
-                        ],
-                            borderColor: [
-                                'rgba(255, 99, 132, 1)',
-                                'rgba(54, 162, 235, 1)',
-                                'rgba(75, 192, 192, 1)'
-                            ],
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            scales: {
-                                y: {
-                                    beginAtZero: true
+                                    data: [{{ order_count }}, {{ product_count }}, {{ records|length }}],
+                                    backgroundColor: [
+                                        'rgba(255, 99, 132, 0.5)',
+                                        'rgba(54, 162, 235, 0.5)',
+                                        'rgba(75, 192, 192, 0.5)'
+                                    ],
+                                    borderColor: [
+                                        'rgba(255, 99, 132, 1)',
+                                        'rgba(54, 162, 235, 1)',
+                                        'rgba(75, 192, 192, 1)'
+                                    ],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
                     </script>
+                </div>
+                <div class="col-md-4 float-right">
+                    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                
+                            
+                    <!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<!-- Radar Chart Canvas -->
+<canvas id="radarChart" width="400" height="400"></canvas>
+
+<script>
+  // Access the canvas element
+  var ctx = document.getElementById('radarChart').getContext('2d');
+
+  // Define the data
+  var data = {
+    labels: [{% for record in records %}'{{ record.first_name }} {{ record.last_name }}',{% endfor %}],
+    datasets: [{
+      label: 'Record Status',
+      data: [{% for record in records %}'{{ record.status }}',{% endfor %}],
+      backgroundColor: 'rgba(75, 192, 192, 0.2)',
+      borderColor: 'rgba(75, 192, 192, 1)',
+      borderWidth: 1
+    }]
+  };
+
+  // Define the options (you can customize them)
+  var options = {
+    scale: {
+      ticks: { beginAtZero: true, min: 0, max: 10 }, // Customize the min and max values
+    }
+  };
+
+  // Create the radar chart
+  var radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: data,
+    options: options
+  });
+</script>
+
                 </div>
                 <ul class="insights">
                     {% for product in products %}
@@ -768,7 +816,7 @@
                     </li>
                     {% endfor %}
                 </ul>
-                
+        
 
         <ul class="insights">
             <li>
@@ -790,57 +838,51 @@
                 </span>
             </li>
         </ul>
+
         <div class="container">
             <div class="table-responsive">
-                <table class="table table-striped table-hover table-bordered">
-                <thead class="thead-dark">
-                    <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Phone</th>
-                        <th scope="col">Address</th>
-                        <th scope="col">City</th>
-                        <th scope="col">Status</th>
-                        <th scope="col">Organization</th>
-                        <th scope="col">Started At</th>
-                        <th scope="col">ID</th>
-                        <th scope="col">Image</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if records %}
-                    {% for record in records %}
-                    <tr>
-                        <td>{{ record.first_name }} {{ record.last_name }}</td>
-                        <td>{{ record.email }}</td>
-                        <td>{{ record.phone }}</td>
-                        <td>{{ record.address }}</td>
-                        <td>{{ record.city }}</td>
-                        <td>{{ record.status }}</td>
-                        <td>{{ record.organization }}</td>
-                        <td>{{ record.created_at }}</td>
-                        <td><a href="{% url 'customer-record' record.id %}">{{ record.id }}</a></td>
-                        <td>
-                            {% if record.image %}
-                            <img src="{{ record.image.url }}" alt="Record Image" height="50" class="img-fluid">
-                            {% else %}
-                            No image available
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    <tr>
-                        <td colspan="11">Total Records: {{ records.count }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="11">No records available.</td>
-                    </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+                <table class="table table-hover table-nowrap">
+                    <thead class="thead-light">
+                        <tr>
+                            <th scope="col">Name</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Phone</th>
+                            <th scope="col">Address</th>
+                            <th scope="col">City</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Organization</th>
+                            <th scope="col">Started At</th>
+                            <th scope="col">ID</th>
+                            <th scope="col">Image</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.first_name }} {{ record.last_name }}</td>
+                            <td>{{ record.email }}</td>
+                            <td>{{ record.phone }}</td>
+                            <td>{{ record.address }}</td>
+                            <td>{{ record.city }}</td>
+                            <td>{{ record.status }}</td>
+                            <td>{{ record.organization }}</td>
+                            <td>{{ record.created_at|date:"M d, Y" }}</td>
+                            <td><a href="{% url 'customer-record' record.id %}">{{ record.id }}</a></td>
+                            <td>
+                                {% if record.image %}
+                                <img src="{{ record.image.url }}" alt="Record Image" height="50" class="img-fluid">
+                                {% else %}
+                                No image available
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+              
+            </div>
         </div>
-    </div>
+        
         
         <div class="container">
             <div class="reminders">

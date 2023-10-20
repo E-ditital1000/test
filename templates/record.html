@@ -8,9 +8,8 @@
         <div class="row align-items-center flex-row-reverse">
             <div class="col-lg-6">
                 <div class="about-text go-to">
-                    <h3 class="dark-color">About Me</h3>
+                    <h3 class="dark-color">About</h3>
                     <h6 class="theme-color lead">{{ customer_record.last_name }}</h6>
-                    <p>I <mark>Work with Engle Electronic</mark> services for customers of all sizes, specializing in creating stylish, modern websites, web services, and online stores. My passion is to design digital user experiences through the bold interface and meaningful interactions.</p>
                     <div class="row about-list">
                         <div class="col-md-6">
                             <div class="media">
@@ -50,7 +49,7 @@
             <div class="col-lg-6">
                 <div class="about-avatar">
                     {% if customer_record.image %}
-                    <img src="{{ customer_record.image.url }}" alt="{{ customer_record.first_name }} {{ customer_record.last_name }}" class="img-fluid my-5" style="width: 80px;">
+                    <img src="{{ customer_record.image.url }}" alt="{{ customer_record.first_name }} {{ customer_record.last_name }}" class="img-fluid my-5" style="width: 80%;">
                     {% else %}
                     <img src="https://mdbcdn.b-cdn.net/img/Photos/new-templates/bootstrap-chat/ava1-bg.webp" alt="Avatar" class="img-fluid my-5" style="width: 80px;">
                     {% endif %}
@@ -74,21 +73,29 @@
              
                 <div class="col-6 col-lg-3">
                     <div class="count-data text-center">
-                        <h6 class="count h2" data-to="150" data-speed="150">150</h6>
-                        <p class="m-0px font-w-600">Project Completed</p>
+                        <a href="{% url 'delete-record' customer_record.id %}" class="btn btn-danger me-2">Delete</a>
+                       
                     </div>
                 </div>
                 <div class="col-6 col-lg-3">
                     <div class="count-data text-center">
-                        <h6 class="count h2" data-to="190" data-speed="190">190</h6>
-                        <p class="m-0px font-w-600">Telephonic Talk</p>
+                        <div class="mt-4">
+                     <a href="{% url 'update-record' customer_record.id %}" class="btn btn-secondary">Update Record</a>
+                            
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <div class="count-data text-center">
+                        <div class="mt-4">
+                            <a href="{% url 'dashboard-index' %}" class="btn btn-secondary me-2">Back</a>
+                            
+                        </div>
                     </div>
                 </div>
             
             </div>
-            <p><a href="{% url 'dashboard-index' %}" class="btn btn-secondary me-2">Back</a></p>
-            <p><a href="{% url 'delete-record' customer_record.id %}" class="btn btn-danger me-2">Delete</a></p>
-            <p><a href="{% url 'update-record' customer_record.id %}" class="btn btn-secondary">Update Record</a></p>
+           
         </div>
     </div>
 </section>

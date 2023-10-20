@@ -31,7 +31,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['a1connect.vercel.app', '.now.sh', '127.0.0.1', 'localhost']
 # Application definition
-# 
+
 INSTALLED_APPS = [
     'cloudinary_storage',
     'jazzmin',
@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'cloudinary',
 ]
+
 
 
 # Cloudinary Configuration

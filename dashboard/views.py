@@ -41,6 +41,35 @@ from django.conf import settings
 from .models import Work
 
 
+
+def chart_view(request):
+    # Retrieve data from the Record model
+    records = Record.objects.all()
+
+    # Process the data and prepare it for the chart (for example, count by status)
+    status_counts = {}  # Initialize a dictionary to store counts
+
+    for record in records:
+        status = record.status
+        if status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts[status] = 1
+
+    # Prepare data for the chart
+    labels = list(status_counts.keys())
+    data = list(status_counts.values())
+    background_colors = ['rgb(255, 99, 132)', 'rgb(54, 162, 235)', 'rgb(255, 205, 86)']  # Customize as needed
+
+    context = {
+        'labels': labels,
+        'data': data,
+        'background_colors': background_colors,
+    }
+
+    return render(request, 'dashboard/index.html', context)
+
+
 @login_required(login_url='user-login')
 def generate_pdf_report(request):
 #    error_message = ''  # Initialize error_message as an empty string
