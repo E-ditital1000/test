@@ -6,6 +6,23 @@ class MonthYearFilterForm(forms.Form):
     month = forms.IntegerField(label='Month', min_value=1, max_value=12)
     year = forms.IntegerField(label='Year', min_value=2000, max_value=2100)
 
+class RecordForm(forms.ModelForm):
+    class Meta:
+        model = Record
+        fields = '__all__'  # You can specify the fields you want to include
+
+class ProductForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = '__all__'  # You can specify the fields you want to include
+
+
+class OrderForm(forms.ModelForm):
+    class Meta:
+        model = Order
+        fields = ['name', 'customer', 'status', 'order_quantity', 'logo', 'end_on', 'start_on']
+
+
 class CallLogSearchForm(forms.Form):
     search_query = forms.CharField(label='Search', max_length=100, required=False)
 

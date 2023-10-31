@@ -677,6 +677,12 @@
         <li><a href="{% url 'work-list' %}"><i class='bx bx-group'></i>Work_List</a></li>
         <li><a href="{% url 'interaction-list' %}"><i class='bx bx-group'></i>Interaction</a></li>
         <li><a href="{% url 'calllog_list' %}"><i class='bx bx-group'></i>Call_Log</a></li>
+        <li><a href="{% url 'create-order' %}"><i class='bx bx-group'></i>Create Order</a></li>
+        <li><a href="{% url 'dashboard-order' %}"><i class='bx bx-group'></i>Order</a></li>
+        <!-- Add a link to create records -->
+        <li><a href="{% url 'add-record' %}"><i class='bx bx-group'></i>Add Customer</a></li>
+        <!-- Add a link to add products -->
+        <li><a href="{% url 'add_product' %}"><i class='bx bx-group'></i>Add Product</a></li>
         <li><a href="{% url 'admin:index' %}"><i class='bx bx-cog'></i>Settings</a></li>
     </ul>
     <ul class="side-menu">
@@ -883,7 +889,7 @@
             </div>
         </div>
         
-        
+ 
         <div class="container">
             <div class="reminders">
                 <div class="header">
@@ -895,6 +901,9 @@
             </div>
         </div>
         
+
+
+                   
 
 
 

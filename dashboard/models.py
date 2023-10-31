@@ -22,18 +22,7 @@ class Product(models.Model):
 
     def __str__(self):
         return f'{self.name} - {self.category} - {self.quantity}'
-
-class Order(models.Model):
-    name = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
-    customer = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    status = models.CharField(max_length=50, choices=COSTOMER, null=True)
-    order_quantity = models.PositiveIntegerField(null=True)
-    logo = models.ImageField(blank=True, upload_to='media', null=True)
-    end_on = models.DateTimeField(default=timezone.now)
-    start_on = models.DateTimeField(default=timezone.now)
-
-    def __str__(self):
-        return f'{self.customer}-{self.name}'
+    
     
 class TodoItem(models.Model):
     title = models.CharField(max_length=250)
@@ -41,6 +30,8 @@ class TodoItem(models.Model):
 
     def __str__(self):
         return self.title
+
+
 
 class Record(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -56,6 +47,22 @@ class Record(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+    
+class Order(models.Model):
+    name = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    customer = models.ForeignKey(Record, on_delete=models.CASCADE, related_name='orders', null=True)
+    status = models.CharField(max_length=50, choices=COSTOMER, null=True)
+    order_quantity = models.PositiveIntegerField(null=True)
+    logo = models.ImageField(blank=True, upload_to='media', null=True)
+    end_on = models.DateTimeField(default=timezone.now)
+    start_on = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f'{self.customer}-{self.name}'
+
+    @property
+    def image(self):
+        return self.customer.image
 
 class Interaction(models.Model):
     record = models.ForeignKey(Record, on_delete=models.CASCADE)

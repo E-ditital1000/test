@@ -39,35 +39,41 @@ from io import BytesIO
 from django.http import HttpResponse
 from django.conf import settings
 from .models import Work
+from .models import Record, Product
+from .forms import RecordForm, ProductForm
 
+def create_order(request):
+    if request.method == 'POST':
+        form = OrderForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('dashboard-order')  # Redirect to the order list page
+    else:
+        form = OrderForm()
+    
+    return render(request, 'dashboard/create_order.html', {'form': form})
 
+def create_record(request):
+    if request.method == 'POST':
+        form = RecordForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('record_list')  # Replace with the URL name of the record list view
+    else:
+        form = RecordForm()
+    
+    return render(request, 'dashboard/create_record.html', {'form': form})
 
-def chart_view(request):
-    # Retrieve data from the Record model
-    records = Record.objects.all()
-
-    # Process the data and prepare it for the chart (for example, count by status)
-    status_counts = {}  # Initialize a dictionary to store counts
-
-    for record in records:
-        status = record.status
-        if status in status_counts:
-            status_counts[status] += 1
-        else:
-            status_counts[status] = 1
-
-    # Prepare data for the chart
-    labels = list(status_counts.keys())
-    data = list(status_counts.values())
-    background_colors = ['rgb(255, 99, 132)', 'rgb(54, 162, 235)', 'rgb(255, 205, 86)']  # Customize as needed
-
-    context = {
-        'labels': labels,
-        'data': data,
-        'background_colors': background_colors,
-    }
-
-    return render(request, 'dashboard/index.html', context)
+def add_product(request):
+    if request.method == 'POST':
+        form = ProductForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('product_list')  # Replace with the URL name of the product list view
+    else:
+        form = ProductForm()
+    
+    return render(request, 'dashboard/add_product.html', {'form': form})
 
 
 @login_required(login_url='user-login')
@@ -928,6 +934,29 @@ def order(request):
     }
     return render(request, 'dashboard/order.html', context)
 
+
+from .forms import OrderForm
+
+def create_order(request):
+    if request.method == 'POST':
+        form = OrderForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            return redirect('dashboard-index')  # Replace with your actual URL name
+    else:
+        form = OrderForm()
+
+    context = {
+        'form': form,  # Make sure the form is included in the context
+    }
+    return render(request, 'dashboard/order.html', context)
+
+
+def delete_order(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
+    order.delete()
+    return redirect('dashboard-index') 
+
 # Create a signal handler to update product quantity when an order is saved
 @receiver(post_save, sender=Order)
 def update_product_quantity(sender, instance, created, **kwargs):
@@ -1028,6 +1057,8 @@ def update_record(request, pk):
 		return redirect('dashboard-index')
 
 
+
+#
 #@login_required(login_url='user-login')
 #def add_product(request):
 #    if request.method == 'POST':

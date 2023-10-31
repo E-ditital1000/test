@@ -18,6 +18,8 @@ urlpatterns = [
     path('customers/', views.customers, name='dashboard-customers'),
     path('customers/detail/<int:pk>/', views.customer_detail, name='dashboard-customer-detail'),
     path('order/', views.order, name='dashboard-order'),
+    path('create-order/', views.create_order, name='create-order'),
+    path('order/delete/<int:order_id>/', views.delete_order, name='delete_order'),
     path('delete/<int:pk>/', views.delete_record, name='delete-record'),
     path('update/<int:pk>/', views.update_record, name='update-record'),
     path('add/', views.add_record, name='add-record'),
@@ -39,6 +41,9 @@ urlpatterns = [
     path('edit/<int:pk>/', CallLogUpdateView.as_view(), name='calllog_edit'),
     path('delete/<int:pk>/', CallLogDeleteView.as_view(), name='calllog_delete'),
     path('generate_calllog_pdf/', views.generate_calllog_pdf, name='generate_calllog_pdf'),
+    path('create_record/', views.create_record, name='create_record'),
+    # Add a product
+    path('add_product/', views.add_product, name='add_product'),
 
 ]
 

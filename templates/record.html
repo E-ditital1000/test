@@ -59,16 +59,9 @@
         <div class="d-flex justify-content-start">
             
         </div>
+        
         <div class="counter">
-            <div>
-                <h2>Orders</h2>
-                <ul>
-                    {% for order in customer_record.order_set.all %}
-                        <li>{{ order.name }} - {{ order.status }} - {{ order.order_quantity }}</li>
-                        <!-- Add more placeholders for order data -->
-                    {% endfor %}
-                </ul>
-            </div>
+            
             <div class="row">
              
                 <div class="col-6 col-lg-3">

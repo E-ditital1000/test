@@ -108,29 +108,6 @@
             select, textarea, input[type="text"], input[type="password"] {
                 margin-bottom: 15px;
             }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
         }
     </style>
 </head>
@@ -138,9 +115,9 @@
 <body>
     <div class="main">
         <p class="sign" align="center">Sign in <i class="fas fa-sign-in-alt"></i></p>
-        <div class="logo-container">
+        <!--<div class="logo-container">
             <img src="{% static 'img/atech.png' %}" alt="Logo" class="logo">
-        </div>
+        </div>-->
         <form class="form1" method="post" action="" style="text-align: center;">
             {% csrf_token %}
             {{ form|crispy }}
