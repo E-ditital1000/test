@@ -20,7 +20,7 @@ class Product(models.Model):
     quantity = models.PositiveIntegerField(null=True)
     category = models.CharField(max_length=50, choices=CATEGORY, null=True)
 
-    def __str__(self):
+    def __str__(self): 
         return f'{self.name} - {self.category} - {self.quantity}'
     
     
@@ -30,8 +30,6 @@ class TodoItem(models.Model):
 
     def __str__(self):
         return self.title
-
-
 
 class Record(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)

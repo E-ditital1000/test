@@ -2,8 +2,6 @@ from django.urls import path
 from .import views 
 from .views import CallLogListView, CallLogCreateView, CallLogUpdateView, CallLogDeleteView
 
-
-
 urlpatterns = [
     path('index/', views.index, name='dashboard-index'),
     path('products/', views.index, name='dashboard-products'),
@@ -29,12 +27,10 @@ urlpatterns = [
     path('interaction/edit/<int:pk>/', views.interaction_edit, name='interaction-edit'),
     path('interaction/delete/<int:pk>/', views.interaction_delete, name='interaction-delete'),
     path('add-interaction/<int:record_id>/', views.add_interaction, name='add-interaction'),
-
     # Work URLs
     path('work/list/', views.work_list, name='work-list'),
     path('work/edit/<int:pk>/', views.work_edit, name='work-edit'),
     path('work/delete/<int:pk>/', views.work_delete, name='work-delete'),
-
      # Include the call log URLs here
     path('list/', CallLogListView.as_view(), name='calllog_list'),
     path('create/', CallLogCreateView.as_view(), name='calllog_create'),

@@ -386,9 +386,6 @@ def index(request):
     }
     return render(request, 'dashboard/index.html', context)
 
-
-
-
 @login_required(login_url='user-login')
 def customer_count(request):
     customer_count = User.objects.filter(groups=2).count()
@@ -784,8 +781,6 @@ def generate_calllog_pdf(request):
     response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="calllog.pdf"'
     return response
-
-
 
 class CallLogListView(ListView):
     model = CallLog
