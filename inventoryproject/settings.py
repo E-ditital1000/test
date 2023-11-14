@@ -27,14 +27,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = '@ujr-e&a%8m%6!z(+ka16+(sm6cug(h6noe%#p%=6%d2nz5t+#'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['a1connect.onrender.com', '.now.sh', '127.0.0.1', 'localhost']
 # Application definition
 
 INSTALLED_APPS = [
-    'cloudinary_storage',
     'jazzmin',
+    'cloudinary_storage',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -181,3 +181,10 @@ LOGIN_URL = 'user-login'
 # settings.py
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+JAZZMIN_SETTINGS = {
+    'site_header': "A1tech",
+    'site_brand': "Admin",
+    'site_logo': "static/img/download.png",
+    'site_copyright': "A1tech",
+}
