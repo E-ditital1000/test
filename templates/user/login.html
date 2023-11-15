@@ -114,16 +114,17 @@
 </head>
 
 <body>
-    <div class="main">
-        <p class="sign" align="center">Sign in <i class="fas fa-sign-in-alt"></i></p>
-        <div class="logo-container">
-            <img src="{% static 'img/atech.png' %}" alt="Logo" class="logo">
-        </div>
-        <form class="form1" method="post" action="" style="text-align: center;">
-            {% csrf_token %}
-            {{ form|crispy }}
-            <button type="submit" class="submit"><i class="fas fa-sign-in-alt"></i> SIGN IN</button>
-        </form>
+ <div class="main">
+    <p class="sign" align="center">Sign in <i class="fas fa-sign-in-alt"></i></p>
+    <div class="logo-container">
+        <!-- Use the Cloudinary URL directly in the src attribute -->
+        <img src="https://res.cloudinary.com/dkhobecps/image/upload/v1696708795/media/profile_images/logo_2_fmvthl.png" alt="Logo" class="logo">
     </div>
+    <form class="form1" method="post" action="" style="text-align: center;">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type="submit" class="submit"><i class="fas fa-sign-in-alt"></i> SIGN IN</button>
+    </form>
+</div>
 </body>
 </html>
