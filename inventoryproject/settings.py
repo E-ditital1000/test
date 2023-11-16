@@ -186,7 +186,7 @@ JAZZMIN_SETTINGS = {
     'site_header': "A1tech",
     'site_brand': "Admin Panel",
     'site_title': "A1tech Admin",
-    'site_logo': 'static/img/logo.png',  # Path to your logo in STATIC_ROOT
+    'site_logo': 'https://res.cloudinary.com/dkhobecps/image/upload/v1696708795/media/profile_images/logo_2_fmvthl.png',  # Path to your logo in STATIC_ROOT
     'navigation_expanded': True,
     'hide_apps': ['auth', 'sites'],  # Apps to hide from the sidebar
     'site_copyright': "© 2023 A1technical Engineering Solutions",
