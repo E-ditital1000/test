@@ -10,7 +10,7 @@ django-crispy-forms==1.8.1
 django-environ==0.9.0
 django-forms-bootstrap==2.0.3.post2
 django-jazzmin==2.4.9
-django-admin-argon-dashboard-1.0.16
+django-admin-argon-dashboard==1.0.16
 gunicorn==20.0.4
 idna==3.4
 importlab==0.8
