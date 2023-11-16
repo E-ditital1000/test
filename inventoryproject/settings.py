@@ -184,7 +184,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 JAZZMIN_SETTINGS = {
     'site_header': "A1tech",
-    'site_brand': "Admin",
-    'site_logo': "static/img/download.png",
-    'site_copyright': "A1tech",
+    'site_brand': "Admin Panel",
+    'site_title': "A1tech Admin",
+    'site_logo': 'static/img/logo.png',  # Path to your logo in STATIC_ROOT
+    'navigation_expanded': True,
+    'hide_apps': ['auth', 'sites'],  # Apps to hide from the sidebar
+    'site_copyright': "© 2023 A1technical Engineering Solutions",
+    'show_powered_by': False,
+    'theme': 'light',
+    'theme_color': '#FFA500',  # Custom theme color
 }
