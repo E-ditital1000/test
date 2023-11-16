@@ -27,14 +27,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = '@ujr-e&a%8m%6!z(+ka16+(sm6cug(h6noe%#p%=6%d2nz5t+#'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['a1connect.onrender.com', '.now.sh', '127.0.0.1', 'localhost']
 # Application definition
+#'jazzmin',
 
 INSTALLED_APPS = [
-    'jazzmin',
     'cloudinary_storage',
+    'admin_argon.apps.AdminArgonConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -182,15 +183,5 @@ LOGIN_URL = 'user-login'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-JAZZMIN_SETTINGS = {
-    'site_header': "A1tech",
-    'site_brand': "Admin Panel",
-    'site_title': "A1tech Admin",
-    'site_logo': 'https://res.cloudinary.com/dkhobecps/image/upload/v1696708795/media/profile_images/logo_2_fmvthl.png',  # Path to your logo in STATIC_ROOT
-    'navigation_expanded': True,
-    'hide_apps': ['auth', 'sites'],  # Apps to hide from the sidebar
-    'site_copyright': "© 2023 A1technical Engineering Solutions",
-    'show_powered_by': False,
-    'theme': 'light',
-    'theme_color': '#FFA500',  # Custom theme color
-}
+
+
