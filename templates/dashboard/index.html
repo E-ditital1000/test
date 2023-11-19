@@ -659,6 +659,70 @@
             clear: both;
             display: table;
         }
+        /* Example CSS - Adjust as needed */
+
+
+.sidebar {
+    height: calc(100vh - 60px); /* Adjust 60px to match your header height */
+    overflow-y: auto; /* Enable vertical scrolling */
+    border-right: 2px solid #ddd; /* Optional: Add a border for visual separation */
+    padding: 20px; /* Adjust padding as needed */
+}
+
+/* Styling for the menu items */
+.side-menu {
+    list-style: none;
+    padding: 0;
+}
+
+.side-menu li {
+    margin-bottom: 10px;
+}
+
+.side-menu a {
+    text-decoration: none;
+    color: #333;
+    display: block;
+}
+
+.side-menu a:hover {
+    color: #007bff;
+}
+
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.logo img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 50%; /* Make the image round */
+    overflow: hidden; /* Ensure the image stays within the rounded shape */
+    border: 2px solid #fff; /* Optional: Add a border */
+}
+
+.A1-logo {
+    margin-left: 10px; /* Adjust spacing between the image and text */
+    font-family: Arial, sans-serif; /* Use a desired font */
+    font-size: 24px; /* Adjust font size */
+}
+
+.A1-logo span {
+    color: #333; /* Adjust text color */
+    font-weight: bold; /* Adjust font weight */
+}
+
+/* Optional: Add media queries for responsiveness */
+@media (max-width: 768px) {
+    .A1-logo {
+        font-size: 18px;
+    }
+}
+
     </style>
 </head>
 {% block content %}
@@ -668,10 +732,10 @@
 <div class="sidebar">
 
     <a href="#" class="logo">
-
-       <!--<img src="{% static 'img/download.png' %}" width="100%" height="100%" alt="">-->
-        <div class="A1-logo"><br><span>A1</span>Tech</div>
+        <img src="{% static 'img/download.png' %}" alt="Logo">
+        <div class="A1-logo"><span>A1</span>Tech</div>
     </a>
+    
     <ul class="side-menu">
         <li><a href="{% url 'dashboard-index' %}"><i class='bx bxs-dashboard'></i>Dashboard</a></li>
         <li><a href="{% url 'work-list' %}"><i class='bx bx-group'></i>Work_List</a></li>
@@ -683,7 +747,11 @@
         <li><a href="{% url 'add-record' %}"><i class='bx bx-group'></i>Add Customer</a></li>
         <!-- Add a link to add products -->
         <li><a href="{% url 'add_product' %}"><i class='bx bx-group'></i>Add Product</a></li>
+        <li><a href="{% url 'add_project' %}"><i class='bx bx-plus'></i>Add Project</a></li>
+        <!-- Add a link to list all projects -->
+        <li><a href="{% url 'project_list' %}"><i class='bx bx-group'></i>Project List</a></li>
         <li><a href="{% url 'admin:index' %}"><i class='bx bx-cog'></i>Settings</a></li>
+        
     </ul>
     <ul class="side-menu">
         <li>

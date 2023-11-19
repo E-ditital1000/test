@@ -19,6 +19,7 @@ from django.contrib.auth import views as auth_views
 from user import views as user_views
 from django.conf import settings
 from django.conf.urls.static import static
+app_name = 'user'
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,6 +30,11 @@ urlpatterns = [
     path('profile/', user_views.profile, name='user-profile'),
     path('profile/update/', user_views.profile_update,
          name='user-profile-update'),
+    path('project/add/', user_views.add_project, name='add_project'),
+    path('project/<int:project_id>/delete/', user_views.delete_project, name='delete_project'),
+     path('project/add/', user_views.add_project, name='add_project'),
+    path('project/<int:project_id>/', user_views.project_detail, name='project_detail'),
+    path('project/list/', user_views.project_list, name='project_list'),
     path('logout/', auth_views.LogoutView.as_view(template_name='user/logout.html'),
          name='user-logout'),
 ]

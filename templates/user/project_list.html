@@ -1,0 +1,83 @@
+{% extends 'partials/base.html' %}
+{% include 'partials/nav.html' %}
+{% load crispy_forms_tags %}
+{% block content %}
+<style>
+    /* CSS for the project list */
+.project-list-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.project-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-gap: 20px;
+}
+
+.project-card {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.project-card h3 {
+    margin-bottom: 10px;
+}
+
+.project-card p {
+    margin-bottom: 15px;
+}
+
+.detail-button {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+.detail-button:hover {
+    background-color: #0056b3;
+}
+.delete-button {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: #dc3545;
+    color: white;
+    text-decoration: none;
+    border: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+    margin-top: 5px;
+}
+
+.delete-button:hover {
+    background-color: #c82333;
+}
+
+
+</style>
+<div class="project-list-container">
+    <h1>All Projects</h1>
+    <div class="project-list">
+        {% for project in projects %}
+        <div class="project-card">
+            <h3>{{ project.title }}</h3>
+            <!-- Add other project details as needed -->
+            <p>{{ project.description }}</p>
+            <form action="{% url 'delete_project' project_id=project.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit" class="delete-button">Delete</button>
+            </form>
+        </div>
+        {% empty %}
+        <p>No projects available</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
