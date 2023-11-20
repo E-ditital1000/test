@@ -23,22 +23,15 @@ class UserUpdateForm(forms.ModelForm):
 
 
 class ProfileUpdateForm(forms.ModelForm):
-   
-
-    class Meta:
-        model = Profile
-        fields = ['phone', 'address', 'image', 'website', 'github', 'twitter', 'instagram', 'facebook', 'projects']
-
-class ProfileUpdateForm(forms.ModelForm):
-     projects = forms.ModelMultipleChoiceField(
+    phone = forms.CharField(label='Phone Number', help_text='Enter your phone number.')
+    image = forms.ImageField(label='Profile Image', help_text='Upload your profile picture.')
+    # Define the projects field within the Meta class
+    projects = forms.ModelMultipleChoiceField(
         queryset=Project.objects.all(),  # Retrieve all projects from the database
         widget=forms.CheckboxSelectMultiple,
         required=False,  # Projects are optional
     )
-     phone = forms.CharField(label='Phone Number', help_text='Enter your phone number.')
-     image = forms.ImageField(label='Profile Image', help_text='Upload your profile picture.')
 
-class Meta:
+    class Meta:
         model = Profile
         fields = ['phone', 'address', 'image', 'website', 'github', 'twitter', 'instagram', 'facebook', 'projects']
-

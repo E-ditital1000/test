@@ -41,6 +41,7 @@ class OrderForm(forms.ModelForm):
         model = Order
         fields = '__all__'
 
+
 class MonthYearForm(forms.Form):
     MONTH_CHOICES = [
         (1, 'January'),
