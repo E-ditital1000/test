@@ -16,11 +16,11 @@
                         {{ u_form|crispy }}
                         {{ p_form|crispy }}
                         <input class="btn btn-info" type="submit" value="Update">
+                        <a href="{% url 'change_password' %}" class="btn btn-warning">Change Password</a>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
-
 {% endblock %}

@@ -174,11 +174,13 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
+LOGIN_URL = 'user-login'  # This is the URL for the login page
+
+# Redirect to the dashboard after a successful login
 LOGIN_REDIRECT_URL = 'dashboard-index'
 
-LOGIN_URL = 'user-login'
-
-# settings.py
+# Customize the password change URL
+PASSWORD_CHANGE_REDIRECT_URL = '/password_change/done/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
