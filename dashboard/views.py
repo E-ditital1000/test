@@ -456,31 +456,18 @@ def interaction_edit(request, pk):
     return render(request, 'dashboard/interaction_edit.html', context)
 
 @login_required(login_url='user-login')
-def add_interaction(request, record_id):
-    # Retrieve the Record object based on the record_id
-    record = get_object_or_404(Record, pk=record_id)
-
+def add_interaction(request):
     if request.method == 'POST':
         form = InteractionForm(request.POST)
         if form.is_valid():
-            # Save the new Interaction object with the associated Record
-            interaction = form.save(commit=False)
-            interaction.record = record
-            interaction.save()
+            interaction = form.save()
             messages.success(request, 'Interaction has been added')
-            return redirect('dashboard/interaction-list')  # Redirect to the interaction list view
+            return redirect('interaction-list')
     else:
         form = InteractionForm()
 
     context = {
         'form': form,
-        'record_id': record_id,  # Include 'record_id' in the context
-    }
-    return render(request, 'interaction_form.html', context)
-
-    context = {
-        'form': form,
-        'record': record,
     }
     return render(request, 'dashboard/interaction_form.html', context)
 
@@ -912,17 +899,35 @@ def update_quantity(request, pk):
         
         return JsonResponse(data)
 
+#@login_required(login_url='user-login')
+#def order(request):
+#    order = Order.objects.all()
+#    order_count = order.count()
+#    customer = User.objects.filter(groups=2)
+#    customer_count = customer.count()
+#    product = Product.objects.all()
+#    product_count = product.count()
+#
+#    context = {
+#        'order': order,
+#        'customer_count': customer_count,
+#        'product_count': product_count,
+#        'order_count': order_count,
+#    }
+#    return render(request, 'dashboard/order.html', context)
+
 @login_required(login_url='user-login')
 def order(request):
-    order = Order.objects.all()
-    order_count = order.count()
-    customer = User.objects.filter(groups=2)
-    customer_count = customer.count()
-    product = Product.objects.all()
-    product_count = product.count()
+    orders = Order.objects.all()  # Fetch all orders
+    order_count = orders.count()
+    # Assuming 'Record' model is related to 'User' model for customer filtering
+    customers = Record.objects.filter(groups=2)
+    customer_count = customers.count()
+    products = Product.objects.all()
+    product_count = products.count()
 
     context = {
-        'order': order,
+        'orders': orders,  # Pass fetched orders to the context
         'customer_count': customer_count,
         'product_count': product_count,
         'order_count': order_count,
@@ -944,13 +949,30 @@ def create_order(request):
     context = {
         'form': form,  # Make sure the form is included in the context
     }
-    return render(request, 'dashboard/order.html', context)
+    return render(request, 'dashboard/create_order.html', context)
 
 
 def delete_order(request, order_id):
     order = get_object_or_404(Order, pk=order_id)
     order.delete()
     return redirect('dashboard-index') 
+
+@login_required(login_url='user-login')
+def edit_order(request, order_id):
+    order = get_object_or_404(Order, pk=order_id)
+    if request.method == 'POST':
+        form = OrderForm(request.POST, request.FILES, instance=order)
+        if form.is_valid():
+            form.save()
+            return redirect('dashboard-index')  # Replace with your actual URL name
+    else:
+        form = OrderForm(instance=order)
+
+    context = {
+        'form': form,
+        'order': order,
+    }
+    return render(request, 'dashboard/edit_order.html', context)
 
 # Create a signal handler to update product quantity when an order is saved
 @receiver(post_save, sender=Order)

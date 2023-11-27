@@ -8,18 +8,6 @@
     <h1 style="text-align: center;">Order Page</h1>
 
     <div class="row">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Create a New Order</h5>
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        {{ form|crispy }}
-                       <button type="submit" class="btn btn-primary"><a href="{% url 'create-order' %}"></a>Create Order</a> </button>
-                    </form>
-                </div>
-            </div>
-        </div>
           
         <div class="col-md-8">
             <!-- Order Table -->
@@ -50,13 +38,21 @@
                             <td>{{ order.end_on|date:"M d, Y" }}</td>
                             <td>
                                 {% if order.logo %}
-                                <img src="{{ order.customer.image.url }}" alt="Order Image" width="50" class="img-fluid">
+                                <img src="{{ order.order_image }}" alt="Order Image" width="50" class="img-fluid">
                                 {% else %}
                                 No image available
                                 {% endif %}
                             </td>
+                            
                             <td>
+                                <a href="{% url 'edit_order' order.id %}" class="btn btn-primary">Edit</a>
+                                
+                                
+                            </td>
+                            <td>
+                              
                                 <a href="{% url 'delete_order' order.id %}" class="btn btn-danger">Delete</a>
+                                
                             </td>
                         </tr>
                         {% endfor %}

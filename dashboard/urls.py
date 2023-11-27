@@ -18,6 +18,8 @@ urlpatterns = [
     path('order/', views.order, name='dashboard-order'),
     path('create-order/', views.create_order, name='create-order'),
     path('order/delete/<int:order_id>/', views.delete_order, name='delete_order'),
+    path('order/edit/<int:order_id>/', views.edit_order, name='edit_order'),
+
     path('delete/<int:pk>/', views.delete_record, name='delete-record'),
     path('update/<int:pk>/', views.update_record, name='update-record'),
     path('add/', views.add_record, name='add-record'),
@@ -26,7 +28,7 @@ urlpatterns = [
     path('interaction/list/', views.interaction_list, name='interaction-list'),
     path('interaction/edit/<int:pk>/', views.interaction_edit, name='interaction-edit'),
     path('interaction/delete/<int:pk>/', views.interaction_delete, name='interaction-delete'),
-    path('add-interaction/<int:record_id>/', views.add_interaction, name='add-interaction'),
+    path('add-interaction/', views.add_interaction, name='add-interaction'),
     # Work URLs
     path('work/list/', views.work_list, name='work-list'),
     path('work/edit/<int:pk>/', views.work_edit, name='work-edit'),
