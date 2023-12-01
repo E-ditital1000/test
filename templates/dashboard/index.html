@@ -885,11 +885,16 @@
                         <span class="info">
                             <h3>{{ product.name }}</h3>
                             <p class="card-text">Quantity: {{ product.quantity }}</p>
+                            {% if product.image %}
                             <p><img class="card-img-top" src="{{ product.image.url }}" alt="Product Image"></p>
+                            {% else %}
+                            <p>No image available</p>
+                            {% endif %}
                         </span>
                     </li>
                     {% endfor %}
                 </ul>
+                
         
 
         <ul class="insights">
