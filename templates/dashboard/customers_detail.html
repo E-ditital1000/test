@@ -3,6 +3,39 @@
 
 {% block content %}
 {% include 'partials/topside.html' %}
+
+<style>
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 250px;
+        height: 100%;
+        background: #1a1a1a;
+        transition: all 0.5s;
+    }
+    .sidebar ul li a {
+        display: block;
+        padding: 10px 20px;
+        color: #f0f0f0;
+        text-decoration: none;
+    }
+    .sidebar ul li a i {
+        margin-right: 10px;
+    }
+    .sidebar ul li a:hover {
+        background: #3b3b3b;
+        color: #fff;
+    }
+    .sidebar .active a {
+        background: #3b3b3b;
+        color: #fff;
+    }
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+    }
+</style>
 <!-- Sidebar -->
 <div class="sidebar">
     
@@ -30,7 +63,44 @@
     </ul>
 </div>
 <!-- End of Sidebar -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<div class="row my-4">
+    <div class="col-md-12">
+        <canvas id="myChart"></canvas>
+    </div>
+</div>
 
+<script>
+var ctx = document.getElementById('myChart').getContext('2d');
+var myChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Sales', 'Orders', 'Employees'],
+        datasets: [{
+            label: 'Number of items',
+            data: [12, 19, 3],
+            backgroundColor: [
+                'rgba(75, 192, 192, 0.2)',
+                'rgba(153, 102, 255, 0.2)',
+                'rgba(255, 159, 64, 0.2)'
+            ],
+            borderColor: [
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)',
+                'rgba(255, 159, 64, 1)'
+            ],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
 <div class="row my-4">
     <div class="col-md-4">
 

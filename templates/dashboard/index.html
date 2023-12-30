@@ -723,7 +723,8 @@
     }
 }
 
-    </style>
+</style><script src="https://d3js.org/d3.v6.min.js"></script>
+
 </head>
 {% block content %}
 {% load crispy_forms_tags %}
@@ -840,41 +841,45 @@
                     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
                 
                             
-                    <!-- Include Chart.js -->
+<!-- Include Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Radar Chart Canvas -->
-<canvas id="radarChart" width="400" height="400"></canvas>
+<!-- Bar Chart Canvas -->
+<canvas id="barChart" width="400" height="400"></canvas>
 
 <script>
-  // Access the canvas element
-  var ctx = document.getElementById('radarChart').getContext('2d');
+// Access the canvas element
+var ctx = document.getElementById('barChart').getContext('2d');
 
-  // Define the data
-  var data = {
+// Define the data
+var data = {
     labels: [{% for record in records %}'{{ record.first_name }} {{ record.last_name }}',{% endfor %}],
     datasets: [{
       label: 'Record Status',
       data: [{% for record in records %}'{{ record.status }}',{% endfor %}],
-      backgroundColor: 'rgba(75, 192, 192, 0.2)',
-      borderColor: 'rgba(75, 192, 192, 1)',
+      backgroundColor: 'rgba(54, 162, 235, 0.2)', // Modified background color
+      borderColor: 'rgba(54, 162, 235, 1)', // Modified border color
       borderWidth: 1
     }]
-  };
+};
 
-  // Define the options (you can customize them)
-  var options = {
-    scale: {
-      ticks: { beginAtZero: true, min: 0, max: 10 }, // Customize the min and max values
+// Define the options (you can customize them)
+var options = {
+    scales: {
+      y: {
+        beginAtZero: true,
+        min: 0,
+        max: 10
+      }
     }
-  };
+};
 
-  // Create the radar chart
-  var radarChart = new Chart(ctx, {
-    type: 'radar',
+// Create the bar chart
+var barChart = new Chart(ctx, {
+    type: 'bar',
     data: data,
     options: options
-  });
+});
 </script>
 
                 </div>
@@ -989,6 +994,7 @@
 </div>
 </main>
 </div>
+<script src="main.js"></script>
 <script>
     $(document).ready(function() {
         // Handle quantity updates when buttons are clicked
