@@ -110,23 +110,23 @@ WSGI_APPLICATION = 'inventoryproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
 
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.sqlite3',
-#        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-#    }
-#}
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'railway',  # Remove the parentheses around the database name
-        'USER': 'postgres',  # Remove the parentheses around the username
-        'PASSWORD': 'hfvSz5SeAtep7bakD7pJ',  # Remove the parentheses around the password
-        'HOST': 'containers-us-west-174.railway.app',  # Remove the parentheses around the host
-        'PORT': '6045',  # Remove the parentheses around the port
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
+
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+#        'NAME': 'railway',  # Remove the parentheses around the database name
+#        'USER': 'postgres',  # Remove the parentheses around the username
+#        'PASSWORD': 'hfvSz5SeAtep7bakD7pJ',  # Remove the parentheses around the password
+#        'HOST': 'containers-us-west-174.railway.app',  # Remove the parentheses around the host
+#        'PORT': '6045',  # Remove the parentheses around the port
+#    }
+#}
 
 
 
