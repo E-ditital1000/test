@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Policy — Settings — A1 360{% endblock %}
+
+{% block page_title %}Policy{% endblock %}
+{% block page_sub %}The numbers the business owns rather than the code · every change is audit-logged{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="policy" %}
+
+  <div class="cols">
+    <form method="post" style="flex:1.4">
+      {% csrf_token %}
+      <div class="card">
+        <div class="hd">
+          <b>Business policy values</b>
+          <span class="meta">{{ settings_rows|length }} value{{ settings_rows|length|pluralize }}</span>
+        </div>
+        {% if settings_rows %}
+          <div class="stack">
+            {% for row in settings_rows %}
+              <div class="fld">
+                <label for="value__{{ row.key }}">{{ row.key }}</label>
+                <input id="value__{{ row.key }}" name="value__{{ row.key }}" value="{{ row.value }}">
+                {% if row.description %}<span class="help">{{ row.description }}</span>{% endif %}
+              </div>
+            {% endfor %}
+            <div class="fld">
+              <label for="reason">Reason</label>
+              <input id="reason" name="reason" placeholder="Why is this policy changing?">
+              <span class="help">Recorded in the audit log with the old and new values.</span>
+            </div>
+            <div><button class="btn btn-pri" type="submit">Save policy</button></div>
+          </div>
+        {% else %}
+          <div class="blank" style="padding:28px">
+            <h6>No policy values yet</h6>
+            <p>
+              The requisition threshold and the attendance policy ship as seed
+              data. Run <span class="mono">manage.py seed_demo_data</span> to
+              write them, then set the real figures here.
+            </p>
+          </div>
+        {% endif %}
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="hd">
+        <b>Attendance correction reasons</b>
+        <span class="meta">The fixed list</span>
+      </div>
+      {% if correction_reasons %}
+        <table>
+          <tbody>
+            {% for reason in correction_reasons %}
+              <tr><td>{{ reason.label }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="blank" style="padding:28px">
+          <h6>None configured</h6>
+          <p>Until this list has entries, no attendance correction can be made.</p>
+        </div>
+      {% endif %}
+      <div class="note">
+        A correction must pick one of these, and cannot be submitted with a
+        blank reason. That is what makes the attendance record defensible.
+      </div>
+    </div>
+  </div>
+{% endblock %}

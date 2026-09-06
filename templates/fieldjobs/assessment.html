@@ -1,0 +1,401 @@
+{% extends "shell/field.html" %}
+{% load a1 %}
+{% block title %}Site assessment — A1 360{% endblock %}
+
+{% comment %}
+The one screen with NO tab bar. A multi-step form holding unsaved local
+answers must not offer a one-tap exit — progress and Back are the only
+navigation.
+
+Everything is filled in on the device. Answers persist to this phone as they
+are typed, so closing the app or losing power does not lose the work, and the
+whole assessment reaches the server as one payload carrying the UUID it was
+created with. Submitting twice cannot create two records.
+{% endcomment %}
+
+{% block tabs %}{% endblock %}
+
+{% block phone_title %}Site assessment{% endblock %}
+{% block phone_sub %}{{ job.reference }} · questions come from {{ job.service_type.name }}{% endblock %}
+
+{% block content %}
+  {% if already_submitted %}
+    <div class="mc ok">
+      <p class="t-label" style="color:var(--green)">Already submitted</p>
+      <p class="t-m-meta dim2">
+        This job was assessed on {{ already_submitted.submitted_at|a1datetime }}.
+        Filling it in again will be refused as a duplicate.
+      </p>
+    </div>
+    <a class="act act-gold" href="{% url 'fieldjobs-job-detail' job.pk %}">Back to the job</a>
+
+  {% elif not steps %}
+    <div class="mc warnbox">
+      <p class="t-label" style="color:var(--gold700)">No questions configured</p>
+      <p class="t-m-meta" style="color:var(--text2)">
+        “{{ job.service_type.name }}” has no assessment questions yet, so there
+        is nothing to fill in. The office adds them in Settings → Service types.
+      </p>
+    </div>
+    <a class="act act-gold" href="{% url 'fieldjobs-job-detail' job.pk %}">Back to the job</a>
+
+  {% else %}
+    <div class="ban" id="offline-banner" hidden>
+      <i></i><span id="offline-text">No signal · answers are saved on this phone</span>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="prg" id="progress">
+        {% for step in steps %}<i></i>{% endfor %}<i></i><i></i>
+      </div>
+      <p class="t-label" id="step-label">Step 1 of {{ total_steps }}</p>
+    </div>
+
+    <form id="assessment"
+          data-job="{{ job.pk }}"
+          data-submit-url="{% url 'fieldjobs-assessment-submit' job.pk %}"
+          data-done-url="{% url 'fieldjobs-job-detail' job.pk %}">
+      {% csrf_token %}
+
+      {% for step in steps %}
+        <section class="a-step" data-step="{{ forloop.counter0 }}" hidden>
+          <p class="t-label">{{ step.label }} answers</p>
+          {% for question in step.questions %}
+            <div class="mc" style="gap:12px">
+              <p class="t-m-action">
+                {{ question.text }}{% if question.is_required %} <span class="bad">*</span>{% endif %}
+              </p>
+              {% if question.help_text %}<p class="t-m-meta dim">{{ question.help_text }}</p>{% endif %}
+
+              {% if question.answer_type == "boolean" %}
+                <div class="opt" data-choice data-q="{{ question.pk }}" data-value="Yes"><i></i>Yes</div>
+                <div class="opt" data-choice data-q="{{ question.pk }}" data-value="No"><i></i>No</div>
+              {% elif question.answer_type == "choice" %}
+                {% for choice in question.choices %}
+                  <div class="opt" data-choice data-q="{{ question.pk }}" data-value="{{ choice }}"><i></i>{{ choice }}</div>
+                {% empty %}
+                  <input type="text" data-q="{{ question.pk }}" placeholder="Type the answer">
+                {% endfor %}
+              {% elif question.answer_type == "number" %}
+                <input type="number" step="any" data-q="{{ question.pk }}" placeholder="Enter a number"
+                       {% if question.is_required %}data-required="1"{% endif %}>
+              {% elif question.answer_type == "long_text" %}
+                <textarea data-q="{{ question.pk }}" rows="3" placeholder="Type what you found"
+                          {% if question.is_required %}data-required="1"{% endif %}></textarea>
+              {% else %}
+                <input type="text" data-q="{{ question.pk }}" placeholder="Type the answer"
+                       {% if question.is_required %}data-required="1"{% endif %}>
+              {% endif %}
+              {% if question.answer_type == "boolean" or question.answer_type == "choice" %}
+                <input type="hidden" data-q="{{ question.pk }}" data-hidden="1"
+                       {% if question.is_required %}data-required="1"{% endif %}>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </section>
+      {% endfor %}
+
+      {# Photos step — each one tagged with what it shows. #}
+      <section class="a-step" data-step="{{ steps|length }}" hidden>
+        <p class="t-label">Photographs</p>
+        <div class="mc" style="gap:12px">
+          <p class="t-m-action">Add photos of what you found</p>
+          <p class="t-m-meta dim">
+            Every photo needs a label saying what it shows — an untagged photo
+            is no use to the office six weeks later.
+          </p>
+          <input type="file" id="photo-input" accept="image/*" capture="environment" multiple>
+          <div class="ph" id="photo-list"></div>
+        </div>
+      </section>
+
+      {# Review before submit. #}
+      <section class="a-step" data-step="{{ steps|length|add:1 }}" hidden>
+        <p class="t-label">Review &amp; submit</p>
+        <div class="mc" style="gap:12px">
+          <div class="kvr"><span>Questions answered</span><b id="r-answered">0 of {{ question_count }}</b></div>
+          <div class="kvr"><span>Required answered</span><b id="r-required">0 of {{ required_count }}</b></div>
+          <div class="kvr"><span>Photos</span><b id="r-photos">0 labelled</b></div>
+          <div class="kvr"><span>GPS at submission</span><b id="r-gps">not captured yet</b></div>
+        </div>
+        <div class="mc" style="gap:8px">
+          <p class="t-label">Notes (optional)</p>
+          <textarea id="a-notes" rows="3" placeholder="Anything the office should know"></textarea>
+        </div>
+        <div class="mc warnbox">
+          <p class="t-label" style="color:var(--gold700)">Saved on this phone</p>
+          <p class="t-m-meta" style="color:var(--text2)">
+            It uploads by itself when signal returns. Submitting twice cannot
+            create two records — each submission carries its own ID.
+          </p>
+        </div>
+        <button class="act act-gold" type="button" id="a-submit">Submit assessment</button>
+      </section>
+
+      <div class="mrow2" id="a-nav">
+        <button class="btn btn-sec" type="button" id="a-back"
+                style="justify-content:center;min-height:52px">Back</button>
+        <button class="btn btn-pri" type="button" id="a-next"
+                style="justify-content:center;min-height:52px">Next</button>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}
+
+
+{% block body_extra %}
+{% if steps and not already_submitted %}
+<script>
+(function () {
+  "use strict";
+  var form = document.getElementById("assessment");
+  var KEY = "assessment:" + form.dataset.job;
+  var sections = Array.prototype.slice.call(document.querySelectorAll(".a-step"));
+  var last = sections.length - 1;
+  var step = 0;
+
+  // The draft, including its photographs, lives in IndexedDB. A site visit
+  // produces several megabytes of images and localStorage would throw partway
+  // through — losing an afternoon's work to a storage quota is exactly the
+  // failure this system exists to prevent.
+  var draft = { client_uuid: A1.uuid(), answers: {}, photos: [], notes: "" };
+  var ready = A1.store.get(KEY).then(function (saved) {
+    if (saved && saved.client_uuid) draft = saved;
+    return draft;
+  });
+
+  function persist() {
+    draft.notes = document.getElementById("a-notes").value;
+    return A1.store.set(KEY, draft);
+  }
+
+  function inputsFor(q) {
+    return Array.prototype.slice.call(form.querySelectorAll('[data-q="' + q + '"]'));
+  }
+
+  function setAnswer(q, value) {
+    draft.answers[q] = value;
+    persist();
+    paintReview();
+  }
+
+  form.addEventListener("input", function (event) {
+    var el = event.target;
+    if (el.dataset.q && !el.hasAttribute("data-choice")) setAnswer(el.dataset.q, el.value);
+  });
+
+  form.addEventListener("click", function (event) {
+    var choice = event.target.closest("[data-choice]");
+    if (!choice) return;
+    var q = choice.dataset.q;
+    inputsFor(q).forEach(function (other) {
+      if (other.hasAttribute("data-choice")) other.classList.remove("sel");
+    });
+    choice.classList.add("sel");
+    setAnswer(q, choice.dataset.value);
+  });
+
+  // -- photographs -------------------------------------------------------
+  // Downscaled on the device before storage: a 12 MP frame is no more use to
+  // the office than a 1280 px one, and it has to survive on the phone until
+  // signal returns.
+  function shrink(file) {
+    return new Promise(function (resolve) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var image = new Image();
+        image.onload = function () {
+          var scale = Math.min(1, 1280 / Math.max(image.width, image.height));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.round(image.width * scale);
+          canvas.height = Math.round(image.height * scale);
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", 0.7));
+        };
+        image.onerror = function () { resolve(null); };
+        image.src = reader.result;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function paintPhotos() {
+    var list = document.getElementById("photo-list");
+    list.innerHTML = "";
+    draft.photos.forEach(function (photo, index) {
+      var cell = document.createElement("div");
+
+      var img = document.createElement("img");
+      img.src = photo.data_url;
+      img.alt = photo.label || "Site photograph";
+      img.style.cssText = "height:72px;width:100%;object-fit:cover;border-radius:10px;display:block";
+
+      var label = document.createElement("input");
+      label.type = "text";
+      label.placeholder = "What does it show?";
+      label.value = photo.label || "";
+      label.setAttribute("aria-label", "Label for photograph " + (index + 1));
+      label.style.cssText = "min-height:40px;font-size:14px";
+      label.addEventListener("input", function () {
+        draft.photos[index].label = label.value;
+        persist();
+        paintReview();
+      });
+
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "btn btn-gho btn-sm";
+      remove.textContent = "Remove";
+      remove.style.color = "var(--red)";
+      remove.addEventListener("click", function () {
+        draft.photos.splice(index, 1);
+        persist().then(paintPhotos);
+      });
+
+      cell.appendChild(img);
+      cell.appendChild(label);
+      cell.appendChild(remove);
+      list.appendChild(cell);
+    });
+    paintReview();
+  }
+
+  document.getElementById("photo-input").addEventListener("change", function (event) {
+    var room = 12 - draft.photos.length;
+    var files = Array.prototype.slice.call(event.target.files).slice(0, room);
+    Promise.all(files.map(shrink)).then(function (urls) {
+      urls.filter(Boolean).forEach(function (url) {
+        draft.photos.push({ client_uuid: A1.uuid(), data_url: url, label: "" });
+      });
+      return persist();
+    }).then(paintPhotos).catch(function () {
+      alert("That photograph could not be saved on this phone. Try taking a smaller one.");
+    });
+    event.target.value = "";
+  });
+
+  // -- review ------------------------------------------------------------
+  var requiredIds = Array.prototype.slice
+    .call(form.querySelectorAll("[data-required]"))
+    .map(function (el) { return el.dataset.q; })
+    .filter(function (v, i, a) { return a.indexOf(v) === i; });
+
+  function filled(q) {
+    return draft.answers[q] !== undefined && String(draft.answers[q]).trim() !== "";
+  }
+
+  function paintReview() {
+    var answered = Object.keys(draft.answers).filter(filled).length;
+    var requiredDone = requiredIds.filter(filled).length;
+    document.getElementById("r-answered").textContent = answered + " of {{ question_count }}";
+    var req = document.getElementById("r-required");
+    req.textContent = requiredDone + " of " + requiredIds.length;
+    req.className = requiredDone === requiredIds.length ? "good" : "warn";
+    var labelled = draft.photos.filter(function (p) { return (p.label || "").trim(); }).length;
+    document.getElementById("r-photos").textContent =
+      labelled + " labelled of " + draft.photos.length;
+  }
+
+  // -- steps -------------------------------------------------------------
+  function show(index) {
+    step = Math.max(0, Math.min(last, index));
+    sections.forEach(function (section, i) { section.hidden = i !== step; });
+    document.querySelectorAll("#progress i").forEach(function (bar, i) {
+      bar.classList.toggle("on", i <= step);
+    });
+    document.getElementById("step-label").textContent =
+      "Step " + (step + 1) + " of " + sections.length;
+    document.getElementById("a-back").disabled = step === 0;
+    document.getElementById("a-next").hidden = step === last;
+    window.scrollTo(0, 0);
+  }
+
+  document.getElementById("a-next").addEventListener("click", function () { show(step + 1); });
+  document.getElementById("a-back").addEventListener("click", function () { show(step - 1); });
+  document.getElementById("a-notes").addEventListener("input", persist);
+
+  // -- submitting --------------------------------------------------------
+  function banner(text, visible) {
+    document.getElementById("offline-text").textContent = text;
+    document.getElementById("offline-banner").hidden = !visible;
+  }
+
+  function push() {
+    return A1.postJson(form.dataset.submitUrl, {
+      client_uuid: draft.client_uuid,
+      device_timestamp: draft.device_timestamp,
+      location: draft.location || {},
+      notes: draft.notes,
+      answers: Object.keys(draft.answers).map(function (q) {
+        return { question_id: parseInt(q, 10), value: draft.answers[q] };
+      }),
+      photos: draft.photos
+    }).then(function (response) {
+      return response.json().then(function (data) {
+        if (data.ok) {
+          return A1.store.remove(KEY).then(function () {
+            window.location = form.dataset.doneUrl;
+            return true;
+          });
+        }
+        // Refused on its merits. Retrying will never help, so say so once.
+        alert(data.message || "That submission was refused.");
+        return true;
+      });
+    }).catch(function () {
+      banner("No signal · saved on this phone, it will upload by itself", true);
+      return false;
+    });
+  }
+
+  document.getElementById("a-submit").addEventListener("click", function () {
+    var missing = requiredIds.filter(function (q) { return !filled(q); });
+    if (missing.length) {
+      alert(missing.length + " required question" + (missing.length === 1 ? " is" : "s are") +
+            " still blank. Go back and answer them before submitting.");
+      return;
+    }
+    var button = document.getElementById("a-submit");
+    button.disabled = true;
+    button.textContent = "Submitting…";
+
+    A1.locate().then(function (fix) {
+      draft.location = fix;
+      draft.device_timestamp = new Date().toISOString();
+      document.getElementById("r-gps").textContent =
+        fix.unavailable ? "location unavailable" : "± " + fix.accuracy_m + " m";
+      return persist().then(push);
+    }).then(function (done) {
+      button.disabled = false;
+      button.textContent = done ? "Submit assessment" : "Try again";
+    });
+  });
+
+  // An assessment the technician finished but could not send retries by
+  // itself when the device comes back online.
+  window.addEventListener("online", function () {
+    if (draft.device_timestamp) push();
+  });
+
+  ready.then(function () {
+    Object.keys(draft.answers).forEach(function (q) {
+      inputsFor(q).forEach(function (el) {
+        if (el.hasAttribute("data-choice")) {
+          el.classList.toggle("sel", el.dataset.value === draft.answers[q]);
+        } else {
+          el.value = draft.answers[q];
+        }
+      });
+    });
+    if (draft.notes) document.getElementById("a-notes").value = draft.notes;
+    paintPhotos();
+    show(0);
+    if (!navigator.onLine) banner("No signal · answers are saved on this phone", true);
+    // Reopened after submitting with no signal? Finish the job.
+    if (draft.device_timestamp) push();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

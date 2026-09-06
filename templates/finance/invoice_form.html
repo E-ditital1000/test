@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}New invoice — A1 360{% endblock %}
+{% block page_title %}New invoice{% endblock %}
+{% block page_sub %}Starts as a draft · lines are added next, then it is marked sent{% endblock %}
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Every invoice attaches to a project. That is what makes project
+        profitability computable without storing a total anywhere.
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'finance-invoices' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Create draft</button>
+    </div>
+  </form>
+{% endblock %}

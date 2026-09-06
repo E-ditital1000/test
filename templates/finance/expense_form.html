@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Log an expense — A1 360{% endblock %}
+{% block page_title %}Log an expense{% endblock %}
+{% block page_sub %}Charged to a project · photograph the receipt from your phone{% endblock %}
+{% block content %}
+  <form method="post" enctype="multipart/form-data" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Every cost attaches to a project, so it shows up in that project's
+        margin the moment it is saved.
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'finance-expenses' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Log the expense</button>
+    </div>
+  </form>
+{% endblock %}

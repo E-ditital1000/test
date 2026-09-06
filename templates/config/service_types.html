@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Service types — Settings — A1 360{% endblock %}
+
+{% block page_title %}Service types{% endblock %}
+{% block page_sub %}Each carries its own assessment question set · adding a service is configuration, not a release{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-pri" href="{% url 'settings-service-type-create' %}">Add service type</a>
+{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="service_types" %}
+
+  {% if service_types %}
+    <div class="card">
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Service type</th>
+              <th scope="col">Code</th>
+              <th scope="col" class="num">Live questions</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for service_type in service_types %}
+              <tr {% if not service_type.is_active %}style="background:var(--sunken)"{% endif %}>
+                <td><b>{{ service_type.name }}</b></td>
+                <td class="mono dim2">{{ service_type.code }}</td>
+                <td class="num">{{ service_type.active_questions.count }}</td>
+                <td>
+                  {% if service_type.is_active %}
+                    <span class="pill p-appr"><i></i>Active</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Retired</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'settings-service-type-questions' service_type.pk %}">Question set</a>
+                  <a class="btn btn-gho btn-sm" href="{% url 'settings-service-type-edit' service_type.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        The question set here <em>is</em> the form a technician fills in on
+        site. Nothing about that form is written in code, so a new service can
+        be live the afternoon it is agreed.
+      </div>
+    </div>
+  {% else %}
+    {% url 'settings-service-type-create' as create_url %}
+    {% include "shell/_empty.html" with icon="settings" heading="No service types yet" body="A service type is the kind of work A-1 does — an electrical install, a solar install, a service call. It decides which questions a technician answers on site, so at least one has to exist before any field work can be assessed." primary_label="Add the first service type" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

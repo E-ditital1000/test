@@ -1,0 +1,135 @@
+{% extends "shell/_document.html" %}
+{% load static %}
+{% block title %}Sign in — A1 360{% endblock %}
+
+{% block body %}
+<div class="login">
+
+  <div class="lft on-navy">
+    <div class="brand-lockup">
+      <img src="{% static 'img/a1-mark.png' %}" alt="">
+      <b>A1 360</b>
+    </div>
+    <div>
+      <h5>One record carries every job from first call to final payment.</h5>
+      <p>
+        Tickets, projects, field assessments, costs and attendance — a single
+        system for A-1 Technical Engineering Solutions.
+      </p>
+    </div>
+    <p style="font-size:12px;color:var(--navy300)">Phase One · Internal use only</p>
+  </div>
+
+  <div class="rgt">
+   <div class="signin-col">
+    <form class="fbox {% if locked %}is-locked{% endif %}" method="post" novalidate>
+      {% csrf_token %}
+
+      <img class="logo-full" src="{% static 'img/a1-logo.png' %}"
+           alt="A-1 Technical Engineering Solutions">
+
+      {% if locked %}
+        {% comment %} The lock state, designed rather than left as a red flash message.
+           It never reveals whether the email exists — that would be an
+           account-enumeration leak. {% endcomment %}
+        <span class="deny kicker" style="border:0;padding:0;margin:0;display:block;
+              font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--red)">
+          Account locked
+        </span>
+        <b style="font-size:24px;font-weight:700;letter-spacing:-.4px">Too many attempts</b>
+        <span class="t-body dim2">{{ lock_message }}</span>
+      {% else %}
+        <b style="font-size:24px;font-weight:700;letter-spacing:-.4px">Sign in</b>
+        <span class="t-body dim2">Use the email address A-1 issued you.</span>
+      {% endif %}
+
+      {% include "shell/_messages.html" %}
+
+      {% for error in form.non_field_errors %}
+        <div class="msg msg-error">{{ error }}</div>
+      {% endfor %}
+
+      <div class="fld {% if form.email.errors %}has-error{% endif %}">
+        <label for="{{ form.email.id_for_label }}">Email address</label>
+        {{ form.email }}
+        {% for error in form.email.errors %}<span class="err">{{ error }}</span>{% endfor %}
+      </div>
+
+      <div class="fld {% if form.password.errors %}has-error{% endif %}">
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        {{ form.password }}
+        {% for error in form.password.errors %}<span class="err">{{ error }}</span>{% endfor %}
+      </div>
+
+      <button type="submit" class="btn btn-pri btn-wide" {% if locked %}disabled{% endif %}>Sign in</button>
+
+      {% if locked %}
+        <div class="deny hint" style="border:0;border-radius:10px">
+          Ask any Admin to release it from <b>Settings &rarr; Users</b>.
+          The lock and the release are both written to the audit log.
+        </div>
+      {% else %}
+        <div class="note" style="border-radius:10px">
+          First login forces a password reset.
+          {{ lockout_threshold }} failed attempts lock the account.
+        </div>
+      {% endif %}
+    </form>
+
+    {% if demo_accounts %}
+      {% comment %}
+      Development only — gated on SHOW_DEMO_ACCOUNTS, which defaults to DEBUG.
+      The list is read from the database, so it cannot drift from the accounts
+      that actually exist. Each row signs in as one role, which is the quickest
+      way to see the navigation change shape.
+      {% endcomment %}
+      <div class="demo-panel">
+        <div class="demo-head">
+          <span class="t-label" style="color:var(--gold700)">Demo accounts · development only</span>
+          <span class="t-small dim2">
+            Password for all: <b class="mono">{{ demo_password }}</b>
+          </span>
+        </div>
+        <ul class="plain demo-list">
+          {% for account in demo_accounts %}
+            <li>
+              <button type="button" class="demo-row"
+                      data-email="{{ account.email }}"
+                      data-password="{{ demo_password }}">
+                <span class="demo-role">
+                  <b>{{ account.role }}</b>
+                  <span class="t-small dim">{{ account.email }}</span>
+                </span>
+                <span class="demo-meta">
+                  <span class="pill p-clos">{{ account.modules }} module{{ account.modules|pluralize }}</span>
+                  {% if account.must_reset %}
+                    <span class="pill p-wait"><i></i>Sets password first</span>
+                  {% endif %}
+                </span>
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+   </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+  {% if demo_accounts %}
+    <script>
+      // Fill the real form and submit it, so a demo sign-in goes through
+      // exactly the same view, lockout and forced-reset path as a typed one.
+      document.querySelectorAll(".demo-row").forEach(function (row) {
+        row.addEventListener("click", function () {
+          var form = document.querySelector(".fbox");
+          form.querySelector("#id_email").value = row.dataset.email;
+          form.querySelector("#id_password").value = row.dataset.password;
+          form.requestSubmit ? form.requestSubmit() : form.submit();
+        });
+      });
+    </script>
+  {% endif %}
+{% endblock %}

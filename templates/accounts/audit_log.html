@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Audit log — Settings — A1 360{% endblock %}
+
+{% block page_title %}Audit log{% endblock %}
+{% block page_sub %}Append-only · actor, timestamp, before, after and reason for everything approved or amended{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="audit" %}
+
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search action, actor or reason"
+           aria-label="Search the audit log" style="max-width:340px">
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query %}<a class="btn btn-gho" href="{% url 'settings-audit-log' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if entries %}
+    {# Compact density: this is read in bulk and printed. #}
+    <div class="card compact">
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">Actor</th>
+              <th scope="col">Action</th>
+              <th scope="col">Target</th>
+              <th scope="col">Before</th>
+              <th scope="col">After</th>
+              <th scope="col">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in entries %}
+              <tr>
+                <td class="mono" style="white-space:nowrap">{{ entry.created_at|a1datetime }}</td>
+                <td>{% if entry.actor %}{{ entry.actor|a1name }}{% else %}<span class="dim">system</span>{% endif %}</td>
+                <td><span class="pill p-clos">{{ entry.action }}</span></td>
+                <td class="t-small dim2 mono">{{ entry.target_type }}:{{ entry.target_id }}</td>
+                <td class="t-small dim">{{ entry.before|default:"—" }}</td>
+                <td class="t-small dim">{{ entry.after|default:"—" }}</td>
+                <td class="t-small">{{ entry.reason }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query %}
+    {% url 'settings-audit-log' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="settings" search_term=query total_count=total_entries total_noun="entry" clear_url=clear_url %}
+  {% else %}
+    {% include "shell/_empty.html" with icon="settings" heading="Nothing recorded yet" body="The log fills itself. Every role change, permission grant, approval and correction writes a row here automatically — nothing is added by hand and nothing is ever removed." %}
+  {% endif %}
+{% endblock %}

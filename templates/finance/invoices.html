@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Finance — A1 360{% endblock %}
+
+{% block page_title %}Finance{% endblock %}
+{% block page_sub %}Invoices, expenses and requisition approvals · amounts in USD{% endblock %}
+{% block page_actions %}
+  {% if perms_held.log_expense %}
+    <a class="btn btn-sec" href="{% url 'finance-expenses' %}">Expenses</a>
+  {% endif %}
+  {% if perms_held.approve_requisition %}
+    <a class="btn btn-sec" href="{% url 'finance-requisitions' %}">Requisitions</a>
+  {% endif %}
+  {% if can_issue %}
+    <a class="btn btn-pri" href="{% url 'finance-invoice-create' %}">New invoice</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric"><span>Outstanding</span><b>{{ outstanding|a1money }}</b><em>across every unpaid invoice</em></div>
+    <div class="metric {% if overdue_count %}alert{% endif %}">
+      <span>Overdue over 30 days</span><b>{{ overdue_total|a1money }}</b>
+      <em>{{ overdue_count }} invoice{{ overdue_count|pluralize }}</em>
+    </div>
+    <div class="metric"><span>Expenses this month</span><b>{{ expenses_this_month|a1money }}</b><em>all charged to a project</em></div>
+    <div class="metric {% if above_threshold %}alert{% endif %}">
+      <span>Requisitions pending</span><b>{{ pending_requisitions }}</b>
+      <em>{{ above_threshold }} above threshold</em>
+    </div>
+  </div>
+
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:320px"
+           placeholder="Search number, customer or project" aria-label="Search invoices">
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query %}<a class="btn btn-gho" href="{% url 'finance-invoices' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if invoices %}
+    <div class="card">
+      <div class="hd"><b>Invoices</b><span class="meta">Every line attaches to a project</span></div>
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">Invoice</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Project</th>
+              <th scope="col" class="num">Amount</th>
+              <th scope="col" class="num">Paid</th>
+              <th scope="col" class="num">Days overdue</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in invoices %}
+              <tr>
+                <td><a class="mono" href="{% url 'finance-invoice-detail' invoice.pk %}"><b>{{ invoice.number }}</b></a></td>
+                <td>{{ invoice.customer.name }}</td>
+                <td><a class="mono t-small" href="{% url 'projects-detail' invoice.project.pk %}">{{ invoice.project.reference }}</a></td>
+                <td class="num"><b>{{ invoice.total|a1money }}</b></td>
+                <td class="num {% if invoice.paid_total %}good{% else %}dim{% endif %}">{{ invoice.paid_total|a1money }}</td>
+                <td class="num {% if invoice.days_overdue %}bad{% else %}dim{% endif %}">
+                  {% if invoice.days_overdue %}{{ invoice.days_overdue }}{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if invoice.state == "paid" %}<span class="pill p-appr"><i></i>Paid</span>
+                  {% elif invoice.state == "part_paid" %}<span class="pill p-prog"><i></i>Part paid</span>
+                  {% elif invoice.days_overdue %}<span class="pill p-over"><i></i>Overdue</span>
+                  {% elif invoice.state == "sent" %}<span class="pill p-open"><i></i>Sent</span>
+                  {% else %}<span class="pill p-clos"><i></i>Draft</span>{% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        No total on this screen is stored. Each is summed from the invoice
+        lines and the payments recorded against them, so every figure traces
+        back to its rows.
+      </div>
+    </div>
+  {% elif query %}
+    {% url 'finance-invoices' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="finance" search_term=query total_noun="invoice" clear_url=clear_url %}
+  {% else %}
+    {% url 'finance-invoice-create' as create_url %}
+    {% include "shell/_empty.html" with icon="finance" heading="No invoices yet" body="An invoice is raised against a project, which is how revenue finds its way back to the job it came from. Once a project has work on it, invoice from here." primary_label="Raise the first invoice" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

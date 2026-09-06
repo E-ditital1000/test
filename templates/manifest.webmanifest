@@ -1,0 +1,14 @@
+{% load static %}{
+  "name": "A1 360",
+  "short_name": "A1 360",
+  "description": "A-1 Technical Engineering Solutions — jobs, assessments and attendance.",
+  "start_url": "/field-jobs/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F7F8FB",
+  "theme_color": "#11043A",
+  "icons": [
+    { "src": "{% static 'img/a1-mark.png' %}", "sizes": "256x256", "type": "image/png", "purpose": "any" }
+  ]
+}

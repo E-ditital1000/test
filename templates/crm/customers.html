@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Customers — A1 360{% endblock %}
+
+{% block page_title %}Customer register{% endblock %}
+{% block page_sub %}Contacts, sites and the full service history per customer{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'crm-tickets' %}">Tickets</a>
+  {% if perms_held.create_customer %}
+    <a class="btn btn-pri" href="{% url 'crm-customer-create' %}">New customer</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:320px"
+           placeholder="Search name, phone, email or site" aria-label="Search customers">
+    <label class="chk" for="inactive" style="min-height:36px">
+      <input type="checkbox" name="inactive" value="1" id="inactive" {% if show_inactive %}checked{% endif %}>
+      <span class="t-small">Include inactive</span>
+    </label>
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query or show_inactive %}<a class="btn btn-gho" href="{% url 'crm-customers' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if customers %}
+    <div class="card">
+      <div class="scroll-x">
+        <table style="min-width:760px">
+          <thead>
+            <tr>
+              <th scope="col">Customer</th>
+              <th scope="col">Phone</th>
+              <th scope="col">Email</th>
+              <th scope="col" class="num">Sites</th>
+              <th scope="col" class="num">Open tickets</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for customer in customers %}
+              <tr {% if not customer.is_active %}style="background:var(--sunken)"{% endif %}>
+                <td>
+                  <a href="{% url 'crm-customer-detail' customer.pk %}" class="two" style="text-decoration:none">
+                    <b>{{ customer.name }}</b>
+                    <span>{{ customer.address|truncatechars:44|default:"No address" }}</span>
+                  </a>
+                </td>
+                <td class="mono dim2">{{ customer.phone|default:"—" }}</td>
+                <td class="dim2">{{ customer.email|default:"—" }}</td>
+                <td class="num">{{ customer.site_count }}</td>
+                <td class="num">
+                  {% if customer.open_tickets %}
+                    <b class="warn">{{ customer.open_tickets }}</b>
+                  {% else %}
+                    <span class="dim">0</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if customer.is_active %}
+                    <span class="pill p-appr"><i></i>Active</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Inactive</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query or show_inactive %}
+    {% url 'crm-customers' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="tickets" search_term=query total_count=total_customers total_noun="customer" clear_url=clear_url %}
+  {% else %}
+    {% url 'crm-customer-create' as create_url %}
+    {% include "shell/_empty.html" with icon="tickets" heading="No customers yet" body="A ticket needs a customer to belong to, so this is the first thing to fill in. Add the customer, then their sites and the person who answers the phone — after that, raising a ticket takes seconds." primary_label="Add the first customer" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

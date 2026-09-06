@@ -1,0 +1,53 @@
+{% extends "shell/_document.html" %}
+{% comment %}
+The phone. Used one-handed, in sunlight, on a low-end Android, with
+connectivity assumed absent rather than present.
+
+Tabs are generated from permissions exactly like the desktop sidebar, so an
+Employee who only clocks in gets two tabs — not four with two greyed out.
+The Sync badge is the number a technician needs most: how much work is still
+sitting on the device.
+
+The bar is hidden in exactly one place — inside a running assessment. A
+multi-step form holding unsaved local answers should not offer a one-tap
+exit, so those screens override {% templatetag openblock %} block tabs
+{% templatetag closeblock %} with nothing.
+
+Blocks a page fills in:
+  phone_title   the large line in the navy header
+  phone_sub     who and where, under it
+  content       the screen
+{% endcomment %}
+
+{% block body %}
+<div class="phone">
+  <header class="phead">
+    <b>{% block phone_title %}{% endblock %}</b>
+    <span>{% block phone_sub %}{% endblock %}</span>
+  </header>
+
+  <main class="pbody" id="main">
+    {% include "shell/_messages.html" %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block tabs %}
+    {% if nav_tabs %}
+      <nav class="a1-tabs" aria-label="Sections">
+        {% for tab in nav_tabs %}
+          <a class="a1-tab {% if tab.icon == tab_active %}on{% endif %}"
+             href="{% url tab.url_name %}"
+             {% if tab.icon == tab_active %}aria-current="page"{% endif %}>
+            {% if tab.icon == "sync" and sync_pending %}
+              <span class="a1-badge">{{ sync_pending }}</span>
+              <span class="sr-only">{{ sync_pending }} item{{ sync_pending|pluralize }} waiting to upload</span>
+            {% endif %}
+            <svg class="ic" width="22" height="22" aria-hidden="true"><use href="#i-{{ tab.icon }}"></use></svg>
+            <span>{{ tab.label }}</span>
+          </a>
+        {% endfor %}
+      </nav>
+    {% endif %}
+  {% endblock %}
+</div>
+{% endblock %}

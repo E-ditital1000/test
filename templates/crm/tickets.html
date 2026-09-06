@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Tickets — A1 360{% endblock %}
+
+{% block page_title %}Customers &amp; Tickets{% endblock %}
+{% block page_sub %}{{ open_count }} open · {{ unassigned_count }} unassigned{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'crm-customers' %}">Customer register</a>
+  {% if perms_held.create_ticket %}
+    <a class="btn btn-pri" href="{% url 'crm-ticket-create' %}">New ticket</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:300px"
+           placeholder="Search tickets, customers, sites…" aria-label="Search tickets">
+    <input type="hidden" name="filter" value="{{ active_filter }}">
+    <button class="btn btn-sec" type="submit">Search</button>
+  </form>
+
+  <nav class="filters" aria-label="Ticket filters">
+    {% for key, label in filters.items %}
+      <a class="chip {% if key == active_filter %}on{% endif %}"
+         href="?filter={{ key }}{% if query %}&q={{ query }}{% endif %}"
+         {% if key == active_filter %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if tickets %}
+    <div class="card">
+      <div class="scroll-x">
+        <table style="min-width:960px">
+          <thead>
+            <tr>
+              <th scope="col">Ticket</th>
+              <th scope="col">Customer &amp; site</th>
+              <th scope="col">Service type</th>
+              <th scope="col">Assigned</th>
+              <th scope="col">Age</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ticket in tickets %}
+              <tr>
+                <td>
+                  <a href="{% url 'crm-ticket-detail' ticket.pk %}" class="two" style="text-decoration:none">
+                    <b class="mono">{{ ticket.reference }}</b>
+                    <span>{{ ticket.description|truncatechars:52 }}</span>
+                  </a>
+                </td>
+                <td>
+                  <div class="two">
+                    <b>{{ ticket.customer.name }}</b>
+                    <span>{{ ticket.site.name|default:"No site" }}</span>
+                  </div>
+                </td>
+                <td class="t-small dim">{{ ticket.service_type.name }}</td>
+                <td>
+                  {% if ticket.assigned_to %}
+                    {{ ticket.assigned_to|a1name }}
+                  {% elif assign_form and ticket.is_open %}
+                    {# Assignment in one action, straight from the list. #}
+                    <form method="post" action="{% url 'crm-ticket-assign' ticket.pk %}"
+                          style="display:flex;gap:6px;align-items:center">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      <select name="assigned_to" aria-label="Assign {{ ticket.reference }}"
+                              style="min-height:36px;max-width:170px;font-size:13px">
+                        <option value="">Assign to…</option>
+                        {% for choice in assign_form.assigned_to.field.queryset %}
+                          <option value="{{ choice.pk }}">{{ choice.get_full_name|default:choice.email }}</option>
+                        {% endfor %}
+                      </select>
+                      <button class="btn btn-sec btn-sm" type="submit">Assign</button>
+                    </form>
+                  {% else %}
+                    <span class="bad">Unassigned</span>
+                  {% endif %}
+                </td>
+                <td class="mono {% if ticket.is_ageing %}warn{% else %}dim{% endif %}">{{ ticket.age_label }}</td>
+                <td>
+                  {% if not ticket.is_open %}
+                    <span class="pill p-clos"><i></i>{{ ticket.status.label }}</span>
+                  {% elif ticket.is_ageing and not ticket.assigned_to %}
+                    <span class="pill p-over"><i></i>Overdue</span>
+                  {% elif ticket.assigned_to %}
+                    <span class="pill p-prog"><i></i>{{ ticket.status.label }}</span>
+                  {% else %}
+                    <span class="pill p-open"><i></i>{{ ticket.status.label }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query or active_filter != "all" %}
+    {% url 'crm-tickets' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="tickets" search_term=query filter_summary=active_filter_label total_count=open_count total_noun="open ticket" clear_url=clear_url %}
+  {% else %}
+    {% url 'crm-ticket-create' as create_url %}
+    {% include "shell/_empty.html" with icon="tickets" heading="No tickets yet" body="Every job in A1 360 starts here. When a customer calls, raise the ticket first — the project, the field job and the invoice all grow from it and stay linked to it." primary_label="Raise the first ticket" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Requisitions — A1 360{% endblock %}
+
+{% block page_title %}Requisitions awaiting approval{% endblock %}
+{% block page_sub %}Threshold {{ threshold|a1money }} · above it an Executive must sign{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'finance-invoices' %}">Back to finance</a>
+{% endblock %}
+
+{% block content %}
+  {% if rows %}
+    <div class="card">
+      <div class="hd"><b>Pending</b><span class="meta">Oldest first</span></div>
+      {% for row in rows %}
+        <div class="row-i">
+          <div class="two g">
+            <b>{{ row.requisition.reference }} · {{ row.requisition.description|truncatechars:56 }}</b>
+            <span>
+              {{ row.requisition.project.reference }}
+              · raised by {{ row.requisition.raised_by|a1name }}
+              · {{ row.requisition.created_at|a1date }}
+              {% if row.requisition.needed_by %} · needed by {{ row.requisition.needed_by|a1date }}{% endif %}
+            </span>
+          </div>
+          <b class="mono" style="width:100px">{{ row.requisition.amount|a1money }}</b>
+          <span class="{% if row.needs_executive %}warn{% else %}dim{% endif %} t-small" style="width:150px">
+            approver: {% if row.needs_executive %}Executive{% else %}Finance{% endif %}
+          </span>
+
+          {% if row.can_decide %}
+            <form method="post" action="{% url 'finance-requisition-decide' row.requisition.pk %}"
+                  style="display:flex;gap:6px;align-items:center">
+              {% csrf_token %}
+              <input type="text" name="comment" placeholder="Comment (required to return)"
+                     style="min-height:36px;max-width:220px;font-size:13px"
+                     aria-label="Comment on {{ row.requisition.reference }}">
+              <button class="btn btn-pri btn-sm" name="decision" value="approved" type="submit">Approve</button>
+              <button class="btn btn-gho btn-sm" style="color:var(--red)"
+                      name="decision" value="returned" type="submit">Return</button>
+            </form>
+          {% else %}
+            {% comment %} Above the threshold and this user is not an Executive. The
+               control is absent rather than disabled, and the server refuses
+               it regardless of what the client renders. {% endcomment %}
+            <span class="pill p-wait"><i></i>Needs an Executive</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+      <div class="note">
+        The threshold lives in Settings → Policy, so Finance changes it
+        without a release. Every decision is an append-only row carrying who
+        made it, when, and any comment.
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="finance" heading="Nothing awaiting approval" body="Every requisition raised against a project has been decided. New ones appear here as soon as a project manager raises them." %}
+  {% endif %}
+{% endblock %}

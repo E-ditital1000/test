@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ invoice.number }} — A1 360{% endblock %}
+
+{% block page_title %}{{ invoice.number }} — {{ invoice.customer.name }}{% endblock %}
+{% block page_sub %}
+  {{ invoice.project.reference }}
+  {% if invoice.issued_on %} · issued {{ invoice.issued_on|a1date }}{% endif %}
+  {% if invoice.due_on %} · due {{ invoice.due_on|a1date }}{% endif %}
+{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'finance-invoices' %}">All invoices</a>
+  {% if can_issue and invoice.state == "draft" %}
+    <form method="post" action="{% url 'finance-invoice-issue' invoice.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn btn-pri" type="submit">Mark as sent</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric"><span>Invoice total</span><b>{{ invoice.total|a1money }}</b><em>{{ invoice.lines.count }} line{{ invoice.lines.count|pluralize }}</em></div>
+    <div class="metric ok"><span>Paid</span><b>{{ invoice.paid_total|a1money }}</b><em>{{ invoice.payments.count }} payment{{ invoice.payments.count|pluralize }}</em></div>
+    <div class="metric {% if invoice.outstanding > 0 %}alert{% endif %}">
+      <span>Outstanding</span><b>{{ invoice.outstanding|a1money }}</b>
+      <em>{% if invoice.days_overdue %}{{ invoice.days_overdue }} days overdue{% else %}within terms{% endif %}</em>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="hd">
+          <b>Lines</b>
+          <span class="meta">
+            {% if invoice.state == "draft" %}Editable while draft{% else %}Fixed — the invoice has been sent{% endif %}
+          </span>
+        </div>
+        <div class="scroll-x">
+          <table style="min-width:560px">
+            <thead>
+              <tr>
+                <th scope="col">Description</th>
+                <th scope="col" class="num">Qty</th>
+                <th scope="col" class="num">Unit price</th>
+                <th scope="col" class="num">Line total</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in invoice.lines.all %}
+                <tr>
+                  <td>{{ line.description }}</td>
+                  <td class="num">{{ line.quantity }}</td>
+                  <td class="num">{{ line.unit_price|a1money }}</td>
+                  <td class="num"><b>{{ line.line_total|a1money }}</b></td>
+                  <td class="acts">
+                    {% if can_issue and invoice.state == "draft" %}
+                      <form method="post" action="{% url 'finance-invoice-line-remove' line.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-gho btn-sm" style="color:var(--red)" type="submit">Remove</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="5" class="dim">No lines yet — an invoice cannot be sent empty.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3"><b>Total</b></td>
+                <td class="num"><b>{{ invoice.total|a1money }}</b></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {% if can_issue and invoice.state == "draft" %}
+          <form method="post" action="{% url 'finance-invoice-line-add' invoice.pk %}">
+            {% csrf_token %}
+            <div class="stack" style="border-top:1px solid var(--border)">
+              {% include "shell/_form_fields.html" with form=line_form %}
+              <div><button class="btn btn-sec" type="submit">Add line</button></div>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Payments</b><span class="meta">Append-only · a mistake is corrected by a further row</span></div>
+        {% for payment in invoice.payments.all %}
+          <div class="row-i">
+            <div class="two g">
+              <b>{{ payment.amount|a1money }}</b>
+              <span>
+                {{ payment.paid_on|a1date }}
+                {% if payment.method %} · {{ payment.method }}{% endif %}
+                {% if payment.reference %} · {{ payment.reference }}{% endif %}
+                · recorded by {{ payment.recorded_by|a1name }}
+              </span>
+            </div>
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">Nothing paid yet.</span></div>
+        {% endfor %}
+
+        {% if can_record_payment and invoice.state != "draft" %}
+          <form method="post" action="{% url 'finance-payment-record' invoice.pk %}">
+            {% csrf_token %}
+            <div class="stack" style="border-top:1px solid var(--border)">
+              {% include "shell/_form_fields.html" with form=payment_form %}
+              <div><button class="btn btn-sec" type="submit">Record payment</button></div>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div class="hd"><b>Linked records</b><span class="meta">one job lineage</span></div>
+        <div class="row-i">
+          <div class="two g">
+            <b><a href="{% url 'projects-detail' invoice.project.pk %}">{{ invoice.project.reference }}</a></b>
+            <span>{{ invoice.project.name }}</span>
+          </div>
+        </div>
+        {% if invoice.project.ticket %}
+          <div class="row-i">
+            <div class="two g">
+              <b><a href="{% url 'crm-ticket-detail' invoice.project.ticket.pk %}">Ticket {{ invoice.project.ticket.reference }}</a></b>
+              <span>where this job started</span>
+            </div>
+          </div>
+        {% endif %}
+        <div class="note">
+          This invoice carries the same job reference as the ticket that
+          started it, so the whole job traces from first call to final payment.
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

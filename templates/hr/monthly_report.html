@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Attendance report — A1 360{% endblock %}
+
+{% block page_title %}Attendance — {{ summary.first|date:"F Y" }}{% endblock %}
+{% block page_sub %}Derived from append-only attendance events · the column contract a Phase Two payroll engine consumes unchanged{% endblock %}
+
+{% block page_actions %}
+  <form method="get" style="display:flex;gap:8px;align-items:center">
+    <select name="month" aria-label="Month" style="min-height:40px;max-width:150px">
+      {% for value, label in months %}
+        <option value="{{ value }}" {% if value == month %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="year" aria-label="Year" style="min-height:40px;max-width:110px">
+      {% for value in years %}
+        <option value="{{ value }}" {% if value == year %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sec" type="submit">Show</button>
+  </form>
+  <a class="btn btn-pri" href="?year={{ year }}&month={{ month }}&export=csv">Export CSV</a>
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric"><span>Headcount</span><b>{{ summary.rows|length }}</b><em>active employees</em></div>
+    <div class="metric"><span>Days present</span><b>{{ totals.days_present }}</b><em>across the month</em></div>
+    <div class="metric {% if totals.days_absent %}alert{% endif %}"><span>Days absent</span><b>{{ totals.days_absent }}</b><em>no clock event</em></div>
+    <div class="metric"><span>Total hours</span><b>{{ totals.total_minutes|a1hours }}</b><em>paired clock events</em></div>
+    <div class="metric"><span>Corrections</span><b>{{ totals.corrections }}</b><em>all carry a reason</em></div>
+  </div>
+
+  {% if summary.rows %}
+    {# Compact: this is read in bulk and printed. #}
+    <div class="card compact">
+      <div class="hd"><b>Per employee</b><span class="meta">{{ summary.rows|length }} rows</span></div>
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col">Staff ID</th>
+              <th scope="col">Department</th>
+              <th scope="col" class="num">Days present</th>
+              <th scope="col" class="num">Days absent</th>
+              <th scope="col" class="num">Late</th>
+              <th scope="col" class="num">Total hours</th>
+              <th scope="col" class="num">Corrections</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in summary.rows %}
+              <tr>
+                <td><b>{{ row.employee|a1register_name }}</b></td>
+                <td class="mono dim2">{{ row.employee.staff_id }}</td>
+                <td>{{ row.employee.department|default:"—" }}</td>
+                <td class="num">{{ row.days_present }}</td>
+                <td class="num {% if row.days_absent %}bad{% else %}dim{% endif %}">{{ row.days_absent }}</td>
+                <td class="num {% if row.late_arrivals %}warn{% else %}dim{% endif %}">{{ row.late_arrivals }}</td>
+                <td class="num">{{ row.total_minutes|a1hours }}</td>
+                <td class="num {% if row.corrections %}pend{% else %}dim{% endif %}">{{ row.corrections }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3"><b>Totals</b></td>
+              <td class="num"><b>{{ totals.days_present }}</b></td>
+              <td class="num"><b>{{ totals.days_absent }}</b></td>
+              <td class="num"><b>{{ totals.late_arrivals }}</b></td>
+              <td class="num"><b>{{ totals.total_minutes|a1hours }}</b></td>
+              <td class="num"><b>{{ totals.corrections }}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="note">
+        Phase One is attendance only. No pay rate, salary or leave balance is
+        stored anywhere in this module — these columns are the contract
+        payroll will read in Phase Two, documented in
+        <span class="mono">docs/attendance-columns.md</span>.
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="hr" heading="No attendance in this month" body="Nobody has clocked in during this period, so there is nothing to report. Pick another month, or check that staff are on the employee register." %}
+  {% endif %}
+{% endblock %}

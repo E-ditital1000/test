@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ project.reference }} — A1 360{% endblock %}
+
+{% block page_title %}{{ project.reference }} — {{ project.name }}{% endblock %}
+{% block page_sub %}
+  {% if project.ticket %}From ticket {{ project.ticket.reference }} · {% endif %}opened {{ project.created_at|a1date }}{% if project.manager %} · {{ project.manager|a1name }}{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'projects-list' %}">All projects</a>
+  {% if perms_held.schedule_field_job %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-schedule-for-project' project.pk %}">Schedule a field job</a>
+  {% endif %}
+  {% if can_manage and next_stage %}
+    <form method="post" action="{% url 'projects-advance' project.pk %}" style="display:inline">
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="{{ next_stage.code }}">
+      <button class="btn btn-pri" type="submit">Advance to {{ next_stage.label }}</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+  {% comment %}
+  The lifecycle bar is a read of the stage events, not a stored progress
+  field — advancing writes an event with actor and timestamp first.
+  {% endcomment %}
+  <div class="card">
+    <div class="steps">
+      {% for step in lifecycle %}
+        <div class="st {{ step.state }}"><i></i>{{ step.label }}</div>
+        {% if not forloop.last %}<div class="ln {% if step.state == 'done' %}done{% endif %}"></div>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if can_see_cost %}
+    <div class="mrow">
+      <div class="metric"><span>Revenue booked</span><b>{{ cost.revenue|a1money }}</b><em>from linked invoices</em></div>
+      <div class="metric"><span>Cost to date</span><b>{{ cost.cost|a1money }}</b><em>expenses + approved requisitions</em></div>
+      <div class="metric {% if cost.margin < 0 %}alert{% elif cost.margin > 0 %}ok{% endif %}">
+        <span>Margin</span><b>{{ cost.margin|a1money }}</b>
+        <em>{% if cost.margin_pct is not None %}{{ cost.margin_pct }}% · {% endif %}computed at query time</em>
+      </div>
+      <div class="metric"><span>Tasks</span><b>{{ tasks|length }}</b><em>on this project</em></div>
+    </div>
+  {% endif %}
+
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+
+      <div class="card">
+        <div class="hd"><b>Tasks</b><span class="meta">{{ tasks|length }}</span></div>
+        {% for task in tasks %}
+          <div class="row-i">
+            <div class="two g">
+              <b {% if task.is_complete %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{{ task.title }}</b>
+              <span>
+                {% if task.assignee %}{{ task.assignee|a1name }}{% else %}Unassigned{% endif %}
+                {% if task.due_date %} · due {{ task.due_date|a1date }}{% endif %}
+                {% if task.is_complete %} · done {{ task.completed_at|a1date }}{% if task.completed_by %} by {{ task.completed_by|a1name }}{% endif %}{% endif %}
+              </span>
+            </div>
+            {% if task.is_complete %}
+              <span class="pill p-appr"><i></i>Complete</span>
+            {% else %}
+              <span class="pill p-open"><i></i>Open</span>
+            {% endif %}
+            {% if can_manage %}
+              <form method="post" action="{% url 'projects-task-toggle' task.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-gho btn-sm" type="submit">{% if task.is_complete %}Reopen{% else %}Complete{% endif %}</button>
+              </form>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">No tasks yet.</span></div>
+        {% endfor %}
+
+        {% if can_manage %}
+          <form method="post" action="{% url 'projects-task-create' project.pk %}">
+            {% csrf_token %}
+            <div class="stack" style="border-top:1px solid var(--border)">
+              {% include "shell/_form_fields.html" with form=task_form %}
+              <div><button class="btn btn-sec" type="submit">Add task</button></div>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Stage history</b><span class="meta">Append-only · newest first</span></div>
+        <div class="timeline">
+          {% for event in stage_events %}
+            <div class="ev">
+              <span class="dot" aria-hidden="true"></span>
+              <div class="body">
+                <b>{% if event.from_stage %}{{ event.from_stage }} → {% endif %}{{ event.to_stage }}</b>
+                <span>{% if event.actor %}{{ event.actor|a1name }} · {% endif %}{{ event.created_at|a1datetime }}{% if event.note %} · {{ event.note }}{% endif %}</span>
+              </div>
+            </div>
+          {% empty %}
+            <div class="ev"><div class="body"><span class="dim">No stage changes recorded.</span></div></div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+
+      <div class="card">
+        <div class="hd"><b>Linked records</b><span class="meta">one job lineage</span></div>
+        {% if project.ticket %}
+          <div class="row-i">
+            <div class="two g">
+              <b><a href="{% url 'crm-ticket-detail' project.ticket.pk %}">Ticket {{ project.ticket.reference }}</a></b>
+              <span>raised {{ project.ticket.created_at|a1date }}{% if project.ticket.raised_by %} by {{ project.ticket.raised_by|a1name }}{% endif %}</span>
+            </div>
+          </div>
+        {% endif %}
+        {% for job in field_jobs %}
+          <div class="row-i">
+            <div class="two g">
+              <b class="mono">{{ job.reference }}</b>
+              <span>{{ job.assigned_to|a1name }} · {{ job.scheduled_for|a1datetime }}</span>
+            </div>
+          </div>
+        {% endfor %}
+        {% for requisition in requisitions %}
+          <div class="row-i">
+            <div class="two g">
+              <b class="mono">{{ requisition.reference }}</b>
+              <span>{{ requisition.amount|a1money }} · {{ requisition.raised_by|a1name }}</span>
+            </div>
+            {% if requisition.is_approved %}
+              <span class="pill p-appr"><i></i>Approved</span>
+            {% else %}
+              <span class="pill p-wait"><i></i>Awaiting approval</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if not project.ticket and not field_jobs and not requisitions %}
+          <div class="row-i"><span class="dim">Nothing linked yet.</span></div>
+        {% endif %}
+        <div class="note">
+          Every record above shares this project's job reference, so the work is
+          traceable from the first call through to the invoice.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Crew</b><span class="meta">{{ crew|length }}</span></div>
+        {% for member in crew %}
+          <div class="row-i">
+            <div class="two g">
+              <b>{{ member.employee.user|a1name }}</b>
+              <span class="mono">{{ member.employee.staff_id }}{% if member.employee.job_title %} · {{ member.employee.job_title }}{% endif %}</span>
+            </div>
+            {% if can_manage %}
+              <form method="post" action="{% url 'projects-crew-remove' member.pk %}">
+                {% csrf_token %}
+                <button class="btn btn-gho btn-sm" style="color:var(--red)" type="submit">Remove</button>
+              </form>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">Nobody assigned yet.</span></div>
+        {% endfor %}
+        {% if can_manage %}
+          <form method="post" action="{% url 'projects-crew-add' project.pk %}">
+            {% csrf_token %}
+            <div class="stack" style="border-top:1px solid var(--border)">
+              {% include "shell/_form_fields.html" with form=crew_form %}
+              <div><button class="btn btn-sec btn-wide" type="submit">Add to crew</button></div>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+
+      {% if requisition_form %}
+        <div class="card">
+          <div class="hd"><b>Raise a requisition</b></div>
+          <form method="post" action="{% url 'projects-requisition-create' project.pk %}">
+            {% csrf_token %}
+            <div class="stack">
+              {% include "shell/_form_fields.html" with form=requisition_form %}
+              <div><button class="btn btn-sec btn-wide" type="submit">Raise it</button></div>
+            </div>
+          </form>
+          <div class="note">
+            Above the Settings-owned threshold it routes to an Executive;
+            below it, Finance can approve.
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="hd"><b>Documents</b><span class="meta">{{ documents|length }}</span></div>
+        {% for document in documents %}
+          <div class="row-i">
+            <div class="two g">
+              <b><a href="{{ document.file.url }}">{{ document.label }}</a></b>
+              <span>{{ document.created_at|a1date }}{% if document.uploaded_by %} · {{ document.uploaded_by|a1name }}{% endif %}</span>
+            </div>
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">Nothing attached.</span></div>
+        {% endfor %}
+        {% if can_manage %}
+          <form method="post" action="{% url 'projects-document-upload' project.pk %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="stack" style="border-top:1px solid var(--border)">
+              {% include "shell/_form_fields.html" with form=document_form %}
+              <div><button class="btn btn-sec btn-wide" type="submit">Attach</button></div>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

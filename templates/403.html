@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Access refused — A1 360{% endblock %}
+
+{% comment %}
+Django renders this for every PermissionDenied, which is what
+@require_permission raises. The brief is explicit that the server refuses
+regardless of what the client sent — so this state always exists and has to
+be designed rather than left as a stock error page.
+
+It names the missing permission and who can grant it, because the
+alternative is a support call.
+{% endcomment %}
+
+{% block page_title %}Access refused{% endblock %}
+{% block page_sub %}The server refused this request{% endblock %}
+
+{% block content %}
+  {% url 'dashboard-index' as back %}
+  {% include "shell/_deny.html" with permission_label=missing_permission role_name=role_names back_url=back back_label="Back to dashboard" %}
+{% endblock %}
+
+{% comment %} A signed-out visitor reaching a refusal gets the same explanation rather
+   than the shell's empty anonymous branch. {% endcomment %}
+{% block anon_content %}
+  {% url 'login' as back %}
+  {% include "shell/_deny.html" with heading="You need to sign in" permission_label="an account with the right role" back_url=back back_label="Go to sign in" %}
+{% endblock %}

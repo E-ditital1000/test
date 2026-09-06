@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit user{% else %}Add user{% endif %} — Settings — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit {{ instance }}{% else %}Add user{% endif %}{% endblock %}
+{% block page_sub %}Everything this person can do comes from the roles ticked below{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:720px">
+    {% csrf_token %}
+
+    <div class="card">
+      <div class="hd"><b>Account</b></div>
+      <div class="stack">
+        {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+        {% for field in form %}
+          {% if field.name != "roles" %}
+            <div class="fld {% if field.errors %}has-error{% endif %}">
+              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+              {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <b>Roles</b>
+        <span class="meta">A role is a bundle of permissions</span>
+      </div>
+      <div class="stack">
+        {% for checkbox in form.roles %}
+          <label class="chk" for="{{ checkbox.id_for_label }}">
+            {{ checkbox.tag }}
+            <span>{{ checkbox.choice_label }}</span>
+          </label>
+        {% endfor %}
+        {% for error in form.roles.errors %}<span class="err">{{ error }}</span>{% endfor %}
+      </div>
+      <div class="note">
+        You cannot grant a role holding permissions you do not hold yourself,
+        and the last remaining Admin cannot be demoted.
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stack">
+        <div class="fld">
+          <label for="reason">Reason</label>
+          <input id="reason" name="reason" placeholder="Why is this account changing?">
+          <span class="help">Recorded in the audit log with your name and the before/after values.</span>
+        </div>
+        {% if not instance %}
+          <p class="t-small dim2">
+            A temporary password is generated and shown once on save. The user
+            is forced to replace it at first sign-in — nobody else ever sees
+            their lasting password.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'settings-users' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

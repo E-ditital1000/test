@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Employees — HR — A1 360{% endblock %}
+
+{% block page_title %}Employee register{% endblock %}
+{% block page_sub %}Deactivation preserves all history · no pay or salary data is held here{% endblock %}
+{% block page_actions %}
+  {% if perms_held.manage_employees %}
+    <a class="btn btn-pri" href="{% url 'hr-employee-create' %}">Add employee</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:340px"
+           placeholder="Search name, staff ID or department" aria-label="Search employees">
+    <label class="chk" for="inactive" style="min-height:36px">
+      <input type="checkbox" name="inactive" value="1" id="inactive" {% if show_inactive %}checked{% endif %}>
+      <span class="t-small">Include deactivated</span>
+    </label>
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query or show_inactive %}<a class="btn btn-gho" href="{% url 'hr-employees' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if employees %}
+    {% comment %} Compact: the register is read in bulk and printed. Surname-first,
+       because this list sorts by surname — the rule is the sort order. {% endcomment %}
+    <div class="card compact">
+      <div class="scroll-x">
+        <table style="min-width:820px">
+          <thead>
+            <tr>
+              <th scope="col">Staff ID</th>
+              <th scope="col">Employee</th>
+              <th scope="col">Role</th>
+              <th scope="col">Department</th>
+              <th scope="col">Supervisor</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for employee in employees %}
+              <tr {% if not employee.is_active %}style="background:var(--sunken)"{% endif %}>
+                <td class="mono dim2">{{ employee.staff_id }}</td>
+                <td><b>{{ employee|a1register_name }}</b></td>
+                <td>{{ employee.job_title|default:"—" }}</td>
+                <td>{{ employee.department|default:"—" }}</td>
+                <td>{% if employee.supervisor %}{{ employee.supervisor.user|a1name }}{% else %}<span class="dim">—</span>{% endif %}</td>
+                <td>
+                  {% if employee.is_active %}
+                    <span class="pill p-appr"><i></i>Active</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Deactivated</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  {% if perms_held.manage_employees %}
+                    <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-edit' employee.pk %}">Edit</a>
+                    {% if employee.is_active %}
+                      <a class="btn btn-gho btn-sm" style="color:var(--red)"
+                         href="{% url 'hr-employee-deactivate' employee.pk %}">Deactivate</a>
+                    {% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Deactivating an employee keeps every attendance record they have. This
+        register carries no pay rate, salary or leave balance — those are the
+        Phase Two payroll engine's, deliberately not held here.
+      </div>
+    </div>
+  {% elif query or show_inactive %}
+    {% url 'hr-employees' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="hr" search_term=query total_count=total_employees total_noun="employee" clear_url=clear_url %}
+  {% else %}
+    {% url 'hr-employee-create' as create_url %}
+    {% include "shell/_empty.html" with icon="hr" heading="No employees on the register yet" body="Attendance runs off this register: an employee clocks in against their record here, and a supervisor's roll-call reads their team from it. Add the supervisors first, then their crews." primary_label="Add the first employee" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% comment %}
+"No data yet" — a different state from "nothing matches", and deliberately a
+different component. On cutover Monday this is the first screen all 38 staff
+meet, and the one that decides whether they use the system or go back to the
+phone. It names the very first action instead of apologising for having no
+data.
+
+Params: icon, heading, body, primary_label/primary_url, secondary_label/secondary_url
+{% endcomment %}
+<div class="card" style="flex:1;display:flex">
+  <div class="blank">
+    <div class="ill">
+      <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-{{ icon|default:'dashboard' }}"></use></svg>
+    </div>
+    <h6>{{ heading }}</h6>
+    <p>{{ body }}</p>
+    {% if primary_label or secondary_label %}
+      <div class="acts">
+        {% if secondary_label %}<a class="btn btn-sec" href="{{ secondary_url|default:'#' }}">{{ secondary_label }}</a>{% endif %}
+        {% if primary_label %}<a class="btn btn-pri" href="{{ primary_url|default:'#' }}">{{ primary_label }}</a>{% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>

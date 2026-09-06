@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ module }} — A1 360{% endblock %}
+
+{% block page_title %}{{ module }}{% endblock %}
+{% block page_sub %}Scheduled for {{ wave }}{% endblock %}
+
+{% comment %}
+A module the user CAN reach but whose screens are not built yet. This is a
+distinct thing from both "no data" and "refused": the route let them in, so
+saying so plainly is more honest than an empty table that looks broken.
+{% endcomment %}
+
+{% block content %}
+  <div class="card" style="flex:1;display:flex">
+    <div class="blank">
+      <div class="ill">
+        <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-{{ icon|default:'dashboard' }}"></use></svg>
+      </div>
+      <h6>{{ module }} opens in {{ wave }}</h6>
+      <p>
+        Your role reaches this module — the permission is granted and the route
+        admits you. The screens themselves are still being built.
+      </p>
+      {% if detail %}<p class="dim">{{ detail }}</p>{% endif %}
+      <div class="acts">
+        <a class="btn btn-sec" href="{% url 'dashboard-index' %}">Back to dashboard</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

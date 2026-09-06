@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Projects — A1 360{% endblock %}
+
+{% block page_title %}Projects{% endblock %}
+{% block page_sub %}{{ active_count }} active of {{ total_projects }} · every one converted from a ticket{% endblock %}
+
+{% block content %}
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:300px"
+           placeholder="Search reference, name or customer" aria-label="Search projects">
+    <select name="stage" aria-label="Filter by stage" style="max-width:220px;min-height:36px">
+      <option value="">Every stage</option>
+      {% for code, label in stages %}
+        <option value="{{ code }}" {% if code == stage %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query or stage %}<a class="btn btn-gho" href="{% url 'projects-list' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if projects %}
+    <div class="card">
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">Project</th>
+              <th scope="col">Customer &amp; site</th>
+              <th scope="col">Stage</th>
+              <th scope="col">Manager</th>
+              <th scope="col">From ticket</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for project in projects %}
+              <tr>
+                <td>
+                  <a href="{% url 'projects-detail' project.pk %}" class="two" style="text-decoration:none">
+                    <b class="mono">{{ project.reference }}</b>
+                    <span>{{ project.name|truncatechars:44 }}</span>
+                  </a>
+                </td>
+                <td>
+                  <div class="two">
+                    <b>{{ project.customer.name }}</b>
+                    <span>{{ project.site.name|default:"No site" }}</span>
+                  </div>
+                </td>
+                <td><span class="pill p-prog"><i></i>{{ project.get_stage_display }}</span></td>
+                <td class="t-small">{% if project.manager %}{{ project.manager|a1name }}{% else %}<span class="dim">—</span>{% endif %}</td>
+                <td>
+                  {% if project.ticket %}
+                    <a class="mono t-small" href="{% url 'crm-ticket-detail' project.ticket.pk %}">{{ project.ticket.reference }}</a>
+                  {% else %}
+                    <span class="dim">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if project.completed_at %}
+                    <span class="pill p-appr"><i></i>{{ project.status.label }}</span>
+                  {% else %}
+                    <span class="pill p-open"><i></i>{{ project.status.label }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query or stage %}
+    {% url 'projects-list' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="projects" search_term=query total_count=total_projects total_noun="project" clear_url=clear_url %}
+  {% else %}
+    {% url 'crm-tickets' as tickets_url %}
+    {% include "shell/_empty.html" with icon="projects" heading="No projects yet" body="Projects are not created directly — they are converted from a ticket, which is what keeps one job traceable from the first phone call through to the invoice. Open a ticket and convert it." primary_label="Go to tickets" primary_url=tickets_url %}
+  {% endif %}
+{% endblock %}

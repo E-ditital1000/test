@@ -1,0 +1,26 @@
+{% comment %}
+Each tab appears only if the viewer holds the permission that gates it —
+absent, not disabled, because no condition would ever make it usable for
+this user.
+{% endcomment %}
+<nav class="filters" aria-label="Settings sections">
+  {% if perms_held.manage_users %}
+    <a class="chip {% if active == 'users' %}on{% endif %}" href="{% url 'settings-users' %}">Users</a>
+  {% endif %}
+  {% if perms_held.manage_roles %}
+    <a class="chip {% if active == 'roles' %}on{% endif %}" href="{% url 'settings-roles' %}">Roles &amp; permissions</a>
+  {% endif %}
+  {% if perms_held.manage_service_types %}
+    <a class="chip {% if active == 'service_types' %}on{% endif %}" href="{% url 'settings-service-types' %}">Service types</a>
+  {% endif %}
+  {% if perms_held.manage_status_lists %}
+    <a class="chip {% if active == 'statuses' %}on{% endif %}" href="{% url 'settings-status-lists' %}">Status lists</a>
+  {% endif %}
+  {% if perms_held.manage_company_details %}
+    <a class="chip {% if active == 'company' %}on{% endif %}" href="{% url 'settings-company' %}">Company</a>
+    <a class="chip {% if active == 'policy' %}on{% endif %}" href="{% url 'settings-policy' %}">Policy</a>
+  {% endif %}
+  {% if perms_held.view_audit_log %}
+    <a class="chip {% if active == 'audit' %}on{% endif %}" href="{% url 'settings-audit-log' %}">Audit log</a>
+  {% endif %}
+</nav>

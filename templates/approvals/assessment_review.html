@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Assessment {{ assessment.field_job.reference }} — A1 360{% endblock %}
+
+{% block page_title %}{{ assessment.field_job.reference }} — {{ assessment.service_type.name }}{% endblock %}
+{% block page_sub %}
+  Submitted by {{ assessment.technician|a1name }} · {{ assessment.submitted_at|a1datetime }} · read-only
+{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'approvals-queue' %}">Back to queue</a>
+{% endblock %}
+
+{% comment %}
+Three read-only columns and one action column. Nothing on this screen edits
+the assessment: an office reviewer approves it or returns it, and returning
+requires a comment the technician will read.
+{% endcomment %}
+
+{% block content %}
+  <div class="cols">
+
+    <div class="card">
+      <div class="hd">
+        <b>Structured answers</b>
+        <span class="meta">{{ answered }} of {{ required }} required</span>
+      </div>
+      {% for answer in technician_answers %}
+        <div class="row-i">
+          <div class="qa g">
+            <b>{{ answer.question_text }}</b>
+            <span>{{ answer.value_text|default:"—" }}</span>
+          </div>
+        </div>
+      {% empty %}
+        <div class="row-i"><span class="dim">No technician answers recorded.</span></div>
+      {% endfor %}
+      {% if assessment.notes %}
+        <div class="grph">Technician&rsquo;s notes</div>
+        <div class="stack" style="padding-top:0">
+          <p class="t-body dim2">{{ assessment.notes|linebreaksbr }}</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="hd"><b>Client responses</b><span class="meta">Recorded separately</span></div>
+      {% for answer in client_answers %}
+        <div class="row-i">
+          <div class="qa g">
+            <b>{{ answer.question_text }}</b>
+            <span>{{ answer.value_text|default:"—" }}</span>
+          </div>
+        </div>
+      {% empty %}
+        <div class="row-i"><span class="dim">The client answered nothing on this visit.</span></div>
+      {% endfor %}
+
+      <div class="grph">Photos · {{ photos|length }} labelled</div>
+      {% if photos %}
+        <div class="thumbs">
+          {% for photo in photos %}
+            <div>
+              <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                <img src="{{ photo.image.url }}" alt="{{ photo.label }}"
+                     style="height:72px;width:100%;object-fit:cover;border-radius:8px;display:block">
+              </a>
+              <span>{{ photo.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="stack" style="padding-top:0"><span class="dim t-small">No photographs attached.</span></div>
+      {% endif %}
+    </div>
+
+    <div class="card focus">
+      <div class="hd"><b>Approval</b></div>
+      <dl style="margin:0">
+        <div class="kv">
+          <dt>Completeness</dt>
+          <dd class="{% if answered >= required %}good{% else %}warn{% endif %}">
+            {{ answered }} / {{ required }} required answered
+          </dd>
+        </div>
+        <div class="kv">
+          <dt>Photos</dt>
+          <dd class="{% if photos %}good{% else %}warn{% endif %}">{{ photos|length }} attached</dd>
+        </div>
+        <div class="kv">
+          <dt>GPS match</dt>
+          <dd class="{% if assessment.gps_match_distance_m %}good{% else %}dim{% endif %}">
+            {% if assessment.gps_match_distance_m %}
+              {{ assessment.gps_match_distance_m }} m from the site on record
+            {% elif assessment.location_unavailable %}
+              Location unavailable at submission
+            {% else %}
+              No site coordinates to compare against
+            {% endif %}
+          </dd>
+        </div>
+        <div class="kv">
+          <dt>Submitted</dt>
+          <dd class="pend">
+            {{ assessment.device_timestamp|a1datetime }} on the device ·
+            synced {{ assessment.server_received_at|a1datetime }}
+          </dd>
+        </div>
+        {% if check_in %}
+          <div class="kv">
+            <dt>Checked in</dt>
+            <dd>{{ check_in.device_timestamp|a1datetime }}</dd>
+          </div>
+        {% endif %}
+      </dl>
+
+      {% if can_decide and assessment.approval_state != "approved" %}
+        <form method="post" action="{% url 'approvals-assessment-decide' assessment.pk %}">
+          {% csrf_token %}
+          <div class="grph">Comment — required to return</div>
+          <div class="stack" style="padding-top:0">
+            <textarea name="comment" rows="3"
+                      placeholder="What does the technician need to add or redo?"></textarea>
+            <button class="btn btn-pri btn-wide" type="submit" name="decision" value="approved">Approve</button>
+            <button class="btn btn-dgr btn-wide" type="submit" name="decision" value="returned">
+              Return to technician
+            </button>
+          </div>
+        </form>
+      {% elif assessment.approval_state == "approved" %}
+        <div class="note">
+          Approved by {{ assessment.latest_decision.actor|a1name }} on
+          {{ assessment.latest_decision.created_at|a1date }}. Approval is
+          append-only, so this cannot be quietly undone — a later decision
+          would show below it.
+        </div>
+      {% endif %}
+
+      <div class="grph" style="border-top:1px solid var(--border)">Approval trail</div>
+      <div class="timeline">
+        {% for decision in trail %}
+          <div class="ev">
+            <span class="dot" aria-hidden="true"></span>
+            <div class="body">
+              <b>{{ decision.get_decision_display }}</b>
+              <span>{{ decision.actor|a1name }} · {{ decision.created_at|a1datetime }}</span>
+              {% if decision.comment %}<span class="dim2">{{ decision.comment }}</span>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

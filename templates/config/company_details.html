@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Company details — Settings — A1 360{% endblock %}
+
+{% block page_title %}Company details{% endblock %}
+{% block page_sub %}Shown across the system and printed on every invoice{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="company" %}
+
+  <form method="post" enctype="multipart/form-data"
+        style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+    </div>
+    <div><button class="btn btn-pri" type="submit">Save</button></div>
+  </form>
+{% endblock %}

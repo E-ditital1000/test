@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit employee{% else %}Add employee{% endif %} — HR — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit {{ instance.full_name }}{% else %}Add employee{% endif %}{% endblock %}
+{% block page_sub %}Attendance only · Phase One holds no pay, salary or leave data{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:720px">
+    {% csrf_token %}
+
+    <div class="card">
+      <div class="hd"><b>Employee record</b></div>
+      <div class="stack">
+        {% include "shell/_form_fields.html" %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="stack">
+        <div class="fld">
+          <label for="reason">Reason</label>
+          <input id="reason" name="reason" placeholder="Why is this record changing?">
+          <span class="help">Recorded in the audit log with the before and after values.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'hr-employees' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

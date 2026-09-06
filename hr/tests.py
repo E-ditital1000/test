@@ -1,0 +1,344 @@
+"""
+Attendance derivation tests.
+
+The one the brief calls for by name: wiping the derived table and rebuilding
+it from the append-only event log reconstructs it identically. The rest
+cover the correction rules — corrections supersede rather than overwrite,
+and a blank reason cannot be submitted.
+"""
+import uuid
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase, tag
+from django.utils import timezone
+
+from config.models import CorrectionReason, PolicySetting
+
+from .models import AttendanceCorrection, AttendanceDay, AttendanceEvent, Employee
+from .services import rebuild_attendance_days
+
+User = get_user_model()
+
+
+class AttendanceRebuildTests(TestCase):
+    def setUp(self):
+        PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
+        PolicySetting.objects.create(key=PolicySetting.LATE_AFTER_MINUTES, value="15")
+        self.reason = CorrectionReason.objects.create(
+            code="forgot_to_clock", label="Forgot to clock in/out"
+        )
+
+        self.supervisor = User.objects.create_user(username="sup", email="sup@test.local")
+        user = User.objects.create_user(username="tech", email="tech@test.local")
+        self.employee = Employee.objects.create(user=user, staff_id="A1-001")
+
+        # Three days of ordinary work.
+        base = timezone.now().replace(hour=7, minute=55, second=0, microsecond=0)
+        self.base = base - timedelta(days=3)
+        for day in range(3):
+            start = self.base + timedelta(days=day)
+            self._event(AttendanceEvent.CLOCK_IN, start)
+            self._event(AttendanceEvent.CLOCK_OUT, start + timedelta(hours=8))
+
+    def _event(self, kind, when):
+        return AttendanceEvent.objects.create(
+            employee=self.employee,
+            kind=kind,
+            client_uuid=uuid.uuid4(),
+            device_timestamp=when,
+        )
+
+    @staticmethod
+    def _fingerprint():
+        """Everything the derived table claims, in a comparable form."""
+        return sorted(
+            (
+                row.employee_id,
+                row.date,
+                row.first_in,
+                row.last_out,
+                row.total_minutes,
+                row.state,
+                row.still_clocked_in,
+                row.correction_count,
+            )
+            for row in AttendanceDay.objects.all()
+        )
+
+    def test_wiped_derived_table_reconstructs_identically(self):
+        rebuild_attendance_days()
+        original = self._fingerprint()
+        self.assertEqual(len(original), 3)
+
+        AttendanceDay.objects.all().delete()
+        self.assertEqual(AttendanceDay.objects.count(), 0)
+
+        rebuild_attendance_days()
+        self.assertEqual(self._fingerprint(), original)
+
+    def test_rebuild_is_idempotent(self):
+        rebuild_attendance_days()
+        first = self._fingerprint()
+        rebuild_attendance_days()
+        rebuild_attendance_days()
+        self.assertEqual(self._fingerprint(), first)
+
+    def test_hours_are_derived_from_the_paired_events(self):
+        rebuild_attendance_days()
+        day = AttendanceDay.objects.order_by("date").first()
+        self.assertEqual(day.total_minutes, 8 * 60)
+        self.assertEqual(day.state, AttendanceDay.PRESENT)
+        self.assertFalse(day.still_clocked_in)
+
+    def test_late_arrival_is_judged_against_the_settings_policy(self):
+        late_day = self.base + timedelta(days=5, minutes=40)  # 08:35, past the grace
+        self._event(AttendanceEvent.CLOCK_IN, late_day)
+        self._event(AttendanceEvent.CLOCK_OUT, late_day + timedelta(hours=6))
+
+        rebuild_attendance_days()
+        day = AttendanceDay.objects.get(date=timezone.localtime(late_day).date())
+        self.assertEqual(day.state, AttendanceDay.LATE)
+
+    def test_correction_supersedes_without_touching_the_original_event(self):
+        event = AttendanceEvent.objects.filter(kind=AttendanceEvent.CLOCK_IN).first()
+        original = event.device_timestamp
+
+        AttendanceCorrection.objects.create(
+            event=event,
+            action=AttendanceCorrection.AMEND_TIME,
+            original_timestamp=original,
+            corrected_timestamp=original - timedelta(hours=1),
+            reason=self.reason,
+            note="Phone was flat at the start of the shift",
+            corrected_by=self.supervisor,
+        )
+
+        event.refresh_from_db()
+        self.assertEqual(event.device_timestamp, original, "the original row must be untouched")
+        self.assertEqual(event.effective_timestamp, original - timedelta(hours=1))
+
+        rebuild_attendance_days()
+        day = AttendanceDay.objects.get(date=timezone.localtime(original).date())
+        self.assertEqual(day.total_minutes, 9 * 60)
+        self.assertEqual(day.correction_count, 1)
+
+    def test_voiding_an_event_removes_it_from_the_derived_figures(self):
+        event = AttendanceEvent.objects.filter(kind=AttendanceEvent.CLOCK_OUT).first()
+        AttendanceCorrection.objects.create(
+            event=event,
+            action=AttendanceCorrection.VOID,
+            original_timestamp=event.device_timestamp,
+            reason=self.reason,
+            corrected_by=self.supervisor,
+        )
+
+        rebuild_attendance_days()
+        day = AttendanceDay.objects.get(date=timezone.localtime(event.device_timestamp).date())
+        self.assertTrue(day.still_clocked_in)
+        self.assertEqual(day.total_minutes, 0)
+        self.assertEqual(AttendanceEvent.objects.filter(pk=event.pk).count(), 1)
+
+    def test_the_same_client_uuid_cannot_create_a_second_row(self):
+        """Resubmission from a second device is idempotent, not a duplicate."""
+        from django.db.utils import IntegrityError
+
+        shared = uuid.uuid4()
+        AttendanceEvent.objects.create(
+            employee=self.employee,
+            kind=AttendanceEvent.CLOCK_IN,
+            client_uuid=shared,
+            device_timestamp=timezone.now(),
+        )
+        with self.assertRaises(IntegrityError):
+            AttendanceEvent.objects.create(
+                employee=self.employee,
+                kind=AttendanceEvent.CLOCK_IN,
+                client_uuid=shared,
+                device_timestamp=timezone.now(),
+            )
+
+
+class EmployeeRegisterTests(TestCase):
+    def test_deactivation_preserves_history(self):
+        user = User.objects.create_user(username="gone", email="gone@test.local")
+        employee = Employee.objects.create(user=user, staff_id="A1-999")
+        AttendanceEvent.objects.create(
+            employee=employee,
+            kind=AttendanceEvent.CLOCK_IN,
+            client_uuid=uuid.uuid4(),
+            device_timestamp=timezone.now(),
+        )
+
+        employee.deactivate()
+        employee.refresh_from_db()
+
+        self.assertFalse(employee.is_active)
+        self.assertIsNotNone(employee.deactivated_at)
+        self.assertEqual(employee.attendance_events.count(), 1)
+
+    def test_register_holds_no_pay_or_salary_field(self):
+        """Payroll is Phase Two; no field anticipates it, not even 'for later'."""
+        field_names = {field.name.lower() for field in Employee._meta.get_fields()}
+        for forbidden in ("salary", "pay", "wage", "rate", "bank", "account_number"):
+            self.assertNotIn(forbidden, field_names)
+
+
+class ClockScreenTests(TestCase):
+    """
+    The mobile clock, through the view a phone actually posts to. These
+    cover the offline contract and the two refusals the release gate names.
+    """
+
+    def setUp(self):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+
+        call_command("seed_permissions", verbosity=0)
+        PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
+        PolicySetting.objects.create(key=PolicySetting.LATE_AFTER_MINUTES, value="15")
+        self.reason = CorrectionReason.objects.create(code="forgot", label="Forgot to clock in")
+
+        self.supervisor = User.objects.create_user(
+            username="sup@test.local", email="sup@test.local", password="Testing!12345"
+        )
+        self.worker = User.objects.create_user(
+            username="emp@test.local", email="emp@test.local", password="Testing!12345"
+        )
+        for user, role in ((self.supervisor, "Supervisor"), (self.worker, "Employee")):
+            user.must_reset_password = False
+            user.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=user, role=Role.objects.get(name=role))
+
+        self.sup_employee = Employee.objects.create(user=self.supervisor, staff_id="A1-001")
+        self.employee = Employee.objects.create(
+            user=self.worker, staff_id="A1-002", supervisor=self.sup_employee
+        )
+
+    def _post(self, kind, client_uuid, **extra):
+        payload = {"kind": kind, "client_uuid": client_uuid}
+        payload.update(extra)
+        return self.client.post(
+            "/hr/clock/event/", payload, headers={"x-requested-with": "XMLHttpRequest"}
+        )
+
+    @tag("acceptance")
+    def test_clocking_out_with_nothing_open_is_refused_with_an_actionable_error(self):
+        self.client.force_login(self.worker)
+        response = self._post("out", str(uuid.uuid4()), location_unavailable="1")
+        self.assertEqual(response.status_code, 409)
+        body = response.json()
+        self.assertFalse(body["ok"])
+        # It says what to do about it, not just that it failed.
+        self.assertIn("correction", body["message"])
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    @tag("acceptance")
+    def test_the_same_client_uuid_records_one_event(self):
+        self.client.force_login(self.worker)
+        client_uuid = str(uuid.uuid4())
+        first = self._post("in", client_uuid, location_unavailable="1")
+        second = self._post("in", client_uuid, location_unavailable="1")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(second.json()["ok"])
+        self.assertEqual(AttendanceEvent.objects.filter(employee=self.employee).count(), 1)
+
+    @tag("acceptance")
+    def test_a_missing_gps_fix_never_blocks_the_clock(self):
+        self.client.force_login(self.worker)
+        self._post("in", str(uuid.uuid4()), location_unavailable="1")
+        event = AttendanceEvent.objects.get()
+        self.assertTrue(event.location_unavailable)
+        self.assertIsNone(event.latitude)
+
+    def test_clocking_in_twice_is_refused(self):
+        self.client.force_login(self.worker)
+        self._post("in", str(uuid.uuid4()), location_unavailable="1")
+        response = self._post("in", str(uuid.uuid4()), location_unavailable="1")
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(AttendanceEvent.objects.count(), 1)
+
+    def test_a_clock_event_rebuilds_the_derived_day(self):
+        self.client.force_login(self.worker)
+        self._post("in", str(uuid.uuid4()), location_unavailable="1")
+        day = AttendanceDay.objects.get(employee=self.employee)
+        self.assertTrue(day.still_clocked_in)
+        self.assertNotEqual(day.state, AttendanceDay.ABSENT)
+
+    @tag("acceptance")
+    def test_a_supervisor_sees_only_their_own_team_on_the_roll_call(self):
+        stranger = User.objects.create_user(
+            username="other@test.local", email="other@test.local", password="Testing!12345"
+        )
+        Employee.objects.create(user=stranger, staff_id="A1-999")
+
+        self.client.force_login(self.supervisor)
+        body = self.client.get("/hr/roll-call/").content.decode()
+        self.assertIn("A1-002", body, "their own team member must appear")
+        self.assertNotIn("A1-999", body, "another team's employee must not")
+
+    @tag("acceptance")
+    def test_a_correction_preserves_the_original_and_needs_a_reason(self):
+        self.client.force_login(self.worker)
+        self._post("in", str(uuid.uuid4()), location_unavailable="1")
+        event = AttendanceEvent.objects.get()
+        original = event.device_timestamp
+
+        self.client.force_login(self.supervisor)
+        # A blank reason cannot submit.
+        self.client.post(f"/hr/events/{event.pk}/correct/", {"action": "amend_time", "reason": ""})
+        self.assertEqual(AttendanceCorrection.objects.count(), 0)
+
+        corrected = (original - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+        self.client.post(
+            f"/hr/events/{event.pk}/correct/",
+            {"action": "amend_time", "corrected_timestamp": corrected, "reason": self.reason.pk},
+        )
+        correction = AttendanceCorrection.objects.get()
+        event.refresh_from_db()
+
+        self.assertEqual(correction.corrected_by, self.supervisor)
+        # The original row is untouched; the correction supersedes it.
+        self.assertEqual(event.device_timestamp, original)
+        self.assertEqual(correction.original_timestamp, original)
+        self.assertNotEqual(event.effective_timestamp, original)
+
+    @tag("acceptance")
+    def test_the_monthly_export_keeps_its_column_contract(self):
+        """
+        These headers are what a Phase Two payroll engine reads. The report
+        belongs to HR — a Supervisor runs the roll-call, not the month.
+        """
+        from accounts.models import Role, UserRole
+
+        hr_user = User.objects.create_user(
+            username="hr@test.local", email="hr@test.local", password="Testing!12345"
+        )
+        hr_user.must_reset_password = False
+        hr_user.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=hr_user, role=Role.objects.get(name="HR"))
+
+        self.assertEqual(
+            self.client.get("/hr/report/?export=csv").status_code, 302,
+            "signed out, the report redirects to sign in",
+        )
+        self.client.force_login(self.supervisor)
+        self.assertEqual(
+            self.client.get("/hr/report/").status_code, 403,
+            "a Supervisor runs the roll-call, not the monthly report",
+        )
+
+        self.client.force_login(hr_user)
+        response = self.client.get("/hr/report/?export=csv")
+        self.assertEqual(response.status_code, 200)
+        header = response.content.decode().splitlines()[0]
+        self.assertEqual(
+            header,
+            "staff_id,surname,first_name,department,days_present,days_absent,"
+            "late_arrivals,total_hours,corrections",
+        )
+        # No pay, rate or salary column exists anywhere in it.
+        for banned in ("salary", "rate", "pay", "wage"):
+            self.assertNotIn(banned, header)

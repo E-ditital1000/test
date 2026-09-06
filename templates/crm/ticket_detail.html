@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ ticket.reference }} — A1 360{% endblock %}
+
+{% block page_title %}{{ ticket.reference }} — {{ ticket.description|truncatechars:48 }}{% endblock %}
+{% block page_sub %}
+  {{ ticket.customer.name }}{% if ticket.site %} · {{ ticket.site.name }}{% endif %}
+  · raised {{ ticket.created_at|a1datetime }}{% if ticket.raised_by %} by {{ ticket.raised_by|a1name }}{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'crm-tickets' %}">All tickets</a>
+  {% if ticket.is_open and perms_held.close_ticket %}
+    <form method="post" action="{% url 'crm-ticket-close' ticket.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn btn-sec" type="submit">Close ticket</button>
+    </form>
+  {% endif %}
+  {% if can_convert %}
+    <form method="post" action="{% url 'crm-ticket-convert' ticket.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn btn-pri" type="submit">Convert to project</button>
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+
+      <div class="card">
+        <div class="hd">
+          <b>Ticket</b>
+          <span class="meta">
+            {% if ticket.is_open %}
+              <span class="pill p-open"><i></i>{{ ticket.status.label }}</span>
+            {% else %}
+              <span class="pill p-clos"><i></i>{{ ticket.status.label }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <dl style="margin:0">
+          <div class="kv">
+            <dt>Customer</dt>
+            <dd><a href="{% url 'crm-customer-detail' ticket.customer.pk %}">{{ ticket.customer.name }}</a></dd>
+          </div>
+          <div class="kv">
+            <dt>Site</dt>
+            <dd>{{ ticket.site.name|default:"—" }}{% if ticket.site.address %} · {{ ticket.site.address }}{% endif %}</dd>
+          </div>
+          <div class="kv"><dt>Service type</dt><dd>{{ ticket.service_type.name }}</dd></div>
+          <div class="kv"><dt>Priority</dt><dd>{{ ticket.get_priority_display }}</dd></div>
+          <div class="kv">
+            <dt>Raised by</dt>
+            <dd>{% if ticket.raised_by %}{{ ticket.raised_by|a1name }}{% else %}—{% endif %} · {{ ticket.created_at|a1datetime }}</dd>
+          </div>
+          <div class="kv">
+            <dt>Assigned to</dt>
+            <dd>
+              {% if ticket.assigned_to %}
+                {{ ticket.assigned_to|a1name }} · {{ ticket.assigned_at|a1datetime }}
+              {% else %}
+                <span class="bad">Unassigned</span>
+              {% endif %}
+            </dd>
+          </div>
+          <div class="kv">
+            <dt>Age</dt>
+            <dd class="mono">{{ ticket.age_label }}{% if not ticket.is_open %} · closed {{ ticket.closed_at|a1datetime }}{% endif %}</dd>
+          </div>
+          <div class="kv"><dt>Description</dt><dd>{{ ticket.description|linebreaksbr }}</dd></div>
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Activity log</b><span class="meta">Append-only · newest first</span></div>
+        <div class="timeline">
+          {% for event in events %}
+            <div class="ev">
+              <span class="dot" aria-hidden="true"></span>
+              <div class="body">
+                <b>{{ event.action }}</b>
+                <span>
+                  {% if event.actor %}{{ event.actor|a1name }} · {% endif %}{{ event.created_at|a1datetime }}{% if event.detail %} · {{ event.detail }}{% endif %}
+                </span>
+              </div>
+            </div>
+          {% empty %}
+            <div class="ev"><div class="body"><span class="dim">Nothing recorded yet.</span></div></div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      {% if project %}
+        <div class="card">
+          <div class="hd"><b>Linked project</b><span class="meta">one job lineage</span></div>
+          <div class="stack">
+            <div class="two">
+              <b><a href="{% url 'projects-detail' project.pk %}">{{ project.reference }}</a></b>
+              <span>{{ project.name }}</span>
+            </div>
+            <div class="kvr"><span>Stage</span><b>{{ project.get_stage_display }}</b></div>
+            <a class="btn btn-sec btn-wide" href="{% url 'projects-detail' project.pk %}">Open project</a>
+          </div>
+          <div class="note">
+            Both records keep their own identity and stay linked permanently.
+            The project carries this job reference through to the invoice.
+          </div>
+        </div>
+
+      {% elif can_convert %}
+        <div class="card focus">
+          <div class="hd"><b>Convert to project</b></div>
+          <div class="stack">
+            <span class="t-small dim2">
+              Customer, site, service type and description carry across. Both
+              records stay linked permanently — the project keeps this job
+              reference, which is what makes the work traceable end to end.
+            </span>
+            <div class="fld">
+              <label>Carries across</label>
+              <div class="inp is-disabled">{{ ticket.customer.name }} · {{ ticket.service_type.name }}</div>
+            </div>
+            <div class="fld">
+              <label>Opens at stage</label>
+              <div class="inp is-disabled">Site assessment</div>
+            </div>
+            <form method="post" action="{% url 'crm-ticket-convert' ticket.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-pri btn-wide" type="submit">Create the project</button>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if ticket.is_open and perms_held.assign_ticket %}
+        <div class="card">
+          <div class="hd"><b>{% if ticket.assigned_to %}Reassign{% else %}Assign{% endif %}</b></div>
+          <form method="post" action="{% url 'crm-ticket-assign' ticket.pk %}">
+            {% csrf_token %}
+            <div class="stack">
+              <div class="fld">
+                <label for="{{ assign_form.assigned_to.id_for_label }}">Technician</label>
+                {{ assign_form.assigned_to }}
+              </div>
+              <button class="btn btn-sec btn-wide" type="submit">Save assignment</button>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if ticket.is_open %}
+        <div class="card">
+          <div class="hd"><b>Status &amp; priority</b></div>
+          <form method="post" action="{% url 'crm-ticket-update' ticket.pk %}">
+            {% csrf_token %}
+            <div class="stack">
+              {% include "shell/_form_fields.html" with form=status_form %}
+              <button class="btn btn-sec btn-wide" type="submit">Update</button>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

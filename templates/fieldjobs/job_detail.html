@@ -1,0 +1,120 @@
+{% extends "shell/field.html" %}
+{% load a1 %}
+{% block title %}{{ job.reference }} — A1 360{% endblock %}
+
+{% block phone_title %}{{ job.reference }}{% endblock %}
+{% block phone_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="mc" style="gap:10px">
+    <p class="t-label">This visit</p>
+    <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
+    <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
+    {% if job.site.address %}
+      <div class="kvr"><span>Address</span><b style="text-align:right">{{ job.site.address }}</b></div>
+    {% endif %}
+    {% if job.instructions %}
+      <p class="t-m-meta dim2">{{ job.instructions|linebreaksbr }}</p>
+    {% endif %}
+  </div>
+
+  {% if check_in %}
+    <div class="mc ok">
+      <p class="t-label" style="color:var(--green)">Checked in</p>
+      <p class="t-m-action">{{ check_in.device_timestamp|date:"H:i" }}</p>
+      <p class="t-m-meta dim2">
+        {% if check_in.location_unavailable %}
+          Location unavailable — the check-in was recorded anyway
+        {% else %}
+          {{ check_in.accuracy_m|a1metres }}
+        {% endif %}
+      </p>
+    </div>
+  {% else %}
+    {% comment %} GPS is captured at the event only. If no fix arrives within five
+       seconds the check-in still records, marked location unavailable. {% endcomment %}
+    <form method="post" action="{% url 'fieldjobs-check-in' job.pk %}" id="checkin-form">
+      {% csrf_token %}
+      <input type="hidden" name="client_uuid" id="ci-uuid">
+      <input type="hidden" name="device_timestamp" id="ci-when">
+      <input type="hidden" name="latitude" id="ci-lat">
+      <input type="hidden" name="longitude" id="ci-lng">
+      <input type="hidden" name="accuracy_m" id="ci-acc">
+      <input type="hidden" name="location_unavailable" id="ci-nogps" value="">
+      <button class="act act-gold" type="submit" id="ci-button">Check in on site</button>
+    </form>
+    <p class="t-m-meta dim">
+      If no fix arrives within five seconds the check-in still records,
+      marked location unavailable. GPS never blocks the event.
+    </p>
+  {% endif %}
+
+  {% if assessment %}
+    <div class="mc ok">
+      <p class="t-label" style="color:var(--green)">Assessment submitted</p>
+      <p class="t-m-action">{{ assessment.submitted_at|date:"H:i" }}</p>
+      <p class="t-m-meta dim2">
+        {{ assessment.answers.count }} answer{{ assessment.answers.count|pluralize }},
+        {{ assessment.photos.count }} photo{{ assessment.photos.count|pluralize }}
+        {% if assessment.approval_state == "approved" %} · approved by the office
+        {% elif assessment.approval_state == "returned" %} · returned for more detail
+        {% else %} · waiting for review{% endif %}
+      </p>
+    </div>
+    {% if assessment.approval_state == "returned" %}
+      <div class="mc warnbox">
+        <p class="t-label" style="color:var(--gold700)">Returned</p>
+        <p class="t-m-meta" style="color:var(--text2)">{{ assessment.latest_decision.comment }}</p>
+      </div>
+      <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Redo the assessment</a>
+    {% endif %}
+  {% elif can_assess %}
+    <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Start the site assessment</a>
+    <p class="t-m-meta dim">
+      The questions come from the service type. You can fill this in with no
+      signal — it saves on the phone and uploads by itself.
+    </p>
+  {% endif %}
+
+  <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px;justify-content:center">
+    Back to today
+  </a>
+{% endblock %}
+
+{% block body_extra %}
+{% if not check_in %}
+<script>
+(function () {
+  "use strict";
+  var form = document.getElementById("checkin-form");
+  if (!form) return;
+
+  var sent = false;
+  form.addEventListener("submit", function (event) {
+    if (sent) return;
+    event.preventDefault();
+
+    var button = document.getElementById("ci-button");
+    button.disabled = true;
+    button.textContent = "Getting location…";
+
+    document.getElementById("ci-uuid").value = A1.uuid();
+    document.getElementById("ci-when").value = new Date().toISOString();
+
+    // Five seconds, then check in regardless. GPS never blocks the event.
+    A1.locate().then(function (fix) {
+      if (fix.unavailable) {
+        document.getElementById("ci-nogps").value = "1";
+      } else {
+        document.getElementById("ci-lat").value = fix.latitude;
+        document.getElementById("ci-lng").value = fix.longitude;
+        document.getElementById("ci-acc").value = fix.accuracy_m;
+      }
+      sent = true;
+      form.submit();
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

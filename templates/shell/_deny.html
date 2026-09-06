@@ -1,0 +1,28 @@
+{% comment %}
+Permission refused. The server refuses regardless of what the client sent,
+so this state always exists and has to be designed. It names the missing
+permission and who can grant it, because the alternative is a support call.
+
+Params: heading, permission_label, scope_note, role_name, back_url, back_label
+{% endcomment %}
+<div style="flex:1;display:flex">
+  <div class="deny">
+    <div class="b">
+      <span class="kicker">Refused by the server</span>
+      <b class="t-h20">{{ heading|default:"You don't have access to this screen" }}</b>
+      <p class="t-body dim2">
+        This view needs the <b>{{ permission_label }}</b> permission{% if scope_note %}, scoped to {{ scope_note }}{% endif %}.
+        {% if role_name %}Your role, <b>{{ role_name }}</b>, doesn't hold it.{% endif %}
+      </p>
+      <div class="hint">
+        An Admin can grant it in <b>Settings &rarr; Roles &amp; permissions</b>.
+        Both the request and the refusal are in the audit log.
+      </div>
+      {% if back_url %}
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-sec" href="{{ back_url }}">{{ back_label|default:"Go back" }}</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Schedule a field job — A1 360{% endblock %}
+
+{% block page_title %}Schedule a field job{% endblock %}
+{% block page_sub %}
+  {% if project %}
+    On {{ project.reference }} · carries the same job reference through to the invoice
+  {% else %}
+    Puts the job on a technician&rsquo;s phone
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:680px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      {% if project %}
+        <div class="note">
+          Customer and service type come from the project and cannot be changed
+          here — the service type is what decides which assessment questions the
+          technician answers on site.
+        </div>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% if project %}{% url 'projects-detail' project.pk %}{% else %}{% url 'projects-list' %}{% endif %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Schedule the job</button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,207 @@
+{% extends "shell/field.html" %}
+{% load a1 %}
+{% block title %}Clock — A1 360{% endblock %}
+
+{% comment %}
+The whole HR module reaches every employee through this one button.
+
+Offline-first: the event is written to this device before it is sent. If the
+network fails it stays queued, the tab badge shows how many are waiting, and
+it uploads by itself when signal returns. Every queued event carries the UUID
+it was created with, so re-sending after a dropped connection resolves to the
+row that already exists instead of creating a second one.
+{% endcomment %}
+
+{% block phone_title %}{% a1greeting %}, {{ user.first_name|default:user.email }}{% endblock %}
+{% block phone_sub %}
+  {% if employee %}{{ employee.staff_id }} · {{ employee.department|default:"A-1 Technical" }}{% else %}A-1 Technical{% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if employee %}
+    <div class="ban" id="queue-banner" hidden>
+      <i></i><span id="queue-text">Saved on this phone</span>
+    </div>
+
+    {% if open_since %}
+      <div class="mc ok">
+        <p class="t-label" style="color:var(--green)">Elapsed today</p>
+        <p class="big" id="elapsed" data-since="{{ open_since|date:'c' }}">{{ elapsed_minutes|a1hours }}</p>
+        <p class="t-m-meta dim2">Clocked in {{ open_since|a1datetime }}</p>
+      </div>
+
+      <form method="post" action="{% url 'hr-clock-event' %}" class="clock-form" data-kind="out">
+        {% csrf_token %}
+        <input type="hidden" name="kind" value="out">
+        <button class="act act-red" type="submit">Clock out</button>
+      </form>
+    {% else %}
+      <form method="post" action="{% url 'hr-clock-event' %}" class="clock-form" data-kind="in">
+        {% csrf_token %}
+        <input type="hidden" name="kind" value="in">
+        <button class="act act-gold" type="submit">Clock in</button>
+      </form>
+
+      <div class="mc" style="gap:6px">
+        <p class="t-label">Today</p>
+        <p class="t-m-action">
+          {% if today and today.first_in %}
+            Clocked out · {{ today.total_minutes|a1hours }} recorded
+          {% else %}
+            Not clocked in yet
+          {% endif %}
+        </p>
+        <p class="t-m-meta dim">
+          Two taps. GPS is captured at the moment you tap, never continuously —
+          and if no fix arrives the clock still records.
+        </p>
+      </div>
+    {% endif %}
+
+    <div class="mc" style="gap:12px">
+      <p class="t-label">Your last seven days</p>
+      {% for day in recent_days %}
+        <div class="dayr">
+          <div class="l">
+            <span>{{ day.date|a1date }}</span>
+            <b class="{% if day.state == 'late' %}warn{% elif day.state == 'absent' %}bad{% endif %}">
+              {% if day.first_in %}{{ day.first_in|date:"H:i" }} — {% if day.last_out %}{{ day.last_out|date:"H:i" }}{% else %}still in{% endif %}{% else %}—{% endif %}
+            </b>
+          </div>
+          {% if day.correction_count %}
+            <small style="color:var(--indigo)">
+              {{ day.correction_count }} correction{{ day.correction_count|pluralize }} on this day
+            </small>
+          {% endif %}
+        </div>
+      {% empty %}
+        <p class="t-m-meta dim">Nothing recorded yet. Your first clock-in will appear here.</p>
+      {% endfor %}
+    </div>
+
+    <div class="mc" style="gap:6px">
+      <p class="t-label">If something is wrong</p>
+      <p class="t-m-meta dim2">
+        You cannot edit a clock event. Ask your supervisor for a correction —
+        the original stays on the record with who changed it and when.
+      </p>
+    </div>
+
+  {% else %}
+    <div class="mc" style="gap:10px;align-items:center;text-align:center;padding:28px 20px">
+      <p class="t-m-action">You are not on the employee register yet</p>
+      <p class="t-m-meta dim">
+        Attendance runs off the HR register. Ask HR to add your record — your
+        account is fine, it just has nothing to clock against.
+      </p>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block body_extra %}
+{% if employee %}
+<script>
+(function () {
+  "use strict";
+  var KEY = "clock-queue";
+  var ENDPOINT = "{% url 'hr-clock-event' %}";
+
+  function paint(queue) {
+    var banner = document.getElementById("queue-banner");
+    if (!banner) return;
+    if (queue.length) {
+      banner.hidden = false;
+      document.getElementById("queue-text").textContent =
+        queue.length + " event" + (queue.length === 1 ? "" : "s") +
+        " saved on this phone · will upload when there is signal";
+    } else {
+      banner.hidden = true;
+    }
+  }
+
+  function read() {
+    return A1.store.get(KEY).then(function (queue) { return queue || []; });
+  }
+
+  function write(queue) {
+    paint(queue);
+    return A1.store.set(KEY, queue);
+  }
+
+  function send(item) {
+    return A1.postForm(ENDPOINT, item).then(function (response) {
+      return response.json().then(function (data) {
+        // 400 and 409 are refusals on the merits — clocking out with nothing
+        // open, or a payload the server will never accept. Retrying cannot
+        // help, so the event leaves the queue and the person is told.
+        var retry = !response.ok && response.status !== 409 && response.status !== 400;
+        return { keep: retry, ok: data.ok, message: data.message };
+      });
+    });
+  }
+
+  function flush() {
+    return read().then(function (queue) {
+      if (!queue.length) return;
+      return send(queue[0]).then(function (result) {
+        if (result.keep) return;
+        return write(queue.slice(1)).then(function () {
+          if (result.ok) location.reload();
+          else alert(result.message);
+        });
+      });
+    }).catch(function () {
+      // Still offline. The queue stays exactly where it is.
+    });
+  }
+
+  document.querySelectorAll(".clock-form").forEach(function (form) {
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      var button = form.querySelector("button");
+      var original = button.textContent;
+      button.disabled = true;
+      button.textContent = "Saving…";
+
+      A1.locate().then(function (fix) {
+        var item = {
+          kind: form.dataset.kind,
+          client_uuid: A1.uuid(),
+          device_timestamp: new Date().toISOString()
+        };
+        if (fix.unavailable) {
+          item.location_unavailable = "1";
+        } else {
+          item.latitude = fix.latitude;
+          item.longitude = fix.longitude;
+          item.accuracy_m = fix.accuracy_m;
+        }
+        // Written to this device first. Only then do we try the network.
+        return read().then(function (queue) {
+          return write(queue.concat([item]));
+        }).then(flush);
+      }).then(function () {
+        button.disabled = false;
+        button.textContent = original;
+      });
+    });
+  });
+
+  window.addEventListener("online", flush);
+  read().then(function (queue) {
+    paint(queue);
+    if (queue.length) flush();
+  });
+
+  var elapsed = document.getElementById("elapsed");
+  if (elapsed && elapsed.dataset.since) {
+    setInterval(function () {
+      var mins = Math.floor((Date.now() - new Date(elapsed.dataset.since)) / 60000);
+      elapsed.textContent =
+        Math.floor(mins / 60) + "h " + String(mins % 60).padStart(2, "0") + "m";
+    }, 30000);
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

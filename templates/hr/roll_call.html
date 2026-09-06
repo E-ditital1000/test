@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Roll-call — A1 360{% endblock %}
+
+{% block page_title %}Daily roll-call — {{ on_date|a1date }}{% endblock %}
+{% block page_sub %}{{ rows|length }} on your team · exceptions first · derived from the event log{% endblock %}
+{% block page_actions %}
+  <form method="get" style="display:flex;gap:8px;align-items:center">
+    <input type="date" name="date" value="{{ on_date|date:'Y-m-d' }}" aria-label="Roll-call date"
+           style="min-height:40px;max-width:180px">
+    <button class="btn btn-sec" type="submit">Show</button>
+  </form>
+  {% if perms_held.view_attendance_reports %}
+    <a class="btn btn-sec" href="{% url 'hr-monthly-report' %}">Monthly report</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric ok"><span>In on time</span><b>{{ counts.present }}</b><em>clocked in within the grace period</em></div>
+    <div class="metric {% if counts.late %}alert{% endif %}"><span>Late</span><b>{{ counts.late }}</b><em>after the grace period</em></div>
+    <div class="metric {% if counts.absent %}alert{% endif %}"><span>Absent</span><b>{{ counts.absent }}</b><em>no clock event</em></div>
+    <div class="metric {% if counts.still_in %}alert{% endif %}"><span>Still clocked in</span><b>{{ counts.still_in }}</b><em>never clocked out</em></div>
+  </div>
+
+  {% if rows %}
+    <div class="card compact">
+      <div class="hd"><b>Today&rsquo;s team</b><span class="meta">Exceptions sorted to the top</span></div>
+      <div class="scroll-x">
+        <table style="min-width:820px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col">Staff ID</th>
+              <th scope="col">Clock in</th>
+              <th scope="col">Clock out</th>
+              <th scope="col">Location</th>
+              <th scope="col">State</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td><b>{{ row.employee|a1register_name }}</b></td>
+                <td class="mono dim2">{{ row.employee.staff_id }}</td>
+                <td class="mono {% if row.state == 'late' %}warn{% elif row.state == 'absent' %}bad{% endif %}">
+                  {% if row.day.first_in %}{{ row.day.first_in|date:"H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="mono dim">
+                  {% if row.day.last_out %}{{ row.day.last_out|date:"H:i" }}{% else %}—{% endif %}
+                </td>
+                <td class="t-small dim">
+                  {% if row.day and row.day.total_minutes %}{{ row.day.total_minutes|a1hours }} recorded{% else %}—{% endif %}
+                </td>
+                <td>
+                  {% if row.day and row.day.still_clocked_in %}
+                    <span class="pill p-prog"><i></i>Still clocked in</span>
+                  {% elif row.state == "present" %}
+                    <span class="pill p-appr"><i></i>Present</span>
+                  {% elif row.state == "late" %}
+                    <span class="pill p-wait"><i></i>Late</span>
+                  {% else %}
+                    <span class="pill p-over"><i></i>Absent</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  {% if can_correct %}
+                    <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-attendance' row.employee.pk %}">Review</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        A correction is a new record, not an edit. The original value stays
+        visible with who changed it and when, and a blank reason cannot be
+        submitted — that is what makes this record defensible later.
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="hr" heading="Nobody on your team yet" body="The roll-call reads your team from the employee register — the people whose supervisor is you. Once HR sets that, your crew appears here every morning." %}
+  {% endif %}
+{% endblock %}

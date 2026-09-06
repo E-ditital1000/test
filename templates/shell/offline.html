@@ -1,0 +1,52 @@
+{% extends "shell/_document.html" %}
+{% load static %}
+{% block title %}Offline — A1 360{% endblock %}
+
+{% comment %}
+The last resort: the device has no signal and this particular screen has
+never been opened on it, so there is nothing cached to show. It says what is
+true — the work already on the phone is safe — because the fear at this
+moment is that something has been lost.
+
+Served from the cache by the service worker, so it must not depend on
+anything the network would have to fetch.
+{% endcomment %}
+
+{% block body %}
+<div class="phone">
+  <header class="phead">
+    <b>No signal</b>
+    <span>and this screen is not on the phone yet</span>
+  </header>
+
+  <main class="pbody" id="main">
+    <div class="mc warnbox">
+      <p class="t-label" style="color:var(--gold700)">Nothing is lost</p>
+      <p class="t-m-meta" style="color:var(--text2)">
+        Anything you have already filled in — a clock event, an assessment you
+        were part way through — is saved on this phone and uploads by itself
+        when signal returns. You do not need to do it again.
+      </p>
+    </div>
+
+    <div class="mc" style="gap:10px">
+      <p class="t-label">What you can still do</p>
+      <p class="t-m-body">
+        Screens you have opened today already work without signal. Go back to
+        your job list and carry on from there.
+      </p>
+      <a class="act act-gold" href="{% url 'fieldjobs-my-jobs' %}">Back to today&rsquo;s jobs</a>
+      <button class="btn btn-sec" type="button" onclick="location.reload()"
+              style="min-height:48px;justify-content:center">Try again</button>
+    </div>
+
+    <div class="mc" style="gap:6px">
+      <p class="t-label">Why this happens</p>
+      <p class="t-m-meta dim">
+        A screen has to be opened once with signal before the phone can show
+        it again offline. This is the only one that was not.
+      </p>
+    </div>
+  </main>
+</div>
+{% endblock %}

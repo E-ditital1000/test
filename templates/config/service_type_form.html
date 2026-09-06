@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit service type{% else %}Add service type{% endif %} — Settings — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit {{ instance.name }}{% else %}Add service type{% endif %}{% endblock %}
+{% block page_sub %}Its question set is edited next, and decides what a technician answers on site{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'settings-service-types' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save and edit questions</button>
+    </div>
+  </form>
+{% endblock %}

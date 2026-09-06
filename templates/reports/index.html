@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{% if report %}{{ report.label }}{% else %}Reports{% endif %} — A1 360{% endblock %}
+
+{% block page_title %}{% if report %}{{ report.label }}{% else %}Reports{% endif %}{% endblock %}
+{% block page_sub %}
+  Fixed set · every figure derived at query time from source rows
+  {% if report and report.period %} · {{ months|length }}{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+  {% if report %}
+    <form method="get" style="display:flex;gap:8px;align-items:center">
+      {% if report.period %}
+        <select name="month" aria-label="Month" style="min-height:40px;max-width:150px">
+          {% for value, label in months %}
+            <option value="{{ value }}" {% if value == month %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="year" aria-label="Year" style="min-height:40px;max-width:110px">
+          {% for value in years %}
+            <option value="{{ value }}" {% if value == year %}selected{% endif %}>{{ value }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-sec" type="submit">Show</button>
+      {% endif %}
+    </form>
+    {% if can_export %}
+      <a class="btn btn-pri" href="?year={{ year }}&month={{ month }}&export=csv">Export CSV</a>
+    {% endif %}
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if not reports %}
+    {% include "shell/_empty.html" with icon="reports" heading="No reports your role can read" body="You can reach the Reports module, but every report in the fixed set needs a permission your role does not hold. An Admin grants those in Settings → Roles & permissions." %}
+  {% else %}
+    <div class="cols">
+      {% comment %}
+      A fixed set, listed in full. There is no builder here on purpose: a
+      report someone can compose is a report nobody owns.
+      {% endcomment %}
+      <div class="card" style="flex:0 0 280px">
+        <div class="hd"><b>Reports</b><span class="meta">{{ reports|length }}</span></div>
+        {% for entry in reports %}
+          <a class="row-i" href="{% url 'reports-detail' entry.key %}"
+             style="text-decoration:none;color:inherit;{% if entry.key == report.key %}background:var(--gold100){% endif %}"
+             {% if entry.key == report.key %}aria-current="page"{% endif %}>
+            <span class="g" style="font-weight:{% if entry.key == report.key %}600{% else %}400{% endif %}">
+              {{ entry.label }}
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card">
+          <div class="hd">
+            <b>{{ report.label }}</b>
+            <span class="meta">
+              {{ rows|length }} row{{ rows|length|pluralize }}
+              {% if report.period %} · {{ report.label }} for {{ month }}/{{ year }}{% endif %}
+            </span>
+          </div>
+
+          {% if rows %}
+            {# Compact: reports are read in bulk and printed. #}
+            <div class="scroll-x">
+              <table style="min-width:720px">
+                <thead>
+                  <tr>
+                    {% for column in report.columns %}
+                      <th scope="col" {% if column.numeric %}class="num"{% endif %}>{{ column.label }}</th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in rows %}
+                    <tr>
+                      {% for column in report.columns %}
+                        {% with value=row|dictkey:column.key %}
+                          <td {% if column.numeric %}class="num"{% endif %}>
+                            {% if column.money %}{{ value|a1money }}
+                            {% elif value|is_datetime %}{{ value|a1datetime }}
+                            {% else %}{{ value }}{% endif %}
+                          </td>
+                        {% endwith %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+                {% if totals %}
+                  <tfoot>
+                    <tr>
+                      {% for column in report.columns %}
+                        {% if forloop.first %}
+                          <td><b>Totals</b></td>
+                        {% else %}
+                          {% with value=totals|dictkey:column.key %}
+                            <td {% if column.numeric %}class="num"{% endif %}>
+                              {% if value != None %}
+                                <b>{% if column.money %}{{ value|a1money }}{% else %}{{ value }}{% endif %}</b>
+                              {% endif %}
+                            </td>
+                          {% endwith %}
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  </tfoot>
+                {% endif %}
+              </table>
+            </div>
+            <div class="note">
+              {{ report.description }} The totals are summed from the rows above,
+              not queried separately — so this report cannot disagree with itself.
+            </div>
+          {% else %}
+            <div class="blank" style="padding:40px">
+              <div class="ill">
+                <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-reports"></use></svg>
+              </div>
+              <h6>Nothing in this period</h6>
+              <p>
+                {{ report.description }}
+                {% if report.period %}
+                  There is no matching activity in {{ month }}/{{ year }} — try another month.
+                {% endif %}
+              </p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

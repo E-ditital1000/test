@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ employee.full_name }} attendance — A1 360{% endblock %}
+
+{% block page_title %}{{ employee|a1register_name }} — attendance{% endblock %}
+{% block page_sub %}{{ employee.staff_id }} · every event, with its corrections{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Back to roll-call</a>
+{% endblock %}
+
+{% block content %}
+  <div class="cols">
+    <div style="flex:2">
+      <div class="card">
+        <div class="hd">
+          <b>Clock events</b>
+          <span class="meta">Append-only · newest first · never edited in place</span>
+        </div>
+        {% for event in events %}
+          <div class="row-i">
+            <div class="two g">
+              <b>
+                {{ event.get_kind_display }} · <span class="mono">{{ event.device_timestamp|a1datetime }}</span>
+                {% if event.is_voided %}<span class="pill p-clos"><i></i>Voided</span>{% endif %}
+              </b>
+              <span>
+                {% if event.location_unavailable %}
+                  Location unavailable
+                {% else %}
+                  {{ event.accuracy_m|a1metres }}
+                {% endif %}
+                · synced {{ event.server_received_at|a1datetime }}
+              </span>
+
+              {% for correction in event.corrections.all %}
+                {# The original stays visible above; this is what changed it. #}
+                <span class="pend" style="font-size:12px">
+                  {{ correction.get_action_display }}
+                  {% if correction.corrected_timestamp %}
+                    → {{ correction.corrected_timestamp|a1datetime }}
+                  {% endif %}
+                  · {{ correction.reason.label }}
+                  · {{ correction.corrected_by|a1name }} on {{ correction.created_at|a1date }}
+                  {% if correction.note %} · {{ correction.note }}{% endif %}
+                </span>
+              {% endfor %}
+            </div>
+            <a class="btn btn-sec btn-sm" href="{% url 'hr-correction-create' event.pk %}">Correct</a>
+          </div>
+        {% empty %}
+          <div class="blank" style="padding:32px">
+            <h6>No clock events yet</h6>
+            <p>Nothing to correct until this person clocks in for the first time.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <div class="card compact">
+        <div class="hd"><b>Derived days</b><span class="meta">Rebuilt from the events</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Hours</th>
+              <th scope="col">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for day in days %}
+              <tr>
+                <td class="mono">{{ day.date|a1date }}</td>
+                <td class="mono">{{ day.total_minutes|a1hours }}</td>
+                <td>
+                  {% if day.state == "present" %}<span class="pill p-appr"><i></i>Present</span>
+                  {% elif day.state == "late" %}<span class="pill p-wait"><i></i>Late</span>
+                  {% else %}<span class="pill p-over"><i></i>Absent</span>{% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="dim">Nothing derived yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="note">
+          These rows are a cache. They are rebuilt from the events above, so
+          wiping them changes nothing — the events are the record.
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

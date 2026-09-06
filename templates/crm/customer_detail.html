@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ customer.name }} — A1 360{% endblock %}
+
+{% block page_title %}{{ customer.name }}{% endblock %}
+{% block page_sub %}
+  {{ open_tickets }} open ticket{{ open_tickets|pluralize }} · {{ tickets|length }} in total · customer since {{ customer.created_at|a1date }}
+{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'crm-customers' %}">All customers</a>
+  {% if perms_held.create_customer %}
+    <a class="btn btn-sec" href="{% url 'crm-customer-edit' customer.pk %}">Edit</a>
+  {% endif %}
+  {% if perms_held.create_ticket %}
+    <a class="btn btn-pri" href="{% url 'crm-ticket-create' %}">New ticket</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+
+      {% comment %}
+      The service history: one timeline answering "what have we done for these
+      people", drawn from the tickets themselves rather than a summary field.
+      {% endcomment %}
+      <div class="card">
+        <div class="hd">
+          <b>Service history</b>
+          <span class="meta">Newest first · drawn from tickets and the projects they became</span>
+        </div>
+        {% if tickets %}
+          <div class="scroll-x">
+            <table style="min-width:680px">
+              <thead>
+                <tr>
+                  <th scope="col">Ticket</th>
+                  <th scope="col">Service type</th>
+                  <th scope="col">Raised</th>
+                  <th scope="col">Became</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ticket in tickets %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'crm-ticket-detail' ticket.pk %}" class="two" style="text-decoration:none">
+                        <b class="mono">{{ ticket.reference }}</b>
+                        <span>{{ ticket.description|truncatechars:44 }}</span>
+                      </a>
+                    </td>
+                    <td class="t-small dim">{{ ticket.service_type.name }}</td>
+                    <td class="mono t-small">{{ ticket.created_at|a1date }}</td>
+                    <td>
+                      {% if ticket.project %}
+                        <a class="mono" href="{% url 'projects-detail' ticket.project.pk %}">{{ ticket.project.reference }}</a>
+                      {% else %}
+                        <span class="dim">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if ticket.is_open %}
+                        <span class="pill p-open"><i></i>{{ ticket.status.label }}</span>
+                      {% else %}
+                        <span class="pill p-clos"><i></i>{{ ticket.status.label }}</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="blank" style="padding:32px">
+            <h6>No service history yet</h6>
+            <p>Nothing has been raised for this customer. The first ticket will appear here and stay for good.</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="hd"><b>Details</b></div>
+        <dl style="margin:0">
+          <div class="kv"><dt>Phone</dt><dd class="mono">{{ customer.phone|default:"—" }}</dd></div>
+          <div class="kv"><dt>Email</dt><dd>{{ customer.email|default:"—" }}</dd></div>
+          <div class="kv"><dt>Address</dt><dd>{{ customer.address|default:"—"|linebreaksbr }}</dd></div>
+          {% if customer.notes %}
+            <div class="kv"><dt>Notes</dt><dd>{{ customer.notes|linebreaksbr }}</dd></div>
+          {% endif %}
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <b>Sites</b>
+          <span class="meta">{{ customer.sites.count }}</span>
+        </div>
+        {% for site in customer.sites.all %}
+          <div class="row-i">
+            <div class="two g">
+              <b>{{ site.name }}</b>
+              <span>{{ site.address|default:"No address" }}</span>
+            </div>
+            {% if site.latitude and site.longitude %}
+              <span class="pill p-clos">GPS</span>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">No sites recorded.</span></div>
+        {% endfor %}
+        {% if perms_held.create_customer %}
+          <div class="stack" style="padding-top:12px">
+            <a class="btn btn-sec btn-wide" href="{% url 'crm-site-create' customer.pk %}">Add a site</a>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <b>Contacts</b>
+          <span class="meta">{{ customer.contacts.count }}</span>
+        </div>
+        {% for contact in customer.contacts.all %}
+          <div class="row-i">
+            <div class="two g">
+              <b>{{ contact.name }}{% if contact.is_primary %} <span class="pill p-appr"><i></i>Primary</span>{% endif %}</b>
+              <span>{{ contact.job_title|default:"—" }}{% if contact.phone %} · {{ contact.phone }}{% endif %}</span>
+            </div>
+          </div>
+        {% empty %}
+          <div class="row-i"><span class="dim">No contacts recorded.</span></div>
+        {% endfor %}
+        {% if perms_held.create_customer %}
+          <div class="stack" style="padding-top:12px">
+            <a class="btn btn-sec btn-wide" href="{% url 'crm-contact-create' customer.pk %}">Add a contact</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

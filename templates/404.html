@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Not found — A1 360{% endblock %}
+
+{% block page_title %}Not found{% endblock %}
+{% block page_sub %}Nothing lives at this address{% endblock %}
+
+{% block content %}
+  {% include "shell/_empty.html" with icon="dashboard" heading="That record isn't here" body="It may have been renamed, or the link may be from a version of a screen that has since changed. Nothing in A1 360 is ever hard-deleted, so if the record existed it still does — try finding it from its module." %}
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Users — Settings — A1 360{% endblock %}
+
+{% block page_title %}Users{% endblock %}
+{% block page_sub %}Accounts are deactivated, never deleted — history stays intact{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-pri" href="{% url 'settings-user-create' %}">Add user</a>
+{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="users" %}
+
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search name or email"
+           aria-label="Search users" style="max-width:320px">
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query %}<a class="btn btn-gho" href="{% url 'settings-users' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if users %}
+    <div class="card">
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">Roles</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in users %}
+              <tr>
+                <td><b>{{ row|a1register_name }}</b></td>
+                <td class="dim2">{{ row.email }}</td>
+                <td>
+                  {% for user_role in row.user_roles.all %}
+                    <span class="pill p-clos">{{ user_role.role.name }}</span>
+                  {% empty %}
+                    <span class="dim">No role</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if row.is_active %}
+                    <span class="pill p-appr"><i></i>Active</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Deactivated</span>
+                  {% endif %}
+                  {% if row.must_reset_password %}
+                    <span class="pill p-wait"><i></i>Reset pending</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'settings-user-edit' row.pk %}">Edit</a>
+                  {% comment %} Absent, not disabled: there is no state in which you
+                     deactivate an already-deactivated account. {% endcomment %}
+                  {% if row.is_active %}
+                    <a class="btn btn-gho btn-sm" style="color:var(--red)"
+                       href="{% url 'settings-user-deactivate' row.pk %}">Deactivate</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query %}
+    {% url 'settings-users' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="settings" search_term=query total_count=total_users total_noun="user" clear_url=clear_url %}
+  {% else %}
+    {% url 'settings-user-create' as create_url %}
+    {% include "shell/_empty.html" with icon="settings" heading="No user accounts yet" body="Every person who signs in needs an account here. Create the first one, then assign it a role — the role is what decides which modules they can see." primary_label="Add the first user" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

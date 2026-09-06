@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Command view — A1 360{% endblock %}
+
+{% block page_title %}How is the business doing{% endblock %}
+{% block page_sub %}Command view · every figure derived at query time from source events{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'dashboard-index' %}">My dashboard</a>
+  {% if perms_held.view_reports %}
+    <a class="btn btn-sec" href="{% url 'reports-index' %}">Reports</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% comment %}
+  A severity rail and a direction on each tile, so the CEO sees *which*
+  number is wrong rather than just what the numbers are. Nothing here is a
+  stored total — each links to the rows that produced it.
+  {% endcomment %}
+  <div class="mrow">
+    <a class="metric {% if overdue_projects %}alert{% endif %}" href="{% url 'projects-list' %}"
+       style="text-decoration:none;color:inherit">
+      <span>Active projects</span><b>{{ active_projects }}</b>
+      <em>{% if overdue_projects %}{{ overdue_projects }} past their target date{% else %}all within target{% endif %}</em>
+    </a>
+    <a class="metric {% if unassigned %}alert{% endif %}" href="{% url 'crm-tickets' %}"
+       style="text-decoration:none;color:inherit">
+      <span>Open tickets</span><b>{{ open_tickets }}</b>
+      <em>{{ unassigned }} unassigned</em>
+    </a>
+    <a class="metric {% if queue %}alert{% endif %}" href="#attention"
+       style="text-decoration:none;color:inherit">
+      <span>Pending your approval</span><b>{{ queue|length }}</b>
+      <em>{% if queue %}oldest waiting {{ queue.0.waiting_since|timesince }}{% else %}nothing blocked{% endif %}</em>
+    </a>
+    <div class="metric {% if on_time_pct != None and on_time_pct < 90 %}alert{% elif on_time_pct %}ok{% endif %}">
+      <span>On-time completion</span>
+      <b>{% if on_time_pct != None %}{{ on_time_pct }}%{% else %}—{% endif %}</b>
+      <em>
+        {% if on_time_pct != None %}
+          {{ on_time_of }} job{{ on_time_of|pluralize }} in 30 days · target 90%
+        {% else %}
+          no jobs completed in the last 30 days
+        {% endif %}
+      </em>
+    </div>
+    <div class="metric ok">
+      <span>Jobs completed</span><b>{{ completed_this_month }}</b>
+      <em>{{ today|date:"F" }} to date</em>
+    </div>
+  </div>
+
+  <div class="cols">
+    <div class="card" style="flex:1.6">
+      <div class="hd">
+        <b>Jobs completed per month</b>
+        <span class="meta">Counted from completion events</span>
+      </div>
+      {% if months %}
+        <div class="plot">
+          {% for entry in months %}
+            <div class="b {% if forloop.last %}hi{% endif %}">
+              <em>{{ entry.value }}</em>
+              <i style="height:{{ entry.height }}%"></i>
+              <span>{{ entry.label }}</span>
+            </div>
+          {% endfor %}
+        </div>
+        <div class="note">
+          Each bar counts the field jobs whose completion event falls in that
+          month. There is no stored monthly figure to drift out of step.
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card" id="attention">
+      <div class="hd">
+        <b>Needs your attention</b>
+        <span class="meta">Oldest first</span>
+      </div>
+      {% for item in queue %}
+        <a class="row-i" href="{{ item.url }}" style="text-decoration:none;color:inherit">
+          <div class="two g">
+            <b>{{ item.label }}</b>
+            <span>{{ item.detail }}</span>
+          </div>
+          <span class="{% if item.tone == 'over' %}bad{% else %}warn{% endif %} t-small" style="width:96px">
+            {{ item.waiting_since|timesince }}
+          </span>
+        </a>
+      {% empty %}
+        <div class="blank" style="padding:32px">
+          <h6>Nothing is blocked on you</h6>
+          <p>No approval, overdue invoice or unassigned ticket is waiting on a decision from you.</p>
+        </div>
+      {% endfor %}
+      <div class="note">
+        Every figure on this screen traces to its rows. Nothing here is a
+        stored total, so the command view and the reports cannot disagree.
+      </div>
+    </div>
+  </div>
+{% endblock %}

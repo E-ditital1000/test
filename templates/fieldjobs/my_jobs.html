@@ -1,0 +1,87 @@
+{% extends "shell/field.html" %}
+{% load a1 %}
+{% block title %}Today&rsquo;s jobs — A1 360{% endblock %}
+
+{% comment %}
+One job is promoted; the rest stay quiet. A technician glancing at this
+between tasks needs to know one thing — where next.
+{% endcomment %}
+
+{% block phone_title %}Today · {{ today|a1date }}{% endblock %}
+{% block phone_sub %}{{ user.get_full_name|default:user.email }} · Technician{% endblock %}
+
+{% block content %}
+  {% if next_job %}
+    <div class="mc navy">
+      <p class="t-label lbl-g" style="color:var(--gold300)">Next job</p>
+      <p class="t-m-action w" style="color:#fff">{{ next_job.reference }} · {{ next_job.service_type.name }}</p>
+      <p class="t-m-body n3" style="color:var(--navy300)">
+        {{ next_job.customer.name }}{% if next_job.site %}, {{ next_job.site.name }}{% endif %}
+        · {{ next_job.scheduled_for|date:"H:i" }}
+      </p>
+      <a class="act act-gold" href="{% url 'fieldjobs-job-detail' next_job.pk %}">Open this job</a>
+    </div>
+
+    {% if later_today %}
+      <p class="t-label">Later today</p>
+      {% for job in later_today %}
+        <a class="mc tight" href="{% url 'fieldjobs-job-detail' job.pk %}" style="text-decoration:none;color:inherit">
+          <p class="t-body-b">{{ job.reference }} · {{ job.service_type.name }}</p>
+          <p class="t-m-meta dim">{{ job.customer.name }} · {{ job.scheduled_for|date:"H:i" }}</p>
+          <span class="pill p-open" style="align-self:flex-start"><i></i>Scheduled</span>
+        </a>
+      {% endfor %}
+    {% endif %}
+
+    {% if done_today %}
+      <p class="t-label">Done today</p>
+      {% for job in done_today %}
+        <a class="mc tight" href="{% url 'fieldjobs-job-detail' job.pk %}" style="text-decoration:none;color:inherit">
+          <p class="t-body-b">{{ job.reference }} · {{ job.customer.name }}</p>
+          <span class="pill p-appr" style="align-self:flex-start"><i></i>Completed</span>
+        </a>
+      {% endfor %}
+    {% endif %}
+
+  {% elif done_today %}
+    <div class="mc ok">
+      <p class="t-label" style="color:var(--green)">All done</p>
+      <p class="t-m-action">Every job today is finished</p>
+      <p class="t-m-meta dim2">{{ done_today|length }} completed. Anything still waiting to upload shows on the Sync tab.</p>
+    </div>
+    {% for job in done_today %}
+      <a class="mc tight" href="{% url 'fieldjobs-job-detail' job.pk %}" style="text-decoration:none;color:inherit">
+        <p class="t-body-b">{{ job.reference }} · {{ job.customer.name }}</p>
+        <span class="pill p-appr" style="align-self:flex-start"><i></i>Completed</span>
+      </a>
+    {% endfor %}
+
+  {% else %}
+    {% comment %} A technician with nothing assigned should not see a blank screen and
+       assume the app is broken. Say what is true and what to do about it. {% endcomment %}
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px 8px">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center">
+        <div style="width:88px;height:88px;border-radius:24px;background:var(--sunken);
+                    display:flex;align-items:center;justify-content:center;--icon-cut:var(--sunken)">
+          <svg width="34" height="34" aria-hidden="true" style="fill:var(--navy300)"><use href="#i-field"></use></svg>
+        </div>
+        <p class="t-m-action">No jobs assigned today</p>
+        <p class="t-m-meta dim2" style="max-width:30ch">
+          Your supervisor assigns jobs from the office. If you were expecting
+          one, check with them — nothing is hidden from you here.
+        </p>
+        <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px">Refresh</a>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if upcoming %}
+    <p class="t-label">Coming up</p>
+    {% for job in upcoming %}
+      <div class="mc tight">
+        <p class="t-body-b">{{ job.reference }} · {{ job.customer.name }}</p>
+        <p class="t-m-meta dim">{{ job.scheduled_for|a1datetime }}</p>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endblock %}

@@ -1,48 +1,59 @@
-"""inventoryproject URL Configuration
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/3.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.contrib import admin
-from django.urls import path, include
-from django.contrib.auth import views as auth_views
-from user import views as user_views
+Root URLconf for the A1 Management System.
+
+Every module mounts its own urls.py. Access is not decided here: each view
+carries its own permission gate from the frozen registry, so a URL that is
+reachable is still refused server-side unless the user holds the code.
+"""
 from django.conf import settings
 from django.conf.urls.static import static
-app_name = 'user'
+from django.contrib import admin
+from django.urls import include, path
+from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('dashboard.urls')),
-    path('register/', user_views.register, name='user-register'),
-    path('', auth_views.LoginView.as_view(
-        template_name='user/login.html'), name='user-login'),
-    path('change-password/', auth_views.PasswordChangeView.as_view(
-        template_name='change_password.html',
-        success_url='/password_change/done/'
-    ), name='change_password'),
-    path('profile/', user_views.profile, name='user-profile'),
-    path('profile/update/', user_views.profile_update,
-         name='user-profile-update'),
-    path('project/add/', user_views.add_project, name='add_project'),
-    path('project/<int:project_id>/delete/', user_views.delete_project, name='delete_project'),
-     path('project/add/', user_views.add_project, name='add_project'),
-    path('project/<int:project_id>/', user_views.project_detail, name='project_detail'),
-    path('project/list/', user_views.project_list, name='project_list'),
-    path('logout/', auth_views.LogoutView.as_view(template_name='user/logout.html'),
-         name='user-logout'),
+    path("admin/", admin.site.urls),
+
+    # The service worker must be served from the site root: a worker's scope
+    # is its own directory, and one under /static/ could not control the app.
+    path(
+        "sw.js",
+        TemplateView.as_view(
+            template_name="sw.js", content_type="application/javascript"
+        ),
+        name="service-worker",
+    ),
+    path(
+        "manifest.webmanifest",
+        TemplateView.as_view(
+            template_name="manifest.webmanifest",
+            content_type="application/manifest+json",
+        ),
+        name="manifest",
+    ),
+    # Cached by the worker and shown when a screen has never been opened on
+    # this device. Deliberately unauthenticated — it must render with no
+    # network and no session.
+    path(
+        "offline/",
+        TemplateView.as_view(template_name="shell/offline.html"),
+        name="offline",
+    ),
+    path("", include("accounts.urls")),
+    path("", include("config.urls")),
+    path("", include("dashboard.urls")),
+    path("", include("crm.urls")),
+    path("", include("projects.urls")),
+    path("", include("fieldjobs.urls")),
+    path("", include("approvals.urls")),
+    path("", include("finance.urls")),
+    path("", include("hr.urls")),
+    path("", include("reports.urls")),
 ]
 
+# The refusal is a designed screen, not a stock error page: it names the
+# permission that is missing and who can grant it.
+handler403 = "accounts.views.permission_denied"
+
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL,
-                          document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

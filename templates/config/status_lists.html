@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Status lists — Settings — A1 360{% endblock %}
+
+{% block page_title %}Status lists{% endblock %}
+{% block page_sub %}Tickets and projects take their status from these rows, so Operations can rename one without a release{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-pri" href="{% url 'settings-status-create' %}">Add status</a>
+{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="statuses" %}
+
+  <div class="cols">
+    {% for group in status_groups %}
+      <div class="card">
+        <div class="hd">
+          <b>{{ group.label }}</b>
+          <span class="meta">{{ group.rows|length }} status{{ group.rows|length|pluralize:"es" }}</span>
+        </div>
+        {% if group.rows %}
+          <table>
+            <thead>
+              <tr>
+                <th scope="col" style="width:56px">Order</th>
+                <th scope="col">Status</th>
+                <th scope="col">Behaviour</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for status in group.rows %}
+                <tr {% if not status.is_active %}style="background:var(--sunken)"{% endif %}>
+                  <td class="mono dim2">{{ status.order }}</td>
+                  <td>
+                    <b>{{ status.label }}</b>
+                    <span class="t-small dim mono" style="display:block">{{ status.code }}</span>
+                  </td>
+                  <td>
+                    {% if status.is_default %}<span class="pill p-open"><i></i>Default</span>{% endif %}
+                    {% if status.is_terminal %}<span class="pill p-clos"><i></i>Closes</span>{% endif %}
+                    {% if not status.is_active %}<span class="pill p-clos"><i></i>Retired</span>{% endif %}
+                  </td>
+                  <td class="acts">
+                    <a class="btn btn-sec btn-sm" href="{% url 'settings-status-edit' status.pk %}">Edit</a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="blank" style="padding:28px">
+            <h6>No {{ group.label|lower }} yet</h6>
+            <p>Add at least one and mark it the default, so new records have somewhere to start.</p>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% endblock %}

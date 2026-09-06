@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Assessment review — A1 360{% endblock %}
+
+{% block page_title %}Assessment review{% endblock %}
+{% block page_sub %}{{ waiting|length }} waiting · oldest first, so the longest-blocked job is always on top{% endblock %}
+
+{% block content %}
+  {% if waiting %}
+    <div class="card">
+      <div class="hd">
+        <b>Waiting for you</b>
+        <span class="meta">Ranked by how long each has been waiting</span>
+      </div>
+      {% for assessment in waiting %}
+        <div class="row-i">
+          <div class="two g">
+            <b>{{ assessment.field_job.reference }} — {{ assessment.service_type.name }}</b>
+            <span>
+              {{ assessment.field_job.customer.name }}
+              · submitted by {{ assessment.technician|a1name }}
+              · {{ assessment.submitted_at|a1datetime }}
+            </span>
+          </div>
+          <span class="warn t-small" style="width:110px">
+            waiting {{ assessment.submitted_at|timesince }}
+          </span>
+          <span class="pill p-wait"><i></i>Awaiting approval</span>
+          <a class="btn btn-sec btn-sm" href="{% url 'approvals-assessment-review' assessment.pk %}">
+            {% if can_decide %}Review{% else %}Open{% endif %}
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="field" heading="Nothing waiting on you" body="Every assessment your crews have submitted has been dealt with. New ones appear here the moment a technician's phone syncs — including work they filled in with no signal earlier in the day." %}
+  {% endif %}
+
+  {% if decided %}
+    <div class="card compact">
+      <div class="hd"><b>Recently decided</b><span class="meta">Last {{ decided|length }}</span></div>
+      {% for assessment in decided %}
+        <div class="row-i">
+          <div class="two g">
+            <b>{{ assessment.field_job.reference }}</b>
+            <span>{{ assessment.field_job.customer.name }} · {{ assessment.technician|a1name }}</span>
+          </div>
+          {% if assessment.approval_state == "approved" %}
+            <span class="pill p-appr"><i></i>Approved</span>
+          {% else %}
+            <span class="pill p-over"><i></i>Returned</span>
+          {% endif %}
+          <a class="btn btn-gho btn-sm" href="{% url 'approvals-assessment-review' assessment.pk %}">Open</a>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

@@ -1,0 +1,79 @@
+{% comment %}
+Icon sprite. Inlined into the page rather than loaded as a font or a file:
+these render on a phone with no signal, which an icon font does not.
+
+Eight module silhouettes plus three mobile ones, all deliberately distinct.
+Because navigation is generated from permissions, the item list differs per
+user — position is never a reliable cue, so the shape has to carry
+recognition on its own.
+
+Use:  <svg class="ic" width="18" height="18" aria-hidden="true"><use href="#i-projects"></use></svg>
+The .cut class marks counter-shapes punched through a solid icon; they take
+the colour of the surface behind the icon.
+{% endcomment %}
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <style>
+    .ic { flex: none; }
+    svg .cut { fill: var(--icon-cut, #11043A); }
+  </style>
+
+  <symbol id="i-dashboard" viewBox="0 0 18 18">
+    <rect x="0" y="0" width="8" height="8" rx="2"/>
+    <rect x="10" y="0" width="8" height="5" rx="2"/>
+    <rect x="0" y="10" width="8" height="8" rx="2"/>
+    <rect x="10" y="7" width="8" height="11" rx="2"/>
+  </symbol>
+
+  <symbol id="i-tickets" viewBox="0 0 18 18">
+    <path d="M8.2 0.6 17.4 9.8a2 2 0 0 1 0 2.8l-4.8 4.8a2 2 0 0 1-2.8 0L0.6 8.2A2 2 0 0 1 0 6.8V2a2 2 0 0 1 2-2h4.8a2 2 0 0 1 1.4 0.6z"/>
+    <circle class="cut" cx="4.6" cy="4.6" r="1.7"/>
+  </symbol>
+
+  <symbol id="i-projects" viewBox="0 0 18 18">
+    <path d="M0 3a2 2 0 0 1 2-2h4.2l2 2.2H16a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2z"/>
+  </symbol>
+
+  <symbol id="i-field" viewBox="0 0 18 18">
+    <path d="M9 0a6.4 6.4 0 0 0-6.4 6.4C2.6 11 9 18 9 18s6.4-7 6.4-11.6A6.4 6.4 0 0 0 9 0z"/>
+    <circle class="cut" cx="9" cy="6.3" r="2.4"/>
+  </symbol>
+
+  <symbol id="i-finance" viewBox="0 0 18 18">
+    <circle cx="9" cy="9" r="9"/>
+    <rect class="cut" x="8.1" y="2.4" width="1.8" height="13.2" rx="0.9"/>
+    <path d="M12.2 6.1c0-1.3-1.4-2.2-3.2-2.2S5.8 4.8 5.8 6.1 7.2 8.2 9 8.6s3.2 1 3.2 2.4-1.4 2.4-3.2 2.4-3.2-1-3.2-2.4"
+          stroke="var(--icon-cut, #11043A)" stroke-width="1.7" fill="none" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="i-reports" viewBox="0 0 18 18">
+    <rect x="0" y="11" width="4" height="7" rx="1.2"/>
+    <rect x="7" y="6" width="4" height="12" rx="1.2"/>
+    <rect x="14" y="0" width="4" height="18" rx="1.2"/>
+  </symbol>
+
+  <symbol id="i-hr" viewBox="0 0 18 18">
+    <circle cx="6" cy="4.6" r="4"/>
+    <path d="M0 18v-2.2C0 13.2 2.7 11.4 6 11.4s6 1.8 6 4.4V18z"/>
+    <circle cx="14.4" cy="6" r="3"/>
+    <path d="M13.2 11.6c2.8 0 4.8 1.5 4.8 3.6V18h-4v-2.2c0-1.7-.9-3.2-2.3-4.2z"/>
+  </symbol>
+
+  <symbol id="i-settings" viewBox="0 0 18 18">
+    <path d="M9 0l2.1 1.6 2.6-.5 1.1 2.4 2.4 1.1-.5 2.6L18 9l-1.3 1.8.5 2.6-2.4 1.1-1.1 2.4-2.6-.5L9 18l-2.1-1.6-2.6.5-1.1-2.4L.8 13.4l.5-2.6L0 9l1.3-1.8-.5-2.6L3.2 3.5 4.3 1.1l2.6.5z"/>
+    <circle class="cut" cx="9" cy="9" r="3.4"/>
+  </symbol>
+
+  <symbol id="i-sync" viewBox="0 0 18 18">
+    <path d="M9 1.4a7.6 7.6 0 0 1 7.3 5.5h-2.2A5.5 5.5 0 0 0 3.6 8.3H6L2.6 12.6 0 8.3h1.6A7.6 7.6 0 0 1 9 1.4z"/>
+    <path d="M9 16.6a7.6 7.6 0 0 1-7.3-5.5h2.2a5.5 5.5 0 0 0 10.5-1.4H12l3.4-4.3L18 9.7h-1.6A7.6 7.6 0 0 1 9 16.6z"/>
+  </symbol>
+
+  <symbol id="i-clock" viewBox="0 0 18 18">
+    <path d="M9 0a9 9 0 1 0 0 18A9 9 0 0 0 9 0zm0 3.6a1 1 0 0 1 1 1V9h3.2a1 1 0 1 1 0 2H9a1 1 0 0 1-1-1V4.6a1 1 0 0 1 1-1z"/>
+  </symbol>
+
+  <symbol id="i-me" viewBox="0 0 18 18">
+    <circle cx="9" cy="5" r="4.4"/>
+    <path d="M0.6 18c0-4.2 3.8-6.6 8.4-6.6s8.4 2.4 8.4 6.6z"/>
+  </symbol>
+</svg>

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Roles &amp; permissions — Settings — A1 360{% endblock %}
+
+{% block page_title %}Roles &amp; permissions{% endblock %}
+{% block page_sub %}A role is a named bundle of permissions. Adding one is configuration, not a release.{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-pri" href="{% url 'settings-role-create' %}">New role</a>
+{% endblock %}
+
+{% block content %}
+  {% include "shell/_settings_nav.html" with active="roles" %}
+
+  {% if roles %}
+    <div class="card">
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Role</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Permissions</th>
+              <th scope="col" class="num">People</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for role in roles %}
+              <tr>
+                <td><b>{{ role.name }}</b></td>
+                <td>
+                  {% if role.is_system %}
+                    <span class="pill p-clos">Pre-built</span>
+                  {% else %}
+                    <span class="pill p-open"><i></i>Custom</span>
+                  {% endif %}
+                </td>
+                <td class="num">{{ role.permissions.count }}</td>
+                <td class="num">{{ role.user_roles.count }}</td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'settings-role-edit' role.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        You cannot grant a permission you do not hold yourself, and the last
+        remaining Admin cannot be demoted. Every grant is written to the audit
+        log with actor, timestamp and before/after.
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="settings" heading="No roles yet" body="The nine pre-built roles ship as seed data. Run manage.py seed_permissions to write the permission list and those roles into the database." %}
+  {% endif %}
+{% endblock %}

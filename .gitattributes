@@ -1,0 +1,12 @@
+# The team works on Windows; normalise line endings in the repository so a
+# checkout on another machine does not show every file as modified.
+* text=auto
+
+# Binary assets git should never try to normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

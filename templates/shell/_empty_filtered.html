@@ -1,0 +1,23 @@
+{% comment %}
+"Nothing matches" — the other empty state, and never the same component as
+"no data yet". It must not read as failure: it names the filter that emptied
+the view, says how many records exist in total, and offers to clear it.
+
+Params: icon, search_term, filter_summary, total_count, total_noun, clear_url
+{% endcomment %}
+<div class="card" style="flex:1;display:flex">
+  <div class="blank">
+    <div class="ill">
+      <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-{{ icon|default:'dashboard' }}"></use></svg>
+    </div>
+    <h6>Nothing matches those filters</h6>
+    <p>
+      {% if search_term %}&ldquo;{{ search_term }}&rdquo;{% endif %}{% if filter_summary %}{% if search_term %} with {% endif %}{{ filter_summary }}{% endif %}
+      returns nothing.
+      {% if total_count %}There {{ total_count|pluralize:"is,are" }} {{ total_count }} {{ total_noun|default:"record" }}{{ total_count|pluralize }} in total.{% endif %}
+    </p>
+    <div class="acts">
+      <a class="btn btn-sec" href="{{ clear_url }}">Clear filters</a>
+    </div>
+  </div>
+</div>

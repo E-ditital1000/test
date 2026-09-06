@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ service_type.name }} questions — Settings — A1 360{% endblock %}
+
+{% block page_title %}{{ service_type.name }} — assessment questions{% endblock %}
+{% block page_sub %}This is the form a technician fills in on site · retiring a question never alters a recorded answer{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'settings-service-types' %}">All service types</a>
+{% endblock %}
+
+{% block content %}
+  {% if questions %}
+    <div class="card">
+      <div class="hd">
+        <b>Question set</b>
+        <span class="meta">Technician answers and client responses are captured as separate groups</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:820px">
+          <thead>
+            <tr>
+              <th scope="col" style="width:56px">Order</th>
+              <th scope="col">Question</th>
+              <th scope="col">Answer type</th>
+              <th scope="col">Asked of</th>
+              <th scope="col">Required</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for question in questions %}
+              <tr {% if question.is_retired %}style="background:var(--sunken)"{% endif %}>
+                <td class="mono dim2">{{ question.order }}</td>
+                <td>
+                  <b>{{ question.text }}</b>
+                  {% if question.is_retired %}
+                    <span class="pill p-clos"><i></i>Retired {{ question.retired_at|a1date }}</span>
+                  {% endif %}
+                  {% if question.help_text %}
+                    <span class="t-small dim" style="display:block">{{ question.help_text }}</span>
+                  {% endif %}
+                </td>
+                <td class="t-small">{{ question.get_answer_type_display }}</td>
+                <td>
+                  {% if question.respondent == "client" %}
+                    <span class="pill p-open"><i></i>Client</span>
+                  {% else %}
+                    <span class="pill p-clos">Technician</span>
+                  {% endif %}
+                </td>
+                <td>{% if question.is_required %}Yes{% else %}<span class="dim">No</span>{% endif %}</td>
+                <td class="acts">
+                  {% comment %} Absent once retired: nothing about a retired question can
+                     be reordered or retired again. {% endcomment %}
+                  {% if not question.is_retired %}
+                    <form method="post" action="{% url 'settings-question-reorder' question.pk %}" style="display:inline">
+                      {% csrf_token %}
+                      <button class="btn btn-sec btn-sm" name="direction" value="up" aria-label="Move &ldquo;{{ question.text }}&rdquo; up">&uarr;</button>
+                      <button class="btn btn-sec btn-sm" name="direction" value="down" aria-label="Move &ldquo;{{ question.text }}&rdquo; down">&darr;</button>
+                    </form>
+                    <form method="post" action="{% url 'settings-question-retire' question.pk %}" style="display:inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="reason" value="Retired from Settings">
+                      <button class="btn btn-gho btn-sm" style="color:var(--red)">Retire</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Retiring stops a question appearing on new assessments. Every answer
+        already recorded keeps the text it was asked with, so a historical
+        assessment still reads correctly years later.
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="settings" heading="No questions in this set yet" body="Until this set has questions, a technician sent to a job of this type has nothing structured to fill in. Add the questions below — they appear on the phone in this order." %}
+  {% endif %}
+
+  <div class="card" style="max-width:720px">
+    <div class="hd"><b>Add a question</b></div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="stack">
+        {% include "shell/_form_fields.html" %}
+      </div>
+      <div class="stack" style="padding-top:0">
+        <button class="btn btn-pri" type="submit">Add question</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

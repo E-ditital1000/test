@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Correct attendance — A1 360{% endblock %}
+
+{% block page_title %}Correct {{ employee|a1register_name }}{% endblock %}
+{% block page_sub %}A correction is a new record — the original event is never changed{% endblock %}
+
+{% block content %}
+  <div class="cols">
+    <div style="flex:1;max-width:640px">
+      <form method="post" style="display:flex;flex-direction:column;gap:20px">
+        {% csrf_token %}
+
+        <div class="card">
+          <div class="hd"><b>The event being corrected</b></div>
+          <dl style="margin:0">
+            <div class="kv"><dt>Employee</dt><dd>{{ employee|a1register_name }} · <span class="mono">{{ employee.staff_id }}</span></dd></div>
+            <div class="kv"><dt>Event</dt><dd>{{ event.get_kind_display }}</dd></div>
+            <div class="kv"><dt>Original time</dt><dd class="mono">{{ event.device_timestamp|a1datetime }}</dd></div>
+            <div class="kv">
+              <dt>Location</dt>
+              <dd>{% if event.location_unavailable %}Unavailable at the time{% else %}{{ event.accuracy_m|a1metres }}{% endif %}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="card">
+          <div class="hd"><b>The correction</b></div>
+          <div class="stack">{% include "shell/_form_fields.html" %}</div>
+          <div class="note">
+            This is written with your name, the time, the old value, the new
+            value and the reason. The original event stays on the record and
+            keeps showing above it.
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-sec" href="{% url 'hr-employee-attendance' employee.pk %}">Cancel</a>
+          <button class="btn btn-pri" type="submit">Record correction</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

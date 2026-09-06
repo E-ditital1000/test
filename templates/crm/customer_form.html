@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit customer{% else %}New customer{% endif %} — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit {{ instance.name }}{% else %}New customer{% endif %}{% endblock %}
+{% block page_sub %}Sites and contacts are added once the customer is saved{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:680px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% if instance %}{% url 'crm-customer-detail' instance.pk %}{% else %}{% url 'crm-customers' %}{% endif %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save customer</button>
+    </div>
+  </form>
+{% endblock %}

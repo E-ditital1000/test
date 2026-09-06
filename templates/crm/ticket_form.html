@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}New ticket — A1 360{% endblock %}
+
+{% block page_title %}New ticket{% endblock %}
+{% block page_sub %}Nothing is saved until you submit{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'crm-tickets' %}">Cancel</a>
+{% endblock %}
+
+{% comment %}
+The highest-frequency screen in the system: used on every inbound call, under
+time pressure, while a customer is talking. Customer comes first because it is
+the first thing said on the phone.
+{% endcomment %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+
+    <div class="card">
+      <div class="hd"><b>Who is calling</b><span class="meta">Step 1 of 3</span></div>
+      <div class="stack">
+        <div class="fld {% if form.customer.errors %}has-error{% endif %}">
+          <label for="{{ form.customer.id_for_label }}">Customer</label>
+          {{ form.customer }}
+          {% for e in form.customer.errors %}<span class="err">{{ e }}</span>{% endfor %}
+          <span class="help">
+            Not on the list? <a href="{% url 'crm-customer-create' %}">Add the customer first</a> —
+            it takes a moment and keeps their history in one place.
+          </span>
+        </div>
+        <div class="fld {% if form.site.errors %}has-error{% endif %}">
+          <label for="{{ form.site.id_for_label }}">Site</label>
+          {{ form.site }}
+          {% for e in form.site.errors %}<span class="err">{{ e }}</span>{% endfor %}
+          <span class="help">Choose the customer and save to pick from their sites.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><b>What is wrong</b><span class="meta">Step 2 of 3</span></div>
+      <div class="stack">
+        <div class="fld {% if form.service_type.errors %}has-error{% endif %}">
+          <label for="{{ form.service_type.id_for_label }}">Service type</label>
+          {{ form.service_type }}
+          {% for e in form.service_type.errors %}<span class="err">{{ e }}</span>{% endfor %}
+          <span class="help">{{ form.service_type.help_text }}</span>
+        </div>
+        <div class="fld {% if form.priority.errors %}has-error{% endif %}">
+          <label for="{{ form.priority.id_for_label }}">Priority</label>
+          {{ form.priority }}
+        </div>
+        <div class="fld {% if form.description.errors %}has-error{% endif %}">
+          <label for="{{ form.description.id_for_label }}">Description</label>
+          {{ form.description }}
+          {% for e in form.description.errors %}<span class="err">{{ e }}</span>{% endfor %}
+          <span class="help">What the caller said, in their words where you can.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><b>Who handles it</b><span class="meta">Step 3 of 3 · optional</span></div>
+      <div class="stack">
+        {% comment %}
+        Disabled rather than absent: assignment genuinely would work here for
+        someone holding assign_ticket — it is the workflow, not the permission,
+        that says a Supervisor does it from the list.
+        {% endcomment %}
+        <div class="fld">
+          <label>Assign technician</label>
+          <div class="inp is-disabled">A Supervisor assigns from the ticket list</div>
+          <span class="help">
+            Leaving this unassigned sends the ticket to the unassigned queue,
+            which is where it should go.
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'crm-tickets' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Create ticket</button>
+    </div>
+  </form>
+{% endblock %}

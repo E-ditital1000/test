@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Expenses — A1 360{% endblock %}
+
+{% block page_title %}Expenses{% endblock %}
+{% block page_sub %}Every cost charged to a project · amounts in USD{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'finance-invoices' %}">Invoices</a>
+  <a class="btn btn-pri" href="{% url 'finance-expense-create' %}">Log expense</a>
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric"><span>This month</span><b>{{ this_month|a1money }}</b><em>all charged to a project</em></div>
+    <div class="metric"><span>Shown here</span><b>{{ total|a1money }}</b><em>{{ expenses|length }} entries</em></div>
+    <div class="metric {% if with_receipt < expenses|length %}alert{% endif %}">
+      <span>With a receipt</span><b>{{ with_receipt }}</b>
+      <em>of {{ expenses|length }}</em>
+    </div>
+  </div>
+
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:320px"
+           placeholder="Search item, project or category" aria-label="Search expenses">
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query %}<a class="btn btn-gho" href="{% url 'finance-expenses' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if expenses %}
+    <div class="card compact">
+      <div class="scroll-x">
+        <table style="min-width:860px">
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col">Project</th>
+              <th scope="col">Category</th>
+              <th scope="col">Date</th>
+              <th scope="col" class="num">Amount</th>
+              <th scope="col">Receipt</th>
+              <th scope="col">Logged by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for expense in expenses %}
+              <tr>
+                <td><b>{{ expense.item }}</b></td>
+                <td><a class="mono t-small" href="{% url 'projects-detail' expense.project.pk %}">{{ expense.project.reference }}</a></td>
+                <td class="t-small dim">{{ expense.category.name }}</td>
+                <td class="mono t-small">{{ expense.incurred_on|a1date }}</td>
+                <td class="num"><b>{{ expense.amount|a1money }}</b></td>
+                <td>
+                  {% if expense.receipt %}
+                    <a class="pill p-appr" href="{{ expense.receipt.url }}" target="_blank" rel="noopener"><i></i>Attached</a>
+                  {% else %}
+                    <span class="pill p-wait"><i></i>Missing</span>
+                  {% endif %}
+                </td>
+                <td class="t-small">{{ expense.logged_by|a1name }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% elif query %}
+    {% url 'finance-expenses' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="finance" search_term=query total_noun="expense" clear_url=clear_url %}
+  {% else %}
+    {% url 'finance-expense-create' as create_url %}
+    {% include "shell/_empty.html" with icon="finance" heading="No expenses logged yet" body="A cost that never reaches a project never reaches its margin either. Log materials, transport and subcontractors here — a photograph of the receipt is enough." primary_label="Log the first expense" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

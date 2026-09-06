@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — A1 360{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_sub %}This is written to the audit log{% endblock %}
+
+{% block content %}
+  <div class="card" style="max-width:640px">
+    <div class="stack">
+      <p class="t-body">{{ body }}</p>
+      <form method="post" style="display:flex;flex-direction:column;gap:16px">
+        {% csrf_token %}
+        <div class="fld">
+          <label for="reason">Reason</label>
+          <input id="reason" name="reason" required
+                 placeholder="Why is this happening?">
+          <span class="help">Recorded in the audit log against your name. It cannot be blank.</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <a class="btn btn-sec" href="{{ cancel_url|default:'/' }}">Cancel</a>
+          <button class="btn btn-dgr" type="submit">{{ action_label }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
