@@ -1,0 +1,119 @@
+name: CI
+
+# Runs on every push and pull request. The point of the browser job is that
+# the offline layer -- the code protecting a technician's unsent work -- had
+# never been executed anywhere before this existed.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  tests:
+    name: Django suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: a1360
+          POSTGRES_PASSWORD: a1360
+          POSTGRES_DB: a1360
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SECRET_KEY: ci-only-not-a-real-key-0123456789abcdef
+      DEBUG: "True"
+      DATABASE_URL: postgres://a1360:a1360@localhost:5432/a1360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Migrations are in step with the models
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: System checks
+        run: python manage.py check
+
+      - name: Test suite
+        run: python manage.py test --exclude-tag browser
+
+      - name: Deployment checklist
+        env:
+          DEBUG: "False"
+          ALLOWED_HOSTS: example.com
+        # HSTS is deliberately left to the operator, so it is the one
+        # warning this is allowed to carry.
+        run: python manage.py check --deploy --fail-level ERROR
+
+  browser:
+    name: Browser behaviour
+    runs-on: ubuntu-latest
+
+    env:
+      SECRET_KEY: ci-only-not-a-real-key-0123456789abcdef
+      DEBUG: "True"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Offline and shell behaviour
+        # These drive a real browser: a clock event taken with the network
+        # off must survive on the device and reach the server exactly once
+        # when it returns.
+        run: python manage.py test --tag browser
+
+  gate:
+    name: Acceptance gate
+    runs-on: ubuntu-latest
+    needs: [tests, browser]
+
+    env:
+      SECRET_KEY: ci-only-not-a-real-key-0123456789abcdef
+      DEBUG: "True"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Phase One release gate
+        # Exits non-zero on any failure. Phase One does not ship on a partial
+        # pass, so neither does this.
+        run: python manage.py acceptance

@@ -51,6 +51,9 @@ SCENARIOS = [
     ("Attention queue",
      "Ranked by how long each item waited, and never shows what the viewer "
      "cannot clear"),
+    ("JavaScript parses",
+     "Every script this system ships, including the offline layer and the "
+     "service worker, is parsed rather than trusted"),
 ]
 
 # Proven on a device, not in a test runner. Named here so a partial pass is
@@ -59,6 +62,15 @@ MANUAL = [
     ("Two-tap clock-in under ten seconds", "on a low-end Android, timed"),
     ("A full assessment on a low-end Android", "in airplane mode, then synced"),
     ("Legible in sunlight, usable one-handed", "on the device the crews carry"),
+]
+
+# Browser behaviour runs under its own tag because it needs Playwright and a
+# chromium download. Reported separately so a box without them cannot mistake
+# a skip for a pass.
+BROWSER_HINT = [
+    "Browser behaviour runs under its own tag and needs a browser:",
+    "    pip install playwright && python -m playwright install chromium",
+    "    python manage.py test --tag browser",
 ]
 
 
@@ -132,4 +144,7 @@ class Command(BaseCommand):
             "A pass here is necessary, not sufficient. The manual checks above "
             "are part of the gate."
         )
+        self.stdout.write("")
+        for line in BROWSER_HINT:
+            self.stdout.write(line)
         self.stdout.write(rule)

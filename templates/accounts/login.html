@@ -120,6 +120,8 @@
 {% block body_extra %}
   {% if demo_accounts %}
     <script>
+    (function () {
+      "use strict";
       // Fill the real form and submit it, so a demo sign-in goes through
       // exactly the same view, lockout and forced-reset path as a typed one.
       document.querySelectorAll(".demo-row").forEach(function (row) {
@@ -127,9 +129,10 @@
           var form = document.querySelector(".fbox");
           form.querySelector("#id_email").value = row.dataset.email;
           form.querySelector("#id_password").value = row.dataset.password;
-          form.requestSubmit ? form.requestSubmit() : form.submit();
+          if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
         });
       });
+    })();
     </script>
   {% endif %}
 {% endblock %}

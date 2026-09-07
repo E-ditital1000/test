@@ -15,3 +15,11 @@ reportlab==4.2.5
 Pillow==10.4.0
 pytest==8.3.3
 pytest-django==4.9.0
+
+# Test-only. esprima parses the JavaScript this system ships, so a syntax
+# error cannot reach production on a box with no Node toolchain.
+esprima==4.0.1
+# Optional: drives a real browser for the offline tests. The browser suite
+# skips itself when this or its chromium download is absent.
+#   pip install playwright && python -m playwright install chromium
+playwright==1.62.0
