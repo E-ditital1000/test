@@ -192,3 +192,91 @@ class RequisitionThresholdTests(TestCase):
             value="500000"
         )
         self.assertFalse(requisition.requires_executive_approval())
+
+
+class TaskAssignmentTests(TestCase):
+    """
+    A task on a project goes to somebody on that project. Offering the whole
+    register invites picking a name with nothing to do with the job, and
+    buries the few people who are actually on it.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+        from config.models import ServiceType, StatusOption
+        from crm.models import Customer
+        from hr.models import Employee
+
+        from .models import Project, ProjectCrew
+
+        call_command("seed_permissions", verbosity=0)
+        User = get_user_model()
+
+        service_type = ServiceType.objects.create(code="solar", name="Solar")
+        status = StatusOption.objects.create(
+            kind=StatusOption.PROJECT, code="active", label="Active", is_default=True
+        )
+        customer = Customer.objects.create(name="Ducor Hotel")
+
+        def staff(email, staff_id):
+            user = User.objects.create_user(
+                username=email, email=email, password="Testing!12345"
+            )
+            user.must_reset_password = False
+            user.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=user, role=Role.objects.get(name="Technician"))
+            return Employee.objects.create(user=user, staff_id=staff_id)
+
+        cls.on_crew = staff("on@test.local", "A1-001")
+        cls.also_crew = staff("also@test.local", "A1-002")
+        cls.elsewhere = staff("else@test.local", "A1-003")
+        cls.other = staff("other@test.local", "A1-004")
+
+        cls.project = Project.objects.create(
+            reference="PRJ-0001", name="Array", customer=customer,
+            service_type=service_type, status=status,
+        )
+        ProjectCrew.objects.create(project=cls.project, employee=cls.on_crew)
+        ProjectCrew.objects.create(project=cls.project, employee=cls.also_crew)
+
+    def test_only_the_projects_crew_can_be_assigned_a_task(self):
+        from .forms import TaskForm
+
+        offered = set(TaskForm(project=self.project).fields["assignee"].queryset)
+        self.assertEqual(offered, {self.on_crew.user, self.also_crew.user})
+        self.assertNotIn(self.elsewhere.user, offered)
+
+    def test_assigning_someone_off_the_crew_is_refused(self):
+        """Enforced by the form on save, not merely absent from the dropdown."""
+        from .forms import TaskForm
+
+        form = TaskForm(
+            {"title": "Run cabling", "assignee": self.elsewhere.user.pk, "due_date": ""},
+            project=self.project,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("assignee", form.errors)
+
+    def test_before_a_crew_exists_everyone_is_offered(self):
+        """
+        A form that cannot be used is worse than a long list, so an empty
+        crew falls back to the whole register and says so.
+        """
+        from config.models import StatusOption
+        from crm.models import Customer
+
+        from .forms import TaskForm
+        from .models import Project
+
+        bare = Project.objects.create(
+            reference="PRJ-0002", name="No crew yet",
+            customer=Customer.objects.first(),
+            service_type=self.project.service_type,
+            status=StatusOption.objects.get(code="active"),
+        )
+        field = TaskForm(project=bare).fields["assignee"]
+        self.assertEqual(field.queryset.count(), 4)
+        self.assertIn("No crew on this project yet", field.help_text)

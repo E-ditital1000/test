@@ -67,6 +67,27 @@ class FieldJobForm(forms.ModelForm):
         self.fields["assigned_to"].empty_label = "Choose a technician…"
 
         if project is not None:
+            # Mark the people already on this project, rather than filtering
+            # the rest out. A supervisor sending an extra body to a site is
+            # ordinary, and a form that refuses it would be worked around by
+            # not using the form.
+            on_project = set(
+                project.crew.values_list("employee__user_id", flat=True)
+            )
+            if project.manager_id:
+                on_project.add(project.manager_id)
+
+            def mark_user(user):
+                name = user.get_full_name() or user.email
+                return f"{name} — on this project" if user.pk in on_project else name
+
+            def mark_employee(employee):
+                label = f"{employee.staff_id} · {employee.full_name}"
+                return f"{label} — on this project" if employee.user_id in on_project else label
+
+            self.fields["assigned_to"].label_from_instance = mark_user
+            self.fields["crew"].label_from_instance = mark_employee
+
             # Scheduled against a project: the customer, site and service type
             # come with it, so they are shown but not re-asked.
             for name in ("customer", "service_type"):
