@@ -21,6 +21,7 @@ box without them still runs the rest of the suite:
     pip install playwright && python -m playwright install chromium
 """
 import os
+import time
 import unittest
 
 from django.contrib.auth import get_user_model
@@ -191,6 +192,32 @@ class OfflineClockTests(StaticLiveServerTestCase):
         UserRole.objects.create(user=self.worker, role=Role.objects.get(name="Technician"))
         self.employee = Employee.objects.create(user=self.worker, staff_id="A1-003")
 
+    def _events(self):
+        """
+        Count this employee's clock events, tolerating SQLite's table lock.
+
+        The live-server thread writes while this thread reads, and SQLite
+        serialises that by refusing the reader. It is an artefact of running
+        the suite on SQLite — production is PostgreSQL — so it is retried
+        rather than allowed to fail a test about offline sync.
+        """
+        from django.db import OperationalError
+
+        try:
+            return AttendanceEvent.objects.filter(employee=self.employee).count()
+        except OperationalError:
+            return None
+
+    def _wait_for_events(self, expected, timeout=30):
+        deadline = time.monotonic() + timeout
+        seen = None
+        while time.monotonic() < deadline:
+            seen = self._events()
+            if seen == expected:
+                return seen
+            time.sleep(0.25)
+        return seen
+
     def _signed_in(self):
         context = self.browser.new_context()
         # No GPS permission granted: the clock must record anyway.
@@ -211,11 +238,19 @@ class OfflineClockTests(StaticLiveServerTestCase):
             # Go offline, then clock in. The event must be kept on the device.
             context.set_offline(True)
             page.click("button.act")
-            page.wait_for_timeout(6500)   # the GPS fix gives up after 5s
+
+            # Wait for the queue to appear rather than for a fixed number of
+            # seconds. The GPS fix gives up after five, but a loaded machine
+            # takes longer, and a sleep long enough to be safe everywhere is
+            # a sleep that makes the suite slow everywhere.
+            page.wait_for_function(
+                "() => window.A1.store.get('a1.clock.queue')"
+                ".then(function (q) { return !!(q && q.length); })",
+                timeout=30000,
+            )
 
             self.assertEqual(
-                AttendanceEvent.objects.filter(employee=self.employee).count(),
-                0,
+                self._wait_for_events(0, timeout=2), 0,
                 "nothing should have reached the server while offline",
             )
             queued = page.evaluate("() => window.A1.store.get('a1.clock.queue')")
@@ -228,11 +263,9 @@ class OfflineClockTests(StaticLiveServerTestCase):
             # Signal returns. The queued event uploads by itself.
             context.set_offline(False)
             page.evaluate("window.dispatchEvent(new Event('online'))")
-            page.wait_for_timeout(2500)
 
             self.assertEqual(
-                AttendanceEvent.objects.filter(employee=self.employee).count(),
-                1,
+                self._wait_for_events(1), 1,
                 "the queued event must reach the server exactly once",
             )
         finally:
@@ -245,8 +278,8 @@ class OfflineClockTests(StaticLiveServerTestCase):
             page.goto(f"{self.live_server_url}/hr/clock/")
             page.wait_for_load_state("networkidle")
             page.click("button.act")
-            page.wait_for_timeout(7000)
 
+            self._wait_for_events(1)
             event = AttendanceEvent.objects.filter(employee=self.employee).first()
             self.assertIsNotNone(event, "the clock must record without a GPS fix")
             self.assertTrue(event.location_unavailable)

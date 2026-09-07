@@ -10,6 +10,7 @@ from django.db import transaction
 from . import audit
 from .decorators import user_has_permission
 from .models import Permission, Role, RolePermission, SCOPE_ALL, UserRole
+from .permissions import forget_permissions
 from .permission_registry import PERMISSION_CODES
 
 # Holding this permission is what makes an account an administrator: it is
@@ -97,6 +98,8 @@ def set_role_permissions(*, actor, role, grants, reason=""):
 
     RolePermission.objects.filter(role=role).delete()
     _write_grants(role, grants)
+    # Whoever is making the change may hold this role themselves.
+    forget_permissions(actor)
     audit.record_change(
         actor=actor,
         action="role.permissions_changed",
@@ -125,6 +128,8 @@ def assign_role(*, actor, user, role, reason=""):
         raise PermissionDenied("missing permission: manage_users")
     before = {"roles": sorted(r.role.name for r in user.user_roles.all())}
     UserRole.objects.get_or_create(user=user, role=role)
+    # The map is stale the moment a grant changes.
+    forget_permissions(user)
     audit.record_change(
         actor=actor,
         action="user.role_assigned",
@@ -150,6 +155,7 @@ def revoke_role(*, actor, user, role, reason=""):
             _assert_not_last_admin(user)
 
     UserRole.objects.filter(user=user, role=role).delete()
+    forget_permissions(user)
     audit.record_change(
         actor=actor,
         action="user.role_revoked",

@@ -67,9 +67,28 @@ jobs:
     name: Browser behaviour
     runs-on: ubuntu-latest
 
+    # On Postgres, not SQLite. These tests read from the test thread while
+    # the live-server thread writes, and SQLite answers that by locking the
+    # table -- an artefact of the harness that has nothing to do with the
+    # behaviour under test. Production is Postgres; so is this.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: a1360
+          POSTGRES_PASSWORD: a1360
+          POSTGRES_DB: a1360
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       SECRET_KEY: ci-only-not-a-real-key-0123456789abcdef
       DEBUG: "True"
+      DATABASE_URL: postgres://a1360:a1360@localhost:5432/a1360
 
     steps:
       - uses: actions/checkout@v4

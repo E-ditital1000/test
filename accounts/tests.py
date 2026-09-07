@@ -11,7 +11,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
-from django.test import TestCase, tag
+from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
 
@@ -510,3 +510,45 @@ class OfflineHelperTests(TestCase):
 
         layer = pathlib.Path("static/js/a1-offline.js").read_text(encoding="utf-8")
         self.assertIn("indexedDB", layer)
+
+
+class NullOrderingTests(SimpleTestCase):
+    """
+    NULL placement in an ORDER BY is not portable: SQLite sorts NULLs first,
+    PostgreSQL sorts them last. Development runs on SQLite and the server on
+    Postgres, so any ordering that leaves it to the default means one thing
+    here and the opposite there — and nobody connects the symptom to the
+    database.
+
+    Every ordering over a nullable column must say where NULLs go.
+    """
+
+    def test_no_model_orders_by_a_nullable_column_by_default(self):
+        import django.apps
+        from django.db.models.expressions import OrderBy
+
+        ours = {
+            "accounts", "config", "crm", "projects", "fieldjobs",
+            "finance", "hr", "approvals", "dashboard", "reports",
+        }
+        offenders = []
+        for model in django.apps.apps.get_models():
+            if model._meta.app_label not in ours:
+                continue
+            nullable = {
+                field.name for field in model._meta.get_fields()
+                if getattr(field, "null", False)
+            }
+            for term in model._meta.ordering or []:
+                # An OrderBy expression has already been explicit about it.
+                if isinstance(term, OrderBy):
+                    continue
+                if isinstance(term, str) and term.lstrip("-") in nullable:
+                    offenders.append(f"{model.__name__}.Meta.ordering: {term!r}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            "these order by a nullable column without saying where NULLs go, so "
+            "they sort differently on SQLite and PostgreSQL: " + ", ".join(offenders),
+        )

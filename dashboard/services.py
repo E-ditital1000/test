@@ -41,6 +41,7 @@ def attention_queue(user, limit=12):
 
     # -- assessments this person can actually review --------------------
     if user_has_permission(user, "review_assessment"):
+        from approvals.models import latest_decisions
         from fieldjobs.models import Assessment
 
         submitted = apply_scope(
@@ -51,8 +52,11 @@ def attention_queue(user, limit=12):
             "review_assessment",
             own_team_filter=Q(technician__employee__supervisor__user=user),
         )
-        for assessment in submitted:
-            if assessment.approval_state in ("approved", "returned"):
+        rows = list(submitted)
+        decided = latest_decisions(Assessment, [a.pk for a in rows])
+        for assessment in rows:
+            latest = decided.get(assessment.pk)
+            if latest and latest.decision in ("approved", "returned"):
                 continue
             items.append(
                 Item(
@@ -186,6 +190,7 @@ def attention_count(user):
     total = 0
 
     if user_has_permission(user, "review_assessment"):
+        from approvals.models import latest_decisions
         from fieldjobs.models import Assessment
 
         submitted = apply_scope(
@@ -194,8 +199,12 @@ def attention_count(user):
             "review_assessment",
             own_team_filter=Q(technician__employee__supervisor__user=user),
         )
+        rows = list(submitted)
+        decided = latest_decisions(Assessment, [a.pk for a in rows])
         total += sum(
-            1 for a in submitted if a.approval_state not in ("approved", "returned")
+            1 for a in rows
+            if (decided.get(a.pk).decision if decided.get(a.pk) else None)
+            not in ("approved", "returned")
         )
 
     if user_has_permission(user, "assign_ticket"):

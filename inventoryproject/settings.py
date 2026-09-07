@@ -88,6 +88,20 @@ DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
 
+# SQLite serialises writers and, by default, blocks readers behind them and
+# gives up immediately. That is fine for one person on `runserver` and not
+# fine the moment anything is concurrent — the browser tests read from the
+# test thread while the live-server thread is writing a clock event, and hit
+# "database table is locked".
+#
+# Write-ahead logging lets a reader carry on during a write, and the timeout
+# makes a blocked writer wait rather than fail. Production is PostgreSQL, so
+# this only ever applies to development and the test suite.
+if "sqlite" in DATABASES["default"]["ENGINE"]:
+    DATABASES["default"].setdefault("OPTIONS", {}).update(
+        {"timeout": 20, "init_command": "PRAGMA journal_mode=WAL;"}
+    )
+
 AUTH_USER_MODEL = "accounts.User"
 
 # Phase One auth scope: people sign in with email and password. The stock

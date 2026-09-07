@@ -8,16 +8,13 @@ def user_scopes_for(user, code):
     The set of scopes the user's roles grant for this permission code, or
     an empty set if they don't hold it at all. A user can in principle hold
     the same code at more than one scope via different roles.
+
+    Served from the same once-per-request map as `user_has_permission`, so
+    scoping a queryset costs no extra round trip.
     """
-    if not user.is_authenticated:
-        return set()
-    if user.is_superuser:
-        return {SCOPE_ALL}
-    return set(
-        user.user_roles.filter(role__permissions__code=code)
-        .values_list("role__rolepermission__scope", flat=True)
-        .distinct()
-    )
+    from .permissions import permission_map
+
+    return set(permission_map(user).get(code, ()))
 
 
 def apply_scope(queryset, user, code, *, own_team_filter=None, own_projects_filter=None):

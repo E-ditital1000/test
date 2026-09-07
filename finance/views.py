@@ -19,7 +19,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from accounts.decorators import require_permission, user_has_permission
-from approvals.models import Approval
+from approvals.models import Approval, latest_decisions
 from config.models import PolicySetting
 from config.references import next_reference
 from projects.models import Requisition
@@ -247,14 +247,25 @@ def expense_create(request):
 # --------------------------------------------------------------------------
 
 def _pending_requisitions():
-    """Raised but not yet decided — computed from the approval trail."""
-    return [
-        requisition
-        for requisition in Requisition.objects.select_related(
-            "project__customer", "raised_by"
-        ).order_by("created_at")
-        if requisition.approval_state not in (Approval.APPROVED, Approval.RETURNED)
-    ]
+    """
+    Raised but not yet decided — computed from the approval trail.
+
+    The whole trail is read once rather than once per requisition: asking
+    each row for its own state turned a queue of forty into forty round
+    trips.
+    """
+    rows = list(
+        Requisition.objects.select_related("project__customer", "raised_by")
+        .order_by("created_at")
+    )
+    decisions = latest_decisions(Requisition, [r.pk for r in rows])
+    pending = []
+    for requisition in rows:
+        latest = decisions.get(requisition.pk)
+        if latest and latest.decision in (Approval.APPROVED, Approval.RETURNED):
+            continue
+        pending.append(requisition)
+    return pending
 
 
 @require_permission("approve_requisition")

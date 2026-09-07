@@ -167,11 +167,18 @@ class Task(TimeStampedModel):
     class Meta:
         # Open work first, then soonest due.
         #
-        # `ordering = ["completed_at", ...]` looks equivalent and is not:
-        # SQLite sorts NULLs first and PostgreSQL sorts them last, so the
-        # list silently inverts between development and the server. Saying
-        # nulls_first makes it mean the same thing on both.
-        ordering = [F("completed_at").asc(nulls_first=True), "due_date", "id"]
+        # Both terms are nullable, and NULL placement is not portable:
+        # SQLite sorts NULLs first, PostgreSQL sorts them last. Left to the
+        # default, this list silently inverts between a developer's machine
+        # and the server. Saying where NULLs go makes it mean one thing.
+        #
+        # completed_at: NULL means open, and open work leads.
+        # due_date:     NULL means undated, and undated work trails dated.
+        ordering = [
+            F("completed_at").asc(nulls_first=True),
+            F("due_date").asc(nulls_last=True),
+            "id",
+        ]
 
     @property
     def is_complete(self):

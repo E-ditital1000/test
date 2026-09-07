@@ -7,12 +7,16 @@ from .permission_registry import PERMISSION_CODES
 
 
 def user_has_permission(user, code):
-    """Does this user hold this permission code at all (no scope check)."""
-    if not user.is_authenticated:
-        return False
-    if user.is_superuser:
-        return True
-    return user.user_roles.filter(role__permissions__code=code).exists()
+    """
+    Does this user hold this permission code at all (no scope check).
+
+    Reads the map loaded once per request by `accounts.permissions`, because
+    a single page asks this a dozen times and the answer cannot change
+    between the asks.
+    """
+    from .permissions import permission_map
+
+    return code in permission_map(user)
 
 
 def require_permission(code):

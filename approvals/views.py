@@ -13,14 +13,14 @@ a mutable status field somebody can set directly.
 """
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 from fieldjobs.models import Assessment
 
-from .models import Approval
+from .models import Approval, latest_decisions
 
 
 def _reviewable(user, code="review_assessment"):
@@ -47,7 +47,10 @@ def queue(request):
     submitted = _reviewable(request.user).filter(state=Assessment.SUBMITTED)
 
     waiting, decided = [], []
-    for assessment in submitted.order_by("submitted_at"):
+    # Oldest first. submitted_at is nullable, and NULL placement is not
+    # portable — an assessment missing one is anomalous and should trail the
+    # queue, not head it because the database happens to sort NULLs first.
+    for assessment in submitted.order_by(F("submitted_at").asc(nulls_last=True)):
         (decided if assessment.approval_state in ("approved", "returned") else waiting).append(
             assessment
         )

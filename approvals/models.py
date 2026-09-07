@@ -45,6 +45,33 @@ class Approval(TimeStampedModel):
         return f"{self.get_decision_display()} by {self.actor} on {self.content_type}:{self.object_id}"
 
 
+def latest_decisions(model, object_ids):
+    """
+    The current decision for many objects in one query.
+
+    `approval_state` on a single object costs a query, which is right when
+    you are looking at one record and wrong when you are listing forty: a
+    queue of pending requisitions was doing one round trip per row. This
+    reads the whole trail for the given ids once and keeps the newest per
+    object.
+
+    Returns {object_id: Approval}.
+    """
+    object_ids = list(object_ids)
+    if not object_ids:
+        return {}
+
+    content_type = ContentType.objects.get_for_model(model)
+    latest = {}
+    # Ordered oldest first, so the last write per id wins — the same rule
+    # `approval_state` applies one object at a time.
+    for approval in Approval.objects.filter(
+        content_type=content_type, object_id__in=object_ids
+    ).select_related("actor").order_by("created_at"):
+        latest[approval.object_id] = approval
+    return latest
+
+
 class ApprovalTrailMixin:
     """
     Mix into any model that is approved. Gives it a trail and a current
