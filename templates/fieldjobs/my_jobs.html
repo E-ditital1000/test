@@ -18,7 +18,13 @@ between tasks needs to know one thing — where next.
       <p class="t-m-body n3" style="color:var(--navy300)">
         {{ next_job.customer.name }}{% if next_job.site %}, {{ next_job.site.name }}{% endif %}
         · {{ next_job.scheduled_for|date:"H:i" }}
+        {% if next_job.crew_size > 1 %} · {{ next_job.crew_size }} on site{% endif %}
       </p>
+      {% if next_job.assigned_to != user %}
+        <p class="t-m-meta" style="color:var(--gold300)">
+          {{ next_job.assigned_to|a1name }} leads · you are crew
+        </p>
+      {% endif %}
       <a class="act act-gold" href="{% url 'fieldjobs-job-detail' next_job.pk %}">Open this job</a>
     </div>
 

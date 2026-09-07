@@ -67,7 +67,10 @@ def queue(request):
 def assessment_review(request, pk):
     assessment = get_object_or_404(
         _reviewable(request.user).prefetch_related(
-            "answers__question", "photos", "field_job__check_ins"
+            "answers__question",
+            "photos",
+            "field_job__check_ins__technician",
+            "field_job__crew__employee__user",
         ),
         pk=pk,
     )
@@ -86,6 +89,8 @@ def assessment_review(request, pk):
             "client_answers": [a for a in answers if a.respondent == "client"],
             "photos": assessment.photos.all(),
             "check_in": assessment.field_job.check_ins.order_by("-device_timestamp").first(),
+            "crew": assessment.field_job.crew.all(),
+            "check_ins": assessment.field_job.check_ins.order_by("device_timestamp"),
             "answered": answered,
             "required": required,
             "trail": assessment.approval_trail.select_related("actor"),

@@ -105,10 +105,21 @@ requires a comment the technician will read.
             synced {{ assessment.server_received_at|a1datetime }}
           </dd>
         </div>
-        {% if check_in %}
+        <div class="kv">
+          <dt>On site</dt>
+          <dd>
+            {{ assessment.technician|a1name }} (lead)
+            {% for member in crew %}, {{ member.employee.user|a1name }}{% endfor %}
+          </dd>
+        </div>
+        {% if check_ins %}
           <div class="kv">
             <dt>Checked in</dt>
-            <dd>{{ check_in.device_timestamp|a1datetime }}</dd>
+            <dd>
+              {% for entry in check_ins %}
+                {{ entry.technician|a1name }} {{ entry.device_timestamp|date:"H:i" }}{% if not forloop.last %} · {% endif %}
+              {% endfor %}
+            </dd>
           </div>
         {% endif %}
       </dl>

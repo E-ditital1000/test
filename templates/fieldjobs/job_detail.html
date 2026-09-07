@@ -6,6 +6,16 @@
 {% block phone_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
 
 {% block content %}
+  {% if not is_lead %}
+    <div class="mc warnbox">
+      <p class="t-label" style="color:var(--gold700)">You are on the crew</p>
+      <p class="t-m-meta" style="color:var(--text2)">
+        {{ job.assigned_to|a1name }} leads this visit and submits the
+        assessment. Check in for yourself when you arrive.
+      </p>
+    </div>
+  {% endif %}
+
   <div class="mc" style="gap:10px">
     <p class="t-label">This visit</p>
     <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
@@ -17,6 +27,25 @@
       <p class="t-m-meta dim2">{{ job.instructions|linebreaksbr }}</p>
     {% endif %}
   </div>
+
+  {% if crew %}
+    <div class="mc" style="gap:8px">
+      <p class="t-label">On site · {{ job.crew_size }}</p>
+      <div class="kvr">
+        <span>{{ job.assigned_to|a1name }}</span>
+        <b>Lead</b>
+      </div>
+      {% for member in crew %}
+        <div class="kvr">
+          <span>{{ member.employee.user|a1name }}</span>
+          <b class="dim">{% if member.employee.user == user %}You{% else %}Crew{% endif %}</b>
+        </div>
+      {% endfor %}
+      <p class="t-m-meta dim">
+        Everyone checks in for themselves. One assessment covers the visit.
+      </p>
+    </div>
+  {% endif %}
 
   {% if check_in %}
     <div class="mc ok">
@@ -74,6 +103,14 @@
       The questions come from the service type. You can fill this in with no
       signal — it saves on the phone and uploads by itself.
     </p>
+  {% elif not is_lead %}
+    <div class="mc" style="gap:6px">
+      <p class="t-label">Assessment</p>
+      <p class="t-m-meta dim2">
+        {{ job.assigned_to|a1name }} fills this in for the visit. If something
+        needs recording that they have not seen, tell them before they submit.
+      </p>
+    </div>
   {% endif %}
 
   <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px;justify-content:center">

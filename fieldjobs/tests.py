@@ -21,7 +21,7 @@ from finance.models import Invoice, InvoiceLine
 from hr.models import Employee
 from projects.models import Project
 
-from .models import Assessment, AssessmentPhoto, CheckIn, FieldJob
+from .models import Assessment, AssessmentPhoto, CheckIn, FieldJob, FieldJobCrew
 
 User = get_user_model()
 
@@ -282,6 +282,109 @@ class FieldWorkTests(TestCase):
         self.client.force_login(self.supervisor)
         response = self.client.get(reverse("approvals-assessment-review", args=[assessment.pk]))
         self.assertEqual(response.status_code, 404)
+
+    # -- a crew on one visit ----------------------------------------------
+
+    def _crewed_job(self):
+        """One visit: technician leads, other_tech is on the crew."""
+        job = self._job()
+        FieldJobCrew.objects.create(
+            field_job=job, employee=Employee.objects.get(user=self.other_tech)
+        )
+        return job
+
+    def test_a_crew_member_sees_the_job_on_their_own_phone(self):
+        job = self._crewed_job()
+        self.client.force_login(self.other_tech)
+
+        listing = self.client.get(reverse("fieldjobs-my-jobs"))
+        self.assertContains(listing, job.reference)
+        self.assertEqual(
+            self.client.get(reverse("fieldjobs-job-detail", args=[job.pk])).status_code, 200
+        )
+
+    def test_a_crew_member_checks_in_for_themselves(self):
+        job = self._crewed_job()
+        for who in (self.technician, self.other_tech):
+            self.client.force_login(who)
+            self.client.post(
+                reverse("fieldjobs-check-in", args=[job.pk]),
+                {"client_uuid": str(uuid.uuid4()), "location_unavailable": "1"},
+            )
+        # Each person on site is recorded arriving, not just the lead.
+        self.assertEqual(job.check_ins.count(), 2)
+        self.assertEqual(
+            set(job.check_ins.values_list("technician", flat=True)),
+            {self.technician.pk, self.other_tech.pk},
+        )
+
+    def test_checking_in_twice_records_once(self):
+        job = self._crewed_job()
+        self.client.force_login(self.other_tech)
+        for _ in range(2):
+            self.client.post(
+                reverse("fieldjobs-check-in", args=[job.pk]),
+                {"client_uuid": str(uuid.uuid4()), "location_unavailable": "1"},
+            )
+        self.assertEqual(job.check_ins.filter(technician=self.other_tech).count(), 1)
+
+    @tag("acceptance")
+    def test_only_the_lead_submits_the_assessment(self):
+        """
+        An assessment with three possible authors is one nobody owns. Crew
+        are on the visit; the report stays with the lead.
+        """
+        job = self._crewed_job()
+        self.client.force_login(self.other_tech)
+
+        # The form redirects them back with an explanation.
+        response = self.client.get(reverse("fieldjobs-assessment", args=[job.pk]))
+        self.assertEqual(response.status_code, 302)
+
+        # And the endpoint refuses a direct post from their device.
+        refused = self._submit(job, self._payload())
+        self.assertEqual(refused.status_code, 403)
+        self.assertEqual(Assessment.objects.filter(field_job=job).count(), 0)
+
+        # The lead submits normally.
+        self.client.force_login(self.technician)
+        self._submit(job, self._payload())
+        self.assertEqual(Assessment.objects.filter(field_job=job).count(), 1)
+
+    def test_someone_on_neither_the_lead_nor_the_crew_cannot_see_it(self):
+        job = self._job()          # no crew
+        self.client.force_login(self.other_tech)
+        self.assertEqual(
+            self.client.get(reverse("fieldjobs-job-detail", args=[job.pk])).status_code, 404
+        )
+
+    def test_scheduling_with_a_crew_records_everyone_once(self):
+        project = Project.objects.create(
+            reference="PRJ-0009", name="Array", customer=self.customer, site=self.site,
+            service_type=self.service_type,
+            status=StatusOption.objects.get(kind=StatusOption.PROJECT, code="active"),
+        )
+        self.client.force_login(self.manager)
+        self.client.post(
+            reverse("fieldjobs-schedule-for-project", args=[project.pk]),
+            {
+                "customer": self.customer.pk, "site": self.site.pk,
+                "service_type": self.service_type.pk,
+                "assigned_to": self.technician.pk,
+                "scheduled_for": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+                "instructions": "",
+                # The lead is deliberately ticked as crew too; they must not
+                # appear on their own job twice.
+                "crew": [
+                    Employee.objects.get(user=self.technician).pk,
+                    Employee.objects.get(user=self.other_tech).pk,
+                ],
+            },
+        )
+        job = FieldJob.objects.latest("id")
+        self.assertEqual(job.crew.count(), 1, "the lead must not be listed as their own crew")
+        self.assertEqual(job.crew.first().employee.user, self.other_tech)
+        self.assertEqual(job.crew_size, 2)
 
     # -- the whole job, end to end ----------------------------------------
 

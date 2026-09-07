@@ -124,7 +124,10 @@
           <div class="row-i">
             <div class="two g">
               <b class="mono">{{ job.reference }}</b>
-              <span>{{ job.assigned_to|a1name }} · {{ job.scheduled_for|a1datetime }}</span>
+              <span>
+                {{ job.assigned_to|a1name }}{% if job.crew_size > 1 %} +{{ job.crew.count }} crew{% endif %}
+                · {{ job.scheduled_for|a1datetime }}
+              </span>
             </div>
           </div>
         {% endfor %}

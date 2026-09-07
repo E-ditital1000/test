@@ -48,6 +48,9 @@ class FieldJob(JobLineageModel, TimeStampedModel):
     service_type = models.ForeignKey(
         "config.ServiceType", on_delete=models.PROTECT, related_name="field_jobs"
     )
+    # The lead. One person is accountable for the visit and is the only one
+    # who can submit its assessment — an assessment with three possible
+    # authors is an assessment nobody owns. Everyone else on site is crew.
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="field_jobs"
     )
@@ -63,8 +66,50 @@ class FieldJob(JobLineageModel, TimeStampedModel):
             models.Index(fields=["job_ref"]),
         ]
 
+    @property
+    def crew_size(self):
+        """The lead plus anyone else on site."""
+        return 1 + self.crew.count()
+
+    def is_led_by(self, user):
+        return self.assigned_to_id == user.pk
+
+    def includes(self, user):
+        """Lead or crew — everyone who should see this job on their phone."""
+        return self.is_led_by(user) or self.crew.filter(employee__user=user).exists()
+
     def __str__(self):
         return f"{self.reference} — {self.customer.name}"
+
+
+class FieldJobCrew(TimeStampedModel):
+    """
+    Who else is on site for this visit, drawn from the HR employee register.
+
+    A crew member sees the job on their own phone and can check in against
+    it, but the assessment stays with the lead. That keeps one author per
+    report while still recording who was actually there — which is what a
+    supervisor needs when a customer disputes what happened on the day.
+
+    Where the work splits across people rather than sharing one visit, the
+    answer is several field jobs on the project, not several leads on one.
+    """
+
+    field_job = models.ForeignKey(FieldJob, on_delete=models.CASCADE, related_name="crew")
+    employee = models.ForeignKey(
+        "hr.Employee", on_delete=models.PROTECT, related_name="field_job_assignments"
+    )
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        blank=True, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["employee__staff_id"]
+        unique_together = ("field_job", "employee")
+
+    def __str__(self):
+        return f"{self.employee} on {self.field_job.reference}"
 
 
 class CheckIn(MobileOriginatedModel):

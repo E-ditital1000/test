@@ -19,6 +19,7 @@ import uuid
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -29,7 +30,14 @@ from config.references import next_reference
 from projects.models import Project
 
 from .forms import FieldJobForm
-from .models import Assessment, AssessmentAnswer, AssessmentPhoto, CheckIn, FieldJob
+from .models import (
+    Assessment,
+    AssessmentAnswer,
+    AssessmentPhoto,
+    CheckIn,
+    FieldJob,
+    FieldJobCrew,
+)
 
 # A phone camera frame held as a data URL is large; anything past this is a
 # sign something has gone wrong rather than a genuine site photo.
@@ -51,8 +59,14 @@ def my_jobs(request):
     now = timezone.now()
     today = timezone.localdate()
 
-    mine = FieldJob.objects.filter(assigned_to=request.user).select_related(
-        "customer", "site", "service_type", "project"
+    # A job belongs on your phone if you lead it or you are on its crew.
+    mine = (
+        FieldJob.objects.filter(
+            Q(assigned_to=request.user) | Q(crew__employee__user=request.user)
+        )
+        .distinct()
+        .select_related("customer", "site", "service_type", "project")
+        .prefetch_related("crew__employee__user")
     )
     todays = list(mine.filter(scheduled_for__date=today).order_by("scheduled_for"))
     upcoming = list(
@@ -75,11 +89,19 @@ def my_jobs(request):
 
 
 def _own_job(request, pk):
-    """A technician only ever reaches their own job."""
+    """
+    A technician only ever reaches a job they are on — as its lead or as
+    crew. Anyone else gets a 404 rather than a refusal, because the
+    existence of another crew's job is not theirs to learn.
+    """
     return get_object_or_404(
-        FieldJob.objects.select_related("customer", "site", "service_type", "project"),
+        FieldJob.objects.filter(
+            Q(assigned_to=request.user) | Q(crew__employee__user=request.user)
+        )
+        .distinct()
+        .select_related("customer", "site", "service_type", "project")
+        .prefetch_related("crew__employee__user"),
         pk=pk,
-        assigned_to=request.user,
     )
 
 
@@ -87,14 +109,23 @@ def _own_job(request, pk):
 def job_detail(request, pk):
     job = _own_job(request, pk)
     assessment = job.assessments.order_by("-device_timestamp").first()
+    is_lead = job.is_led_by(request.user)
     return render(
         request,
         "fieldjobs/job_detail.html",
         {
             "job": job,
-            "check_in": job.check_ins.order_by("-device_timestamp").first(),
+            "crew": job.crew.all(),
+            "is_lead": is_lead,
+            # My own check-in, not the lead's — each person on site checks in
+            # for themselves.
+            "check_in": job.check_ins.filter(technician=request.user)
+            .order_by("-device_timestamp").first(),
+            "all_check_ins": job.check_ins.select_related("technician")
+            .order_by("device_timestamp"),
             "assessment": assessment,
-            "can_assess": user_has_permission(request.user, "submit_assessment"),
+            # Crew can be on site and check in; the assessment is the lead's.
+            "can_assess": is_lead and user_has_permission(request.user, "submit_assessment"),
             "tab_active": "field",
         },
     )
@@ -113,6 +144,9 @@ def check_in(request, pk):
     client_uuid = request.POST.get("client_uuid") or str(uuid.uuid4())
     if CheckIn.objects.filter(client_uuid=client_uuid).exists():
         messages.info(request, "Already checked in — nothing was duplicated.")
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+    if job.check_ins.filter(technician=request.user).exists():
+        messages.info(request, "You are already checked in on this job.")
         return redirect("fieldjobs-job-detail", pk=job.pk)
 
     def decimal_or_none(name):
@@ -150,6 +184,16 @@ def assessment_form(request, pk):
     configuration, so nothing here knows what any of them ask.
     """
     job = _own_job(request, pk)
+    if not job.is_led_by(request.user):
+        # Crew are on the visit but do not report on it. Say which, so the
+        # refusal is actionable rather than mysterious.
+        messages.error(
+            request,
+            f"{job.assigned_to.get_full_name() or job.assigned_to.email} leads this "
+            "job and submits its assessment. You can check in and work on it.",
+        )
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
     questions = list(job.service_type.active_questions())
 
     # Technician answers and the client's own responses are captured as two
@@ -193,6 +237,13 @@ def assessment_submit(request, pk):
     blindly when signal returns.
     """
     job = _own_job(request, pk)
+    if not job.is_led_by(request.user):
+        # Enforced server-side, not merely hidden: a crew member's device
+        # could post this directly.
+        return JsonResponse(
+            {"ok": False, "message": "Only the job's lead submits its assessment."},
+            status=403,
+        )
     if request.method != "POST":
         return redirect("fieldjobs-assessment", pk=job.pk)
 
@@ -318,8 +369,23 @@ def schedule(request, project_pk=None):
             job.job_ref = project.job_ref
         job.reference = next_reference(FieldJob, "FJ")
         job.save()
+
+        crew = form.cleaned_data.get("crew") or []
+        for member in crew:
+            # The lead is already on the job; adding them again would put
+            # their name on it twice.
+            if member.user_id == job.assigned_to_id:
+                continue
+            FieldJobCrew.objects.create(
+                field_job=job, employee=member, assigned_by=request.user
+            )
+
+        who = job.assigned_to.get_full_name() or job.assigned_to.email
+        extra = len([m for m in crew if m.user_id != job.assigned_to_id])
         messages.success(
-            request, f"{job.reference} scheduled for {job.assigned_to.get_full_name() or job.assigned_to.email}."
+            request,
+            f"{job.reference} scheduled for {who}"
+            + (f" with {extra} other{'s' if extra != 1 else ''} on site." if extra else "."),
         )
         if project is not None:
             return redirect("projects-detail", pk=project.pk)
