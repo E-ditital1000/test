@@ -51,7 +51,7 @@ created with. Submitting twice cannot create two records.
       <p class="t-label" id="step-label">Step 1 of {{ total_steps }}</p>
     </div>
 
-    <form id="assessment"
+    <form id="assessment" class="a-form"
           data-job="{{ job.pk }}"
           data-submit-url="{% url 'fieldjobs-assessment-submit' job.pk %}"
           data-done-url="{% url 'fieldjobs-job-detail' job.pk %}">

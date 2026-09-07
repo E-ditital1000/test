@@ -760,26 +760,6 @@ input[type=checkbox], input[type=radio] {
    -------------------------------------------------------------------------- */
 .phone { display: flex; flex-direction: column; min-height: 100vh; background: var(--page); }
 
-/* The field surfaces are designed for a phone held one-handed. On a desktop
-   they are presented in a phone-width column rather than stretched: a 44 px
-   control spread across 1900 px is neither usable nor honest about what the
-   screen is for, and a supervisor opening a technician's view should see
-   what the technician sees. */
-@media (min-width: 901px) {
-  body.is-field { background: var(--sunken); }
-  body.is-field .phone {
-    max-width: 430px;
-    margin: 24px auto;
-    min-height: calc(100vh - 48px);
-    border: 1px solid var(--border);
-    border-radius: 24px;
-    overflow: hidden;
-    box-shadow: 0 18px 40px -18px rgba(17, 4, 58, .28), 0 2px 6px rgba(17, 4, 58, .06);
-  }
-  /* Sticky bottom is measured against the viewport, which is taller than
-     this column — pin the tab bar to the column instead. */
-  body.is-field .a1-tabs { position: static; }
-}
 .phead { background: var(--navy); padding: 18px 20px 20px; }
 .phead b {
   display: block; font-size: 22px; line-height: 30px; font-weight: 700;
@@ -820,6 +800,7 @@ input[type=checkbox], input[type=radio] {
 .kvr { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kvr span { font-size: 16px; color: var(--text2); }
 .kvr b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.kvr b.ar { text-align: right; }
 .big { font-size: 28px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 
 /* One day in the employee's own seven-day record. A correction is shown
@@ -865,6 +846,205 @@ input[type=checkbox], input[type=radio] {
   border-radius: 9px; background: var(--gold); color: var(--navy); font-size: 11px;
   font-weight: 700; display: flex; align-items: center; justify-content: center;
   padding: 0 5px; border: 2px solid var(--navy); font-variant-numeric: tabular-nums;
+}
+
+/* Layout wrappers for the field screens.
+
+   Every one of these is `display: contents` on a phone: the wrapper is not
+   rendered and its children stack in .pbody's flex column exactly as they did
+   when there were no wrappers at all. They become a layout only at 901px.
+   That is what lets one document be two genuinely different shapes without
+   sending the phone a single extra box to get there. */
+.fgrid, .fmain, .frail, .fcards, .fdl, .fhero-t { display: contents; }
+
+/* Not in that list: this one is a layout on both devices, centred in
+   whatever height is left over. */
+.fempty { display: flex; flex: 1; align-items: center; justify-content: center; padding: 24px 8px; }
+.fempty-in {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; text-align: center;
+}
+.fempty-in .t-m-meta { max-width: 30ch; }
+
+.fcard { text-decoration: none; color: inherit; }
+.mc .pill { align-self: flex-start; }
+
+/* Empty state — the icon plate and the column under it. This was three inline
+   style attributes; it is a layout, so it lives here. */
+.fempty-ic {
+  width: 88px; height: 88px; border-radius: 24px; background: var(--sunken);
+  display: flex; align-items: center; justify-content: center;
+  --icon-cut: var(--sunken);
+}
+.fempty-ic svg { fill: var(--navy300); }
+
+/* One person on the visit, and whether they have actually arrived. */
+.crewr { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.crewr .who { font-size: 16px; color: var(--text2); min-width: 0; }
+.crewr b { font-size: 14px; font-weight: 600; flex: none; }
+.ok-t { color: var(--green); }
+
+/* Desktop-only pieces of the shell — absent on a phone rather than shrunk. */
+.ftop-brand, .ftop-out, .phead .ph-acts { display: none; }
+
+/* The assessment wizard. These three had no rules at all, which is why
+   question cards sat flush against one another, the photo grid was a column
+   of full-width images, and Back/Next filled the screen one above the other.
+   [hidden] still wins over all of them — it is declared !important, and that
+   is what keeps a step which is not the current step out of the layout. */
+/* The form is a block, so the visible step and the Back/Next row sat
+   flush against one another. Hidden steps are display:none and cost
+   nothing here. */
+.a-form { display: flex; flex-direction: column; gap: 16px; }
+.a-step { display: flex; flex-direction: column; gap: 12px; }
+.mrow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ph { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.ph > div { display: flex; flex-direction: column; gap: 6px; }
+
+/* --------------------------------------------------------------------------
+   The field screens on a computer (901px and up)
+
+   These used to be drawn as a 430 px phone-shaped column floating on a grey
+   field. That is defensible as a preview — a supervisor seeing exactly what
+   the technician sees — and wrong as a place to work. People do field jobs at
+   a desk too: raising a visit, checking who has arrived, reading an
+   assessment back. Asking them to do it down a 430 px straw wastes the other
+   1500 and makes a 24" monitor behave like a worse phone.
+
+   So the phone layout stays exactly what it was below 901px, and above it the
+   same markup becomes a real desktop screen: navigation across the top, a
+   page header, and the work in two columns — what you do on the left, what
+   you need to know beside it rather than under it.
+   -------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  body.is-field { background: var(--page); }
+
+  /* --- the top bar -----------------------------------------------------
+     The tab bar is last in the document so that a phone gets it under the
+     thumb and a screen reader meets the page before the navigation.
+     `order` lifts it to the top of the screen without moving it in the
+     document, so both of those stay true. */
+  body.is-field .a1-tabs {
+    order: -1; position: sticky; top: 0; z-index: 30;
+    margin-top: 0; height: 62px; padding: 0 var(--pad-x);
+    align-items: center; gap: 4px;
+    border-top: none; border-bottom: 1px solid var(--navy600);
+  }
+  body.is-field .a1-tab {
+    flex: none; flex-direction: row; gap: 9px;
+    min-height: 40px; padding: 0 15px; border-radius: 999px;
+  }
+  body.is-field .a1-tab svg { width: 18px; height: 18px; }
+  body.is-field .a1-tab span { font-size: 13px; line-height: 18px; }
+  body.is-field .a1-badge {
+    position: static; top: auto; left: auto; margin-left: 2px; border: none;
+  }
+
+  .ftop-brand {
+    display: flex; align-items: center; gap: 10px; flex: none;
+    margin-right: 20px; text-decoration: none;
+  }
+  .ftop-brand img { width: 30px; height: 30px; border-radius: 8px; display: block; }
+  .ftop-brand b {
+    display: block; font-size: 15px; line-height: 18px; color: #fff; letter-spacing: -.2px;
+  }
+  .ftop-brand i {
+    display: block; font-style: normal; font-size: 10px; line-height: 13px;
+    font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--gold);
+  }
+
+  .ftop-out { display: block; margin-left: auto; flex: none; }
+  .ftop-out button {
+    background: none; border: 1px solid var(--navy600); color: var(--navy300);
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    min-height: 36px; padding: 0 14px; border-radius: var(--r-ctl);
+  }
+  .ftop-out button:hover { color: #fff; border-color: var(--gold); }
+
+  /* --- the page header --------------------------------------------------
+     Navy on a phone, because there it is the whole top of the screen. On a
+     desktop the navy is already spent on the bar above it, so this becomes
+     the office's own title bar and the screen stops reading as two
+     competing headers. */
+  body.is-field .phead {
+    background: var(--card); border-bottom: 1px solid var(--border);
+    padding: 14px var(--pad-x); display: flex; align-items: center;
+    gap: 16px; flex-wrap: wrap;
+  }
+  body.is-field .phead b {
+    font-size: 22px; line-height: 30px; color: var(--text); margin-bottom: 1px;
+  }
+  body.is-field .phead span { color: var(--muted); font-size: 13px; }
+  body.is-field .phead .ph-acts {
+    display: flex; align-items: center; gap: 10px; margin-left: auto;
+  }
+
+  /* --- the body ---------------------------------------------------------
+     Measured, not stretched. Text does not want to be 1900 px wide any more
+     than a button does. */
+  body.is-field .pbody {
+    width: 100%; max-width: 1220px; margin: 0 auto;
+    padding: 24px var(--pad-x) 48px; gap: 18px;
+  }
+
+  .fgrid {
+    display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+    gap: 20px; align-items: start;
+  }
+  /* Nothing in the rail would otherwise leave an empty column. */
+  .fgrid.solo { grid-template-columns: minmax(0, 1fr); max-width: 800px; }
+  .fmain, .frail { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .frail { position: sticky; top: 86px; }
+  .fcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .fdl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 32px; }
+  .fdl .kvr { justify-content: flex-start; gap: 14px; align-items: baseline; }
+  .fdl .kvr span { flex: none; min-width: 88px; }
+  .fdl .kvr b, .fdl .kvr b.ar { text-align: left; min-width: 0; }
+
+  /* A 64 px control spanning a desk monitor is not a bigger target, it is a
+     stretched one. Here the primary action sizes to its own label. */
+  body.is-field .act {
+    width: auto; align-self: flex-start;
+    min-height: 46px; padding: 0 26px; font-size: 16px;
+  }
+
+  /* The promoted job, laid across rather than down: everything about the
+     visit on one side, the single thing to press on the other.
+
+     A row rather than a grid on purpose. The obvious grid version parks the
+     button in a second column with `grid-row: 1 / -1` to centre it against
+     however many lines of text there are -- and that silently does nothing,
+     because -1 counts back through the *explicit* rows and these are all
+     implicit. Two flex children cannot be got wrong that way. */
+  .fhero { flex-direction: row; align-items: center; gap: 28px; padding: 22px 24px; }
+  .fhero-t { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
+  body.is-field .fhero .act { flex: none; align-self: center; }
+
+  .fempty { padding: 56px 8px; }
+  .fempty-in .t-m-meta { max-width: 42ch; }
+
+  /* The rail carries a way back on a phone, where it lands at the end of the
+     scroll. On a desktop it is in the header instead. */
+  .fback { display: none; }
+
+  /* An assessment question is a label and one control. Two fit side by side
+     at a desk, and the wizard stops being ten screens long. */
+  .a-step {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 14px; align-items: start;
+  }
+  .a-step > .t-label { grid-column: 1 / -1; }
+  body.is-field .mrow2 { grid-template-columns: auto auto; justify-content: flex-end; gap: 12px; }
+  body.is-field .mrow2 .btn { min-width: 140px; }
+}
+
+/* Between the phone and a real desktop -- a small laptop, a tablet held
+   landscape -- there is room for the desktop chrome but not for two columns.
+   A 1.65/1 split at 950px gives a rail too narrow to read and a main column
+   no wider than the phone had. One column, full chrome. */
+@media (min-width: 901px) and (max-width: 1099px) {
+  .fgrid, .fgrid.solo { grid-template-columns: minmax(0, 1fr); }
+  .frail { position: static; }
 }
 
 /* --------------------------------------------------------------------------

@@ -11,6 +11,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
+from django.conf import settings
 from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
@@ -551,4 +552,62 @@ class NullOrderingTests(SimpleTestCase):
             [],
             "these order by a nullable column without saying where NULLs go, so "
             "they sort differently on SQLite and PostgreSQL: " + ", ".join(offenders),
+        )
+
+
+class StylesheetCascadeTests(SimpleTestCase):
+    """
+    Two rules of equal specificity are settled by which one is written last,
+    and that is not visible from any template, any view, or any other test in
+    this suite.
+
+    It bit for real: the field screens' desktop block sets
+    `.fhero { display: grid }`, and it was written ABOVE `.mc { display: flex }`
+    -- so the desktop hero silently stayed a flex column while every other
+    rule in the same media query applied normally. Nothing failed. The page
+    just quietly rendered the wrong layout.
+
+    So: the block that overrides the field primitives must come after them.
+    """
+
+    CSS = settings.BASE_DIR / "static" / "css" / "a1.css"
+
+    # Every primitive the desktop field block redeclares at equal or lower
+    # specificity. Add to this when the block starts overriding something new.
+    OVERRIDDEN = [
+        ".phone {", ".phead {", ".pbody {", ".mc {", ".act {",
+        ".a1-tabs {", ".a1-tab {", ".a1-badge {",
+    ]
+    MARKER = "/* Layout wrappers for the field screens."
+
+    def setUp(self):
+        self.css = self.CSS.read_text(encoding="utf-8")
+        self.block_at = self.css.find(self.MARKER)
+        self.assertNotEqual(
+            self.block_at, -1,
+            "the field layout block is gone or its opening comment changed; "
+            "this test cannot check an ordering it cannot find",
+        )
+
+    def test_the_desktop_field_block_is_written_after_what_it_overrides(self):
+        for selector in self.OVERRIDDEN:
+            at = self.css.find(selector)
+            self.assertNotEqual(at, -1, f"{selector} is no longer in the stylesheet")
+            self.assertLess(
+                at, self.block_at,
+                f"{selector} is declared AFTER the field layout block, so it "
+                f"wins on source order and the desktop override silently does "
+                f"nothing. Move the block below it.",
+            )
+
+    def test_hidden_still_beats_every_layout_this_file_sets(self):
+        """
+        The wizard toggles steps with the `hidden` attribute while giving
+        `.a-step` a display of its own. `[hidden]` only wins because it is
+        !important -- this is the rule that keeps every step of an assessment
+        from rendering at once.
+        """
+        self.assertIn(
+            "[hidden] { display: none !important; }", self.css,
+            "removing !important here renders every assessment step at once",
         )

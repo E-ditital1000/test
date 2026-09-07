@@ -2,120 +2,140 @@
 {% load a1 %}
 {% block title %}{{ job.reference }} — A1 360{% endblock %}
 
+{% comment %}
+One visit. On a phone it is a stack worked top to bottom: what this is, who
+is here, check in, assess. On a desktop the doing stays in the left column
+and the knowing moves to a rail, so a lead at a computer can see the crew and
+who has actually arrived without scrolling past the thing they came to press.
+
+Arrivals are shown against each person rather than as a separate list. Who is
+on the crew and who has turned up is one question asked twice.
+{% endcomment %}
+
 {% block phone_title %}{{ job.reference }}{% endblock %}
 {% block phone_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
 
+{% block phone_actions %}
+  <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+{% endblock %}
+
 {% block content %}
-  {% if not is_lead %}
-    <div class="mc warnbox">
-      <p class="t-label" style="color:var(--gold700)">You are on the crew</p>
-      <p class="t-m-meta" style="color:var(--text2)">
-        {{ job.assigned_to|a1name }} leads this visit and submits the
-        assessment. Check in for yourself when you arrive.
-      </p>
-    </div>
-  {% endif %}
-
-  <div class="mc" style="gap:10px">
-    <p class="t-label">This visit</p>
-    <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
-    <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
-    {% if job.site.address %}
-      <div class="kvr"><span>Address</span><b style="text-align:right">{{ job.site.address }}</b></div>
-    {% endif %}
-    {% if job.instructions %}
-      <p class="t-m-meta dim2">{{ job.instructions|linebreaksbr }}</p>
-    {% endif %}
-  </div>
-
-  {% if crew %}
-    <div class="mc" style="gap:8px">
-      <p class="t-label">On site · {{ job.crew_size }}</p>
-      <div class="kvr">
-        <span>{{ job.assigned_to|a1name }}</span>
-        <b>Lead</b>
-      </div>
-      {% for member in crew %}
-        <div class="kvr">
-          <span>{{ member.employee.user|a1name }}</span>
-          <b class="dim">{% if member.employee.user == user %}You{% else %}Crew{% endif %}</b>
+  <div class="fgrid">
+    <div class="fmain">
+      {% if not is_lead %}
+        <div class="mc warnbox">
+          <p class="t-label" style="color:var(--gold700)">You are on the crew</p>
+          <p class="t-m-meta" style="color:var(--text2)">
+            {{ job.assigned_to|a1name }} leads this visit and submits the
+            assessment. Check in for yourself when you arrive.
+          </p>
         </div>
-      {% endfor %}
-      <p class="t-m-meta dim">
-        Everyone checks in for themselves. One assessment covers the visit.
-      </p>
-    </div>
-  {% endif %}
+      {% endif %}
 
-  {% if check_in %}
-    <div class="mc ok">
-      <p class="t-label" style="color:var(--green)">Checked in</p>
-      <p class="t-m-action">{{ check_in.device_timestamp|date:"H:i" }}</p>
-      <p class="t-m-meta dim2">
-        {% if check_in.location_unavailable %}
-          Location unavailable — the check-in was recorded anyway
-        {% else %}
-          {{ check_in.accuracy_m|a1metres }}
+      <div class="mc" style="gap:10px">
+        <p class="t-label">This visit</p>
+        <div class="fdl">
+          <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
+          <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
+          {% if job.site.address %}
+            <div class="kvr"><span>Address</span><b class="ar">{{ job.site.address }}</b></div>
+          {% endif %}
+        </div>
+        {% if job.instructions %}
+          <p class="t-m-meta dim2">{{ job.instructions|linebreaksbr }}</p>
         {% endif %}
-      </p>
-    </div>
-  {% else %}
-    {% comment %} GPS is captured at the event only. If no fix arrives within five
-       seconds the check-in still records, marked location unavailable. {% endcomment %}
-    <form method="post" action="{% url 'fieldjobs-check-in' job.pk %}" id="checkin-form">
-      {% csrf_token %}
-      <input type="hidden" name="client_uuid" id="ci-uuid">
-      <input type="hidden" name="device_timestamp" id="ci-when">
-      <input type="hidden" name="latitude" id="ci-lat">
-      <input type="hidden" name="longitude" id="ci-lng">
-      <input type="hidden" name="accuracy_m" id="ci-acc">
-      <input type="hidden" name="location_unavailable" id="ci-nogps" value="">
-      <button class="act act-gold" type="submit" id="ci-button">Check in on site</button>
-    </form>
-    <p class="t-m-meta dim">
-      If no fix arrives within five seconds the check-in still records,
-      marked location unavailable. GPS never blocks the event.
-    </p>
-  {% endif %}
-
-  {% if assessment %}
-    <div class="mc ok">
-      <p class="t-label" style="color:var(--green)">Assessment submitted</p>
-      <p class="t-m-action">{{ assessment.submitted_at|date:"H:i" }}</p>
-      <p class="t-m-meta dim2">
-        {{ assessment.answers.count }} answer{{ assessment.answers.count|pluralize }},
-        {{ assessment.photos.count }} photo{{ assessment.photos.count|pluralize }}
-        {% if assessment.approval_state == "approved" %} · approved by the office
-        {% elif assessment.approval_state == "returned" %} · returned for more detail
-        {% else %} · waiting for review{% endif %}
-      </p>
-    </div>
-    {% if assessment.approval_state == "returned" %}
-      <div class="mc warnbox">
-        <p class="t-label" style="color:var(--gold700)">Returned</p>
-        <p class="t-m-meta" style="color:var(--text2)">{{ assessment.latest_decision.comment }}</p>
       </div>
-      <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Redo the assessment</a>
-    {% endif %}
-  {% elif can_assess %}
-    <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Start the site assessment</a>
-    <p class="t-m-meta dim">
-      The questions come from the service type. You can fill this in with no
-      signal — it saves on the phone and uploads by itself.
-    </p>
-  {% elif not is_lead %}
-    <div class="mc" style="gap:6px">
-      <p class="t-label">Assessment</p>
-      <p class="t-m-meta dim2">
-        {{ job.assigned_to|a1name }} fills this in for the visit. If something
-        needs recording that they have not seen, tell them before they submit.
-      </p>
-    </div>
-  {% endif %}
 
-  <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px;justify-content:center">
-    Back to today
-  </a>
+      {% if check_in %}
+        <div class="mc ok">
+          <p class="t-label" style="color:var(--green)">Checked in</p>
+          <p class="t-m-action">{{ check_in.device_timestamp|date:"H:i" }}</p>
+          <p class="t-m-meta dim2">
+            {% if check_in.location_unavailable %}
+              Location unavailable — the check-in was recorded anyway
+            {% else %}
+              {{ check_in.accuracy_m|a1metres }}
+            {% endif %}
+          </p>
+        </div>
+      {% else %}
+        {% comment %} GPS is captured at the event only. If no fix arrives within five
+           seconds the check-in still records, marked location unavailable. {% endcomment %}
+        <form method="post" action="{% url 'fieldjobs-check-in' job.pk %}" id="checkin-form">
+          {% csrf_token %}
+          <input type="hidden" name="client_uuid" id="ci-uuid">
+          <input type="hidden" name="device_timestamp" id="ci-when">
+          <input type="hidden" name="latitude" id="ci-lat">
+          <input type="hidden" name="longitude" id="ci-lng">
+          <input type="hidden" name="accuracy_m" id="ci-acc">
+          <input type="hidden" name="location_unavailable" id="ci-nogps" value="">
+          <button class="act act-gold" type="submit" id="ci-button">Check in on site</button>
+        </form>
+        <p class="t-m-meta dim">
+          If no fix arrives within five seconds the check-in still records,
+          marked location unavailable. GPS never blocks the event.
+        </p>
+      {% endif %}
+
+      {% if assessment %}
+        <div class="mc ok">
+          <p class="t-label" style="color:var(--green)">Assessment submitted</p>
+          <p class="t-m-action">{{ assessment.submitted_at|date:"H:i" }}</p>
+          <p class="t-m-meta dim2">
+            {{ assessment.answers.count }} answer{{ assessment.answers.count|pluralize }},
+            {{ assessment.photos.count }} photo{{ assessment.photos.count|pluralize }}
+            {% if assessment.approval_state == "approved" %} · approved by the office
+            {% elif assessment.approval_state == "returned" %} · returned for more detail
+            {% else %} · waiting for review{% endif %}
+          </p>
+        </div>
+        {% if assessment.approval_state == "returned" %}
+          <div class="mc warnbox">
+            <p class="t-label" style="color:var(--gold700)">Returned</p>
+            <p class="t-m-meta" style="color:var(--text2)">{{ assessment.latest_decision.comment }}</p>
+          </div>
+          <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Redo the assessment</a>
+        {% endif %}
+      {% elif can_assess %}
+        <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Start the site assessment</a>
+        <p class="t-m-meta dim">
+          The questions come from the service type. You can fill this in with no
+          signal — it saves on the phone and uploads by itself.
+        </p>
+      {% elif not is_lead %}
+        <div class="mc" style="gap:6px">
+          <p class="t-label">Assessment</p>
+          <p class="t-m-meta dim2">
+            {{ job.assigned_to|a1name }} fills this in for the visit. If something
+            needs recording that they have not seen, tell them before they submit.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="frail">
+      <div class="mc" style="gap:8px">
+        <p class="t-label">On site · {{ arrived_count }} of {{ crew_rows|length }} arrived</p>
+        {% for row in crew_rows %}
+          <div class="crewr">
+            <span class="who">
+              {{ row.person|a1name }}{% if row.is_you %} <span class="dim">(you)</span>{% endif %}
+            </span>
+            {% if row.arrival %}
+              <b class="mono ok-t">{{ row.arrival.device_timestamp|date:"H:i" }}</b>
+            {% else %}
+              <b class="dim">{{ row.role }}</b>
+            {% endif %}
+          </div>
+        {% endfor %}
+        <p class="t-m-meta dim">
+          Everyone checks in for themselves. One assessment covers the visit.
+        </p>
+      </div>
+
+      <a class="btn btn-sec fback" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+    </div>
+  </div>
 {% endblock %}
 
 {% block body_extra %}

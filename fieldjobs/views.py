@@ -116,24 +116,58 @@ def _own_job(request, pk):
     )
 
 
+def _crew_rows(job, viewer):
+    """
+    Everyone on this visit, in the order they matter, each carrying their own
+    arrival.
+
+    Who is on site and who has actually turned up are the same question asked
+    twice, and they were being answered in two places — a crew list that knew
+    nothing about arrivals, and a check-in list nothing rendered. One row per
+    person answers both.
+    """
+    arrivals = {}
+    for event in job.check_ins.select_related("technician").order_by("device_timestamp"):
+        # First arrival, not the latest. Someone who checks in twice arrived
+        # once.
+        arrivals.setdefault(event.technician_id, event)
+
+    rows = [{
+        "person": job.assigned_to,
+        "role": "Lead",
+        "is_you": job.assigned_to_id == viewer.pk,
+        "arrival": arrivals.get(job.assigned_to_id),
+    }]
+    for member in job.crew.all():
+        person = member.employee.user
+        rows.append({
+            "person": person,
+            "role": "Crew",
+            "is_you": person.pk == viewer.pk,
+            "arrival": arrivals.get(person.pk),
+        })
+    return rows
+
+
 @require_permission("view_own_job_list")
 def job_detail(request, pk):
     job = _own_job(request, pk)
     assessment = job.assessments.order_by("-device_timestamp").first()
     is_lead = job.is_led_by(request.user)
+    crew_rows = _crew_rows(job, request.user)
     return render(
         request,
         "fieldjobs/job_detail.html",
         {
             "job": job,
             "crew": job.crew.all(),
+            "crew_rows": crew_rows,
+            "arrived_count": sum(1 for row in crew_rows if row["arrival"]),
             "is_lead": is_lead,
             # My own check-in, not the lead's — each person on site checks in
             # for themselves.
             "check_in": job.check_ins.filter(technician=request.user)
             .order_by("-device_timestamp").first(),
-            "all_check_ins": job.check_ins.select_related("technician")
-            .order_by("device_timestamp"),
             "assessment": assessment,
             # Crew can be on site and check in; the assessment is the lead's.
             "can_assess": is_lead and user_has_permission(request.user, "submit_assessment"),

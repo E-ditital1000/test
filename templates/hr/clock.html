@@ -19,10 +19,19 @@ row that already exists instead of creating a second one.
 
 {% block content %}
   {% if employee %}
+    {% comment %}
+    Two regions: the thing you came to press, and the record it writes to.
+    On a phone .fgrid and its children are `display: contents`, so this is
+    the same flat stack it has always been -- the clock button keeps its
+    exact markup and its exact position on the screen it is timed on. From
+    901px the record moves alongside the button instead of below it.
+    {% endcomment %}
     <div class="ban" id="queue-banner" hidden>
       <i></i><span id="queue-text">Saved on this phone</span>
     </div>
 
+    <div class="fgrid">
+      <div class="fmain">
     {% if open_since %}
       <div class="mc ok">
         <p class="t-label" style="color:var(--green)">Elapsed today</p>
@@ -57,7 +66,9 @@ row that already exists instead of creating a second one.
         </p>
       </div>
     {% endif %}
+      </div>
 
+      <div class="frail">
     <div class="mc" style="gap:12px">
       <p class="t-label">Your last seven days</p>
       {% for day in recent_days %}
@@ -85,6 +96,8 @@ row that already exists instead of creating a second one.
         You cannot edit a clock event. Ask your supervisor for a correction —
         the original stays on the record with who changed it and when.
       </p>
+    </div>
+      </div>
     </div>
 
   {% else %}

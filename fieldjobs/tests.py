@@ -456,3 +456,67 @@ class FieldWorkTests(TestCase):
         self.assertEqual(assessment.approval_state, Approval.APPROVED)
         self.assertEqual(invoice.state, Invoice.PAID)
         self.assertEqual(invoice.outstanding, 0)
+
+
+class CrewArrivalTests(TestCase):
+    """
+    Who is on the visit and who has actually turned up used to be two
+    questions answered in two places -- a crew list that knew nothing about
+    arrivals, and a check-in list nothing rendered. One row per person now
+    answers both, which puts real logic behind the roster.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+        cls.service_type = ServiceType.objects.create(code="solar", name="Solar Installation")
+        cls.customer = Customer.objects.create(name="Duport Road Clinic")
+        cls.lead = make_user("lead@test.local", ["Technician"])
+        cls.mate = make_user("mate@test.local", ["Technician"])
+        Employee.objects.create(user=cls.lead, staff_id="A1-010")
+        cls.mate_employee = Employee.objects.create(user=cls.mate, staff_id="A1-011")
+
+    def _job(self):
+        job = FieldJob.objects.create(
+            reference="FJ-0100", customer=self.customer, service_type=self.service_type,
+            assigned_to=self.lead, scheduled_for=timezone.now(),
+        )
+        FieldJobCrew.objects.create(field_job=job, employee=self.mate_employee, assigned_by=self.lead)
+        return job
+
+    def test_the_lead_leads_the_roster_and_crew_follow(self):
+        from .views import _crew_rows
+
+        rows = _crew_rows(self._job(), self.lead)
+        self.assertEqual([r["person"] for r in rows], [self.lead, self.mate])
+        self.assertEqual(rows[0]["role"], "Lead")
+        self.assertTrue(rows[0]["is_you"], "the viewer must be able to find themselves")
+        self.assertFalse(rows[1]["is_you"])
+
+    def test_nobody_has_arrived_until_they_check_in(self):
+        from .views import _crew_rows
+
+        rows = _crew_rows(self._job(), self.lead)
+        self.assertEqual([r["arrival"] for r in rows], [None, None])
+
+    def test_a_second_check_in_does_not_move_the_arrival_time(self):
+        """
+        Somebody who checks in twice arrived once. The roster shows when they
+        got there, not the last time they pressed the button.
+        """
+        from .views import _crew_rows
+
+        job = self._job()
+        first = timezone.now() - timedelta(hours=2)
+        CheckIn.objects.create(
+            field_job=job, technician=self.lead, client_uuid=uuid.uuid4(),
+            device_timestamp=first, location_unavailable=True,
+        )
+        CheckIn.objects.create(
+            field_job=job, technician=self.lead, client_uuid=uuid.uuid4(),
+            device_timestamp=timezone.now(), location_unavailable=True,
+        )
+
+        rows = _crew_rows(job, self.lead)
+        self.assertEqual(rows[0]["arrival"].device_timestamp, first)
+        self.assertIsNone(rows[1]["arrival"], "the mate has not arrived")

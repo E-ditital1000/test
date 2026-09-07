@@ -1,31 +1,49 @@
 {% extends "shell/_document.html" %}
+{% load static %}
 {% comment %}
-The phone. Used one-handed, in sunlight, on a low-end Android, with
-connectivity assumed absent rather than present.
+The field surfaces. Used one-handed, in sunlight, on a low-end Android, with
+connectivity assumed absent rather than present — and also, it turns out, at
+a desk on a 24" monitor, which is a different posture doing the same job.
+
+One document serves both. The phone gets a single column and one thumb-sized
+thing at a time; from 901px the same markup becomes a proper desktop screen —
+a top nav bar, a page header, and the visit laid out across two columns
+instead of three screens of scrolling. Nothing extra is sent to the phone to
+make that happen: the desktop wrappers are `display: contents` until the
+breakpoint, so on a handset they are not there at all.
 
 Tabs are generated from permissions exactly like the desktop sidebar, so an
 Employee who only clocks in gets two tabs — not four with two greyed out.
 The Sync badge is the number a technician needs most: how much work is still
-sitting on the device.
+sitting on the device. On a phone the bar sits at the bottom under the thumb;
+on a desktop CSS `order` lifts it to the top without moving it in the
+document, so a screen reader still meets the page before the navigation.
 
 The bar is hidden in exactly one place — inside a running assessment. A
 multi-step form holding unsaved local answers should not offer a one-tap
 exit, so those screens override {% templatetag openblock %} block tabs
-{% templatetag closeblock %} with nothing.
+{% templatetag closeblock %} with nothing. The brand and sign-out live inside
+that same block deliberately: on an assessment screen there is no way out but
+through, on either kind of device.
 
 Blocks a page fills in:
-  phone_title   the large line in the navy header
+  phone_title   the large line in the header
   phone_sub     who and where, under it
+  phone_actions desktop-only actions beside the title; ignored on a phone
   content       the screen
 {% endcomment %}
 
 {% block body_class %}is-field{% endblock %}
 
 {% block body %}
+<a class="skip" href="#main">Skip to content</a>
 <div class="phone">
   <header class="phead">
-    <b>{% block phone_title %}{% endblock %}</b>
-    <span>{% block phone_sub %}{% endblock %}</span>
+    <div class="ph-ttl">
+      <b>{% block phone_title %}{% endblock %}</b>
+      <span>{% block phone_sub %}{% endblock %}</span>
+    </div>
+    <div class="ph-acts">{% block phone_actions %}{% endblock %}</div>
   </header>
 
   <main class="pbody" id="main">
@@ -36,6 +54,21 @@ Blocks a page fills in:
   {% block tabs %}
     {% if nav_tabs %}
       <nav class="a1-tabs" aria-label="Sections">
+        {% comment %}
+        Brand and sign-out are desktop-only — hidden outright below 901px,
+        where the bottom bar is four thumb targets and nothing else. Sign-out
+        has never existed on the field surfaces at all; on a shared computer
+        that is not a missing nicety, it is a way for the next person to
+        inherit a session.
+        {% endcomment %}
+        <a class="ftop-brand" href="{% url 'fieldjobs-my-jobs' %}">
+          <img src="{% static 'img/a1-mark.png' %}" alt="">
+          <span>
+            <b>A1 360</b>
+            <i>Field</i>
+          </span>
+        </a>
+
         {% for tab in nav_tabs %}
           <a class="a1-tab {% if tab.icon == tab_active %}on{% endif %}"
              href="{% url tab.url_name %}"
@@ -48,6 +81,11 @@ Blocks a page fills in:
             <span>{{ tab.label }}</span>
           </a>
         {% endfor %}
+
+        <form class="ftop-out" method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit">Sign out</button>
+        </form>
       </nav>
     {% endif %}
   {% endblock %}
