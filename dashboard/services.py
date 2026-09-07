@@ -150,6 +150,26 @@ def attention_queue(user, limit=12):
                 )
             )
 
+    # -- your own overdue work ------------------------------------------
+    # No permission gate: this is the person's own task, the same way their
+    # own job list needs no permission beyond having one.
+    from projects.models import Task
+
+    for task in Task.objects.for_person(user).overdue().select_related("project"):
+        items.append(
+            Item(
+                kind="Task",
+                label=task.title,
+                detail=f"{task.project.reference} · due {task.due_date:%d %b}",
+                # Ranked from when it fell due, so the longest-overdue leads.
+                waiting_since=timezone.make_aware(
+                    datetime.combine(task.due_date, datetime.min.time())
+                ),
+                url=reverse("projects-detail", args=[task.project_id]) + "#tasks",
+                tone="over",
+            )
+        )
+
     items.sort(key=lambda item: item.waiting_since)
     return items[:limit]
 
@@ -214,5 +234,9 @@ def attention_count(user):
         total += AttendanceDay.objects.filter(
             employee__in=team, still_clocked_in=True, date__lt=timezone.localdate()
         ).count()
+
+    from projects.models import Task
+
+    total += Task.objects.for_person(user).overdue().count()
 
     return total

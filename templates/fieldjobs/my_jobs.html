@@ -81,6 +81,29 @@ between tasks needs to know one thing — where next.
     </div>
   {% endif %}
 
+  {% if tasks %}
+    <p class="t-label">
+      Your tasks{% if overdue_tasks %} · {{ overdue_tasks }} overdue{% endif %}
+    </p>
+    {% for task in tasks %}
+      <div class="mc tight">
+        <p class="t-body-b">{{ task.title }}</p>
+        <p class="t-m-meta dim">
+          {{ task.project.reference }}
+          {% if task.due_date %} · due {{ task.due_date|a1date }}{% endif %}
+        </p>
+        {% if task.description %}
+          <p class="t-m-meta dim2">{{ task.description|truncatechars:120 }}</p>
+        {% endif %}
+        {% if task.is_overdue %}
+          <span class="pill p-over" style="align-self:flex-start"><i></i>Overdue</span>
+        {% else %}
+          <span class="pill p-open" style="align-self:flex-start"><i></i>Open</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% endif %}
+
   {% if upcoming %}
     <p class="t-label">Coming up</p>
     {% for job in upcoming %}

@@ -74,10 +74,21 @@ def my_jobs(request):
     )
 
     outstanding = [job for job in todays if job.state != FieldJob.COMPLETED]
+
+    # A technician works from this screen. A task they are given that only
+    # lives on a project page in the office is a task they will never do.
+    from projects.models import Task
+
+    my_tasks = list(
+        Task.objects.for_person(request.user).open().select_related("project")[:6]
+    )
+
     return render(
         request,
         "fieldjobs/my_jobs.html",
         {
+            "tasks": my_tasks,
+            "overdue_tasks": sum(1 for t in my_tasks if t.is_overdue),
             "next_job": outstanding[0] if outstanding else None,
             "later_today": outstanding[1:],
             "done_today": [job for job in todays if job.state == FieldJob.COMPLETED],

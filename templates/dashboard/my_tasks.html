@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}My tasks — A1 360{% endblock %}
+
+{% block page_title %}My tasks{% endblock %}
+{% block page_sub %}
+  {{ open_tasks|length }} open{% if overdue_count %} · {{ overdue_count }} overdue{% endif %}
+  · across every project you are on
+{% endblock %}
+
+{% comment %}
+Everything assigned to this person, wherever it came from. A task that only
+appears on the project page it was created on is a note to whoever created
+it, not work anyone will do.
+{% endcomment %}
+
+{% block content %}
+  {% if open_tasks %}
+    <div class="card">
+      <div class="hd">
+        <b>Open</b>
+        <span class="meta">Soonest due first · overdue at the top</span>
+      </div>
+      {% for task in open_tasks %}
+        <a class="row-i" href="{% url 'projects-detail' task.project_id %}#tasks"
+           style="text-decoration:none;color:inherit">
+          <div class="two g">
+            <b>{{ task.title }}</b>
+            <span>
+              {{ task.project.reference }} · {{ task.project.customer.name }}
+              {% if task.assigned_by %} · set by {{ task.assigned_by|a1name }}{% endif %}
+            </span>
+            {% if task.description %}
+              <span class="dim2">{{ task.description|truncatechars:110 }}</span>
+            {% endif %}
+          </div>
+          {% if task.due_date %}
+            <span class="{% if task.is_overdue %}bad{% else %}dim{% endif %} t-small mono"
+                  style="width:120px">
+              due {{ task.due_date|a1date }}
+            </span>
+          {% else %}
+            <span class="dim t-small" style="width:120px">no date</span>
+          {% endif %}
+          {% if task.is_overdue %}
+            <span class="pill p-over"><i></i>Overdue</span>
+          {% else %}
+            <span class="pill p-open"><i></i>Open</span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="projects" heading="Nothing assigned to you" body="Work given to you on any project appears here, and lands in your attention queue once it is overdue. Nothing is waiting on you right now." %}
+  {% endif %}
+
+  {% if done_tasks %}
+    <div class="card compact">
+      <div class="hd"><b>Recently finished</b><span class="meta">Last {{ done_tasks|length }}</span></div>
+      {% for task in done_tasks %}
+        <div class="row-i">
+          <div class="two g">
+            <b style="color:var(--muted)">{{ task.title }}</b>
+            <span>
+              {{ task.project.reference }} · done {{ task.completed_at|a1date }}
+              {% if task.completion_note %} · {{ task.completion_note|truncatechars:70 }}{% endif %}
+            </span>
+          </div>
+          <span class="pill p-appr"><i></i>Complete</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

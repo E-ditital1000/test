@@ -10,14 +10,22 @@ Running cost is computed at query time from linked expenses, requisitions and
 invoices. No total is stored anywhere in this module.
 """
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
-from .forms import ProjectCrewForm, ProjectDocumentForm, RequisitionForm, TaskForm
+from .forms import (
+    ProjectCrewForm,
+    ProjectDocumentForm,
+    RequisitionForm,
+    TaskCompletionForm,
+    TaskForm,
+)
 from .models import Project, ProjectCrew, Requisition, Task
 
 
@@ -87,7 +95,9 @@ def project_detail(request, pk):
         {
             "project": project,
             "lifecycle": lifecycle,
-            "tasks": project.tasks.select_related("assignee"),
+            "tasks": project.tasks.select_related("assignee", "assigned_by", "completed_by"),
+            "open_task_count": project.tasks.open().count(),
+            "overdue_task_count": project.tasks.overdue().count(),
             "crew": project.crew.select_related("employee__user"),
             "documents": project.documents.select_related("uploaded_by"),
             "requisitions": project.requisitions.select_related("raised_by"),
@@ -168,27 +178,58 @@ def task_create(request, pk):
         if form.is_valid():
             task = form.save(commit=False)
             task.project = project
+            # Who set this, so "who told her to do that" has an answer.
+            task.assigned_by = request.user
             task.save()
-            messages.success(request, "Task added.")
+            if task.assignee:
+                who = task.assignee.get_full_name() or task.assignee.email
+                messages.success(
+                    request,
+                    f"Task assigned to {who}. It is on their dashboard and their phone now.",
+                )
+            else:
+                messages.success(request, "Task added, unassigned for now.")
         else:
             messages.error(request, "That task could not be saved.")
     return redirect("projects-detail", pk=project.pk)
 
 
-@require_permission("manage_project")
 def task_toggle(request, pk):
-    """Completion is a timestamp and an actor, not a checkbox."""
-    task = get_object_or_404(Task, pk=pk)
-    get_object_or_404(_visible_projects(request.user), pk=task.project_id)
+    """
+    Completion is a timestamp, an actor and — where somebody bothers — a
+    note, not a checkbox.
+
+    Whoever the task belongs to can finish it. Requiring manage_project would
+    mean a technician cannot tick off their own work, which is the surest way
+    to have a task list nobody keeps up to date.
+    """
+    task = get_object_or_404(Task.objects.select_related("project"), pk=pk)
+
+    is_mine = task.assignee_id == request.user.pk
+    if not is_mine:
+        if not user_has_permission(request.user, "manage_project"):
+            raise PermissionDenied("missing permission: manage_project")
+        get_object_or_404(_visible_projects(request.user), pk=task.project_id)
+
     if request.method == "POST":
         from django.utils import timezone
 
         if task.completed_at:
             task.completed_at, task.completed_by = None, None
+            task.completion_note = ""
+            messages.success(request, "Task reopened.")
         else:
+            form = TaskCompletionForm(request.POST)
             task.completed_at, task.completed_by = timezone.now(), request.user
-        task.save(update_fields=["completed_at", "completed_by"])
-    return redirect("projects-detail", pk=task.project_id)
+            task.completion_note = (
+                form.cleaned_data["completion_note"] if form.is_valid() else ""
+            )
+            messages.success(request, f"“{task.title}” marked done.")
+        task.save(
+            update_fields=["completed_at", "completed_by", "completion_note"]
+        )
+
+    return redirect(request.POST.get("next") or reverse("projects-detail", args=[task.project_id]))
 
 
 @require_permission("manage_project")

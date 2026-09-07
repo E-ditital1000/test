@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from config.models import PolicySetting, ServiceType, StatusOption
@@ -280,3 +281,158 @@ class TaskAssignmentTests(TestCase):
         field = TaskForm(project=bare).fields["assignee"]
         self.assertEqual(field.queryset.count(), 4)
         self.assertIn("No crew on this project yet", field.help_text)
+
+
+class TaskVisibilityTests(TestCase):
+    """
+    A task the assignee never sees is a note to whoever wrote it. These
+    assert it reaches them.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from datetime import timedelta
+
+        from django.core.management import call_command
+        from django.utils import timezone as tz
+
+        from accounts.models import Role, UserRole
+        from config.models import ServiceType, StatusOption
+        from crm.models import Customer
+        from hr.models import Employee
+
+        from .models import Project, ProjectCrew, Task
+
+        call_command("seed_permissions", verbosity=0)
+        User = get_user_model()
+
+        service_type = ServiceType.objects.create(code="solar", name="Solar")
+        status = StatusOption.objects.create(
+            kind=StatusOption.PROJECT, code="active", label="Active", is_default=True
+        )
+        customer = Customer.objects.create(name="Ducor Hotel")
+
+        def staff(email, staff_id, role):
+            user = User.objects.create_user(
+                username=email, email=email, password="Testing!12345"
+            )
+            user.must_reset_password = False
+            user.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=user, role=Role.objects.get(name=role))
+            Employee.objects.create(user=user, staff_id=staff_id)
+            return user
+
+        cls.tech = staff("tech@test.local", "A1-001", "Technician")
+        cls.other = staff("other@test.local", "A1-002", "Technician")
+        cls.manager = staff("pm@test.local", "A1-003", "Project Manager")
+
+        cls.project = Project.objects.create(
+            reference="PRJ-0001", name="Array", customer=customer,
+            service_type=service_type, status=status, manager=cls.manager,
+        )
+        ProjectCrew.objects.create(
+            project=cls.project, employee=Employee.objects.get(user=cls.tech)
+        )
+
+        today = tz.localdate()
+        cls.overdue = Task.objects.create(
+            project=cls.project, title="Run cabling", assignee=cls.tech,
+            due_date=today - timedelta(days=3), assigned_by=cls.manager,
+        )
+        cls.upcoming = Task.objects.create(
+            project=cls.project, title="Commission inverter", assignee=cls.tech,
+            due_date=today + timedelta(days=4), assigned_by=cls.manager,
+        )
+        cls.someone_elses = Task.objects.create(
+            project=cls.project, title="Not yours", assignee=cls.other,
+            due_date=today - timedelta(days=1),
+        )
+
+    def test_open_work_sorts_above_finished_work(self):
+        """
+        SQLite sorts NULLs first and PostgreSQL sorts them last, so an
+        unqualified `ordering` silently inverts between here and the server.
+        """
+        from django.utils import timezone as tz
+
+        from .models import Task
+
+        self.upcoming.completed_at = tz.now()
+        self.upcoming.save(update_fields=["completed_at"])
+
+        order = list(Task.objects.filter(project=self.project).values_list("title", flat=True))
+        self.assertLess(
+            order.index("Run cabling"), order.index("Commission inverter"),
+            "open work must lead, on either database",
+        )
+
+    def test_a_task_reaches_the_assignees_dashboard(self):
+        self.client.force_login(self.tech)
+        body = self.client.get(reverse("dashboard-index")).content.decode()
+        self.assertIn("My tasks", body)
+        # And the overdue one is in the queue, ranked from when it fell due.
+        self.assertIn("Run cabling", body)
+
+    def test_a_task_reaches_the_assignees_phone(self):
+        self.client.force_login(self.tech)
+        body = self.client.get(reverse("fieldjobs-my-jobs")).content.decode()
+        self.assertIn("Run cabling", body)
+        self.assertIn("Commission inverter", body)
+
+    def test_my_tasks_shows_only_your_own(self):
+        self.client.force_login(self.tech)
+        body = self.client.get(reverse("dashboard-my-tasks")).content.decode()
+        self.assertIn("Run cabling", body)
+        self.assertNotIn("Not yours", body)
+
+    def test_the_attention_queue_carries_overdue_tasks_only(self):
+        from dashboard.services import attention_queue
+
+        labels = [item.label for item in attention_queue(self.tech)]
+        self.assertIn("Run cabling", labels)
+        self.assertNotIn("Commission inverter", labels, "a task not yet due is not blocked work")
+        self.assertNotIn("Not yours", labels)
+
+    def test_the_assignee_can_finish_their_own_task(self):
+        """
+        A list only its manager can tick is a list that goes stale. The
+        technician holds no manage_project and must still be able to.
+        """
+        from .models import Task
+
+        self.client.force_login(self.tech)
+        response = self.client.post(
+            reverse("projects-task-toggle", args=[self.overdue.pk]),
+            {"completion_note": "Pulled 60 m, terminated both ends."},
+        )
+        self.assertEqual(response.status_code, 302)
+
+        task = Task.objects.get(pk=self.overdue.pk)
+        self.assertTrue(task.is_complete)
+        self.assertEqual(task.completed_by, self.tech)
+        self.assertEqual(task.completion_note, "Pulled 60 m, terminated both ends.")
+
+    def test_somebody_elses_task_cannot_be_finished_for_them(self):
+        from .models import Task
+
+        self.client.force_login(self.tech)
+        response = self.client.post(
+            reverse("projects-task-toggle", args=[self.someone_elses.pk]), {}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Task.objects.get(pk=self.someone_elses.pk).is_complete)
+
+    def test_creating_a_task_records_who_assigned_it(self):
+        from .models import Task
+
+        self.client.force_login(self.manager)
+        self.client.post(
+            reverse("projects-task-create", args=[self.project.pk]),
+            {
+                "title": "Fit the isolator", "assignee": self.tech.pk,
+                "due_date": "", "description": "Bring the 63 A unit.",
+            },
+        )
+        task = Task.objects.get(title="Fit the isolator")
+        self.assertEqual(task.assigned_by, self.manager)
+        self.assertEqual(task.description, "Bring the 63 A unit.")

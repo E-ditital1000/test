@@ -51,27 +51,50 @@
   <div class="cols">
     <div style="flex:2;display:flex;flex-direction:column;gap:20px">
 
-      <div class="card">
-        <div class="hd"><b>Tasks</b><span class="meta">{{ tasks|length }}</span></div>
+      <div class="card" id="tasks">
+        <div class="hd">
+          <b>Tasks</b>
+          <span class="meta">
+            {{ open_task_count }} open{% if overdue_task_count %} · {{ overdue_task_count }} overdue{% endif %}
+          </span>
+        </div>
         {% for task in tasks %}
           <div class="row-i">
             <div class="two g">
               <b {% if task.is_complete %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{{ task.title }}</b>
               <span>
-                {% if task.assignee %}{{ task.assignee|a1name }}{% else %}Unassigned{% endif %}
+                {% if task.assignee %}{{ task.assignee|a1name }}{% else %}<span class="warn">Unassigned</span>{% endif %}
                 {% if task.due_date %} · due {{ task.due_date|a1date }}{% endif %}
+                {% if task.assigned_by %} · set by {{ task.assigned_by|a1name }}{% endif %}
                 {% if task.is_complete %} · done {{ task.completed_at|a1date }}{% if task.completed_by %} by {{ task.completed_by|a1name }}{% endif %}{% endif %}
               </span>
+              {% if task.description %}
+                <span class="dim2 t-small">{{ task.description }}</span>
+              {% endif %}
+              {% if task.completion_note %}
+                <span class="good t-small">{{ task.completion_note }}</span>
+              {% endif %}
             </div>
             {% if task.is_complete %}
               <span class="pill p-appr"><i></i>Complete</span>
+            {% elif task.is_overdue %}
+              <span class="pill p-over"><i></i>Overdue</span>
             {% else %}
               <span class="pill p-open"><i></i>Open</span>
             {% endif %}
-            {% if can_manage %}
-              <form method="post" action="{% url 'projects-task-toggle' task.pk %}">
+            {% comment %} The person a task belongs to can finish it; so can whoever
+               runs the project. A list only its manager can tick is a list
+               that goes stale. {% endcomment %}
+            {% if can_manage or task.assignee == user %}
+              <form method="post" action="{% url 'projects-task-toggle' task.pk %}"
+                    style="display:flex;gap:6px;align-items:center">
                 {% csrf_token %}
-                <button class="btn btn-gho btn-sm" type="submit">{% if task.is_complete %}Reopen{% else %}Complete{% endif %}</button>
+                {% if not task.is_complete %}
+                  <input type="text" name="completion_note" placeholder="What was done (optional)"
+                         aria-label="Completion note for {{ task.title }}"
+                         style="min-height:36px;max-width:230px;font-size:13px">
+                {% endif %}
+                <button class="btn btn-gho btn-sm" type="submit">{% if task.is_complete %}Reopen{% else %}Mark done{% endif %}</button>
               </form>
             {% endif %}
           </div>

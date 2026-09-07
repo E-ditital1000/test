@@ -64,6 +64,7 @@ ENDPOINTS = {
     "finance-requisitions": "approve_requisition",
     # Wave 3 / shell
     "global-search": "view_dashboard",
+    "dashboard-my-tasks": "view_dashboard",
 }
 
 # Endpoints the matrix cannot GET meaningfully: they only accept POST, so a

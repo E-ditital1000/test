@@ -107,6 +107,22 @@ def index(request):
             )
         )
 
+    # Everyone sees their own tasks. No permission gate: this is the
+    # person's own work, like their own job list.
+    from projects.models import Task
+
+    my_tasks = Task.objects.for_person(user).open()
+    open_count = my_tasks.count()
+    if open_count:
+        overdue = my_tasks.overdue().count()
+        tiles.append(
+            _tile(
+                "My tasks", open_count, "dashboard-my-tasks",
+                f"{overdue} overdue" if overdue else "none overdue",
+                "alert" if overdue else "",
+            )
+        )
+
     queue = attention_queue(user)
     return render(
         request,
@@ -203,5 +219,29 @@ def global_search(request):
             "query": query,
             "sections": sections,
             "total": sum(len(section["hits"]) for section in sections),
+        },
+    )
+
+
+@require_permission("view_dashboard")
+def my_tasks(request):
+    """
+    Everything assigned to this person, across every project.
+
+    Scoped to themselves by construction: there is no parameter here that
+    could be made to show somebody else's work.
+    """
+    from projects.models import Task
+
+    mine = Task.objects.for_person(request.user).select_related(
+        "project__customer", "assigned_by"
+    )
+    return render(
+        request,
+        "dashboard/my_tasks.html",
+        {
+            "open_tasks": mine.open(),
+            "overdue_count": mine.overdue().count(),
+            "done_tasks": mine.filter(completed_at__isnull=False)[:10],
         },
     )

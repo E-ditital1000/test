@@ -12,8 +12,16 @@ User = get_user_model()
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ["title", "assignee", "due_date"]
-        widgets = {"due_date": forms.DateInput(attrs={"type": "date"})}
+        fields = ["title", "assignee", "due_date", "description"]
+        widgets = {
+            "due_date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.Textarea(attrs={"rows": 2}),
+        }
+        labels = {"description": "What needs doing"}
+        help_texts = {
+            "description": "Read on a phone by whoever picks it up. Which client, "
+                           "what to bring, what finished looks like.",
+        }
 
     def __init__(self, *args, project=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,3 +93,16 @@ class RequisitionForm(forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 3}),
             "needed_by": forms.DateInput(attrs={"type": "date"}),
         }
+
+
+class TaskCompletionForm(forms.Form):
+    """
+    Marking a task done. The note is optional but asked for, because "done"
+    on its own answers nothing when somebody reads the project back later.
+    """
+
+    completion_note = forms.CharField(
+        required=False,
+        label="What was done (optional)",
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )

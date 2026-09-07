@@ -5,6 +5,7 @@ by query rather than by storing denormalised totals.
 """
 from django.conf import settings
 from django.db import models
+from django.db.models import F
 
 from approvals.models import ApprovalTrailMixin
 from config.mixins import JobLineageModel, TimeStampedModel
@@ -100,9 +101,48 @@ class ProjectStageEvent(TimeStampedModel):
         return f"{self.project.reference}: {self.from_stage} -> {self.to_stage}"
 
 
+class TaskQuerySet(models.QuerySet):
+    """
+    The questions every screen asks of a task. Kept here so the dashboard,
+    the phone and the attention queue cannot each answer "is this overdue"
+    slightly differently.
+    """
+
+    def open(self):
+        return self.filter(completed_at__isnull=True)
+
+    def overdue(self, on=None):
+        from django.utils import timezone
+
+        return self.open().filter(due_date__isnull=False, due_date__lt=on or timezone.localdate())
+
+    def for_person(self, user):
+        """Only ever your own work. Scoped by construction, not by a filter
+        a screen has to remember to apply."""
+        return self.filter(assignee=user)
+
+
 class Task(TimeStampedModel):
+    """
+    A piece of work on a project, owned by one person.
+
+    A task the assignee never sees is a note to yourself, so this appears on
+    their dashboard and on their phone, and lands in the attention queue once
+    it is overdue.
+    """
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="tasks")
     title = models.CharField(max_length=200)
+    # A title is a label. What to bring, which client, what "done" looks
+    # like — that belongs here, and the person doing it reads it on a phone.
+    description = models.TextField(blank=True)
+    assigned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks_assigned",
+    )
     assignee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -119,13 +159,33 @@ class Task(TimeStampedModel):
         blank=True,
         related_name="+",
     )
+    # "Done" on its own answers nothing six weeks later.
+    completion_note = models.TextField(blank=True)
+
+    objects = TaskQuerySet.as_manager()
 
     class Meta:
-        ordering = ["completed_at", "due_date", "id"]
+        # Open work first, then soonest due.
+        #
+        # `ordering = ["completed_at", ...]` looks equivalent and is not:
+        # SQLite sorts NULLs first and PostgreSQL sorts them last, so the
+        # list silently inverts between development and the server. Saying
+        # nulls_first makes it mean the same thing on both.
+        ordering = [F("completed_at").asc(nulls_first=True), "due_date", "id"]
 
     @property
     def is_complete(self):
         return self.completed_at is not None
+
+    @property
+    def is_overdue(self):
+        from django.utils import timezone
+
+        return (
+            not self.is_complete
+            and self.due_date is not None
+            and self.due_date < timezone.localdate()
+        )
 
     def __str__(self):
         return self.title
