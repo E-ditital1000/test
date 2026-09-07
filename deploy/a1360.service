@@ -1,0 +1,55 @@
+# A1 360 application server.
+#
+#   sudo cp deploy/a1360.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now a1360
+#   systemctl status a1360
+#   journalctl -u a1360 -f          # logs
+#
+# gunicorn binds a unix socket rather than a port: nothing but nginx can
+# reach the application, without needing a firewall rule to say so.
+
+[Unit]
+Description=A1 360 management system (gunicorn)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=a1360
+Group=www-data
+WorkingDirectory=/srv/a1360
+
+# Holds SECRET_KEY and the database password. chmod 600, owned by a1360.
+EnvironmentFile=/srv/a1360/.env
+
+# systemd creates and cleans up /run/a1360 for us.
+RuntimeDirectory=a1360
+RuntimeDirectoryMode=0755
+
+# Three workers suits a small VPS. The rule of thumb is (2 x cores) + 1;
+# raise it only if you have the RAM, since each worker is a full process.
+# The 60s timeout is for the assessment endpoint, which decodes up to twelve
+# photographs out of one request.
+ExecStart=/srv/a1360/.venv/bin/gunicorn \
+    --bind unix:/run/a1360/gunicorn.sock \
+    --workers 3 \
+    --timeout 60 \
+    --graceful-timeout 30 \
+    --access-logfile - \
+    --error-logfile - \
+    inventoryproject.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# The application writes nothing outside these two directories.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/a1360/media /srv/a1360/staticfiles
+
+[Install]
+WantedBy=multi-user.target

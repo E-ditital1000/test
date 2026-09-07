@@ -159,6 +159,52 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard-index"
 LOGOUT_REDIRECT_URL = "login"
 
+# A site assessment arrives as ONE JSON body carrying its photographs as
+# base64 data URLs — that is what lets a technician fill the whole thing in
+# with no signal and push it in a single idempotent request. Twelve 1280 px
+# frames plus base64's 33% overhead runs to roughly 4 MB, well past Django's
+# 2.5 MB default, which would reject an assessment somebody spent an
+# afternoon on. nginx needs a matching client_max_body_size; see
+# deploy/nginx.conf.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=25 * 1024 * 1024)
+
+# --------------------------------------------------------------------------
+# Transport security
+#
+# Applied only when DEBUG is off, so `runserver` on http://127.0.0.1 keeps
+# working. On the VPS these are what make the session cookie safe to carry a
+# technician's login across a mobile network.
+# --------------------------------------------------------------------------
+if not DEBUG:
+    # nginx terminates TLS and forwards over http, so Django has to be told
+    # how to recognise an already-secure request. Without this,
+    # SECURE_SSL_REDIRECT sends the browser into an endless redirect loop.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+    X_FRAME_OPTIONS = "DENY"
+
+    # Django's CSRF check needs the site's real origin behind a proxy.
+    # e.g. CSRF_TRUSTED_ORIGINS=https://a1360.example.com
+    CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+
+    # HSTS is deliberately OFF by default. It tells browsers to refuse plain
+    # HTTP for this domain for the whole period, and that instruction cannot
+    # be recalled from a browser that has already cached it. Turn it on
+    # (SECURE_HSTS_SECONDS=31536000) only once HTTPS is confirmed working on
+    # the real domain — not before.
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=0)
+    if SECURE_HSTS_SECONDS:
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+            "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
+        )
+        SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=False)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
