@@ -19,7 +19,7 @@ Params: heading, permission_label, scope_note, role_name, back_url, back_label
         Both the request and the refusal are in the audit log.
       </div>
       {% if back_url %}
-        <div style="display:flex;gap:10px">
+        <div class="form-actions">
           <a class="btn btn-sec" href="{{ back_url }}">{{ back_label|default:"Go back" }}</a>
         </div>
       {% endif %}

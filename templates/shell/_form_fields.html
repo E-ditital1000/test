@@ -1,23 +1,76 @@
 {% comment %}
-Renders every field of a form. An error keeps its message, not just a red
-edge — and the message is tied to the input with aria-describedby so a
-screen reader reaches it too.
+Every form in the system renders through here, so a field type only has to be
+got right once.
+
+Four kinds need their own treatment, and got it wrong before:
+
+  checkbox                a tick belongs BESIDE its label, not under it
+  checkboxselectmultiple  a group of ticks is a fieldset with a legend
+  clearablefile           a bare file input is unstyled and unreadable
+  everything else         label above the control
+
+Short fields — numbers, dates, checkboxes — are marked narrow so they pair up
+on a wide screen instead of each taking a full row and leaving a column of
+dead space beside them.
+
+An error keeps its message, not just a red edge, and the message is tied to
+the input with aria-describedby so a screen reader reaches it too.
 {% endcomment %}
+
 {% for error in form.non_field_errors %}
   <div class="msg msg-error">{{ error }}</div>
 {% endfor %}
 
-{% for field in form %}
-  <div class="fld {% if field.errors %}has-error{% endif %}">
-    <label for="{{ field.id_for_label }}">
-      {{ field.label }}{% if field.field.required %}<span aria-hidden="true"> *</span>{% endif %}
-    </label>
-    {{ field }}
-    {% if field.help_text %}
-      <span class="help" id="{{ field.id_for_label }}_help">{{ field.help_text }}</span>
+<div class="form-rows">
+  {% for field in form %}
+
+    {% if field.widget_type == "checkbox" %}
+      <div class="fld narrow {% if field.errors %}has-error{% endif %}">
+        <label class="chk" for="{{ field.id_for_label }}">
+          {{ field }}
+          <span>{{ field.label }}</span>
+        </label>
+        {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+        {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+      </div>
+
+    {% elif field.widget_type == "checkboxselectmultiple" or field.widget_type == "radioselect" %}
+      <fieldset class="fld {% if field.errors %}has-error{% endif %}">
+        <legend>
+          {{ field.label }}{% if field.field.required %}<abbr title="required" aria-label="required"> *</abbr>{% endif %}
+        </legend>
+        {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+        <div class="chk-list">
+          {% for choice in field %}
+            <label class="chk" for="{{ choice.id_for_label }}">
+              {{ choice.tag }}
+              <span>{{ choice.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+      </fieldset>
+
+    {% else %}
+      <div class="fld {% if field.widget_type == 'number' or field.widget_type == 'date' or field.widget_type == 'datetime' %}narrow{% endif %} {% if field.errors %}has-error{% endif %}">
+        <label for="{{ field.id_for_label }}">
+          {{ field.label }}{% if field.field.required %}<abbr title="required" aria-label="required"> *</abbr>{% endif %}
+        </label>
+
+        {% if field.widget_type == "clearablefile" %}
+          <div class="filefield">{{ field }}</div>
+        {% else %}
+          {{ field }}
+        {% endif %}
+
+        {% if field.help_text %}
+          <span class="help" id="{{ field.id_for_label }}_help">{{ field.help_text }}</span>
+        {% endif %}
+        {% for error in field.errors %}
+          <span class="err" id="{{ field.id_for_label }}_err">{{ error }}</span>
+        {% endfor %}
+      </div>
     {% endif %}
-    {% for error in field.errors %}
-      <span class="err" id="{{ field.id_for_label }}_err">{{ error }}</span>
-    {% endfor %}
-  </div>
-{% endfor %}
+
+  {% endfor %}
+</div>

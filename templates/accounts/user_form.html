@@ -12,16 +12,29 @@
       <div class="hd"><b>Account</b></div>
       <div class="stack">
         {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
-        {% for field in form %}
-          {% if field.name != "roles" %}
-            <div class="fld {% if field.errors %}has-error{% endif %}">
-              <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
-              {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
-            </div>
-          {% endif %}
-        {% endfor %}
+        <div class="form-rows">
+          {% for field in form %}
+            {% if field.name != "roles" %}
+              {% if field.widget_type == "checkbox" %}
+                <div class="fld narrow {% if field.errors %}has-error{% endif %}">
+                  <label class="chk" for="{{ field.id_for_label }}">
+                    {{ field }}<span>{{ field.label }}</span>
+                  </label>
+                  {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+                </div>
+              {% else %}
+                <div class="fld {% if field.errors %}has-error{% endif %}">
+                  <label for="{{ field.id_for_label }}">
+                    {{ field.label }}{% if field.field.required %}<abbr title="required"> *</abbr>{% endif %}
+                  </label>
+                  {{ field }}
+                  {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+                  {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+                </div>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </div>
       </div>
     </div>
 
@@ -31,12 +44,14 @@
         <span class="meta">A role is a bundle of permissions</span>
       </div>
       <div class="stack">
-        {% for checkbox in form.roles %}
-          <label class="chk" for="{{ checkbox.id_for_label }}">
-            {{ checkbox.tag }}
-            <span>{{ checkbox.choice_label }}</span>
-          </label>
-        {% endfor %}
+        <div class="chk-list">
+          {% for checkbox in form.roles %}
+            <label class="chk" for="{{ checkbox.id_for_label }}">
+              {{ checkbox.tag }}
+              <span>{{ checkbox.choice_label }}</span>
+            </label>
+          {% endfor %}
+        </div>
         {% for error in form.roles.errors %}<span class="err">{{ error }}</span>{% endfor %}
       </div>
       <div class="note">
@@ -62,7 +77,7 @@
       </div>
     </div>
 
-    <div style="display:flex;gap:10px">
+    <div class="form-actions">
       <a class="btn btn-sec" href="{% url 'settings-users' %}">Cancel</a>
       <button class="btn btn-pri" type="submit">Save</button>
     </div>

@@ -556,10 +556,55 @@ td.acts .btn + .btn { margin-left: 6px; }
    Forms — focus thickens the border and adds a soft ring. An error keeps its
    message, not just a red edge.
    -------------------------------------------------------------------------- */
-.fld { display: flex; flex-direction: column; gap: 6px; }
-.fld > label { font-size: 12px; font-weight: 600; color: var(--text2); }
+/* Fields flow in a wrapping row, so short ones pair up on a wide screen
+   rather than each taking a full line with dead space beside it. */
+.form-rows { display: flex; flex-wrap: wrap; gap: 16px; }
+.form-rows > * { flex: 1 1 100%; min-width: 0; }
+.form-rows > .narrow { flex: 1 1 210px; }
+
+.fld { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
+.fld > label,
+.fld > legend { font-size: 12px; font-weight: 600; color: var(--text2); padding: 0; }
 .fld .help { font-size: 12px; color: var(--text2); }
 .fld .err { font-size: 12px; color: var(--red); font-weight: 500; }
+/* The required mark is a cue, not an emphasis — the label is what is read. */
+.fld abbr { color: var(--red); text-decoration: none; font-weight: 700; }
+
+/* A tick sits beside its label. Above it, the pair reads as two things. */
+.fld > .chk { min-height: 44px; cursor: pointer; }
+.fld > .chk span { font-size: 14px; color: var(--text); font-weight: 500; }
+
+.chk-list {
+  display: flex; flex-direction: column; gap: 2px;
+  border: 1px solid var(--border); border-radius: var(--r-ctl);
+  padding: 6px 12px; background: var(--card);
+}
+.chk-list .chk { min-height: 40px; cursor: pointer; }
+.chk-list .chk span { font-size: 14px; font-weight: 500; }
+
+/* A bare file input is unstyled and unreadable; give it the same frame as
+   every other control. */
+.filefield {
+  border: 1px dashed var(--line); border-radius: var(--r-ctl);
+  padding: 12px 14px; background: var(--card); font-size: 13px; color: var(--text2);
+}
+.filefield input[type="file"] {
+  width: 100%; min-height: 0; border: 0; padding: 0; background: none; font-size: 13px;
+}
+.filefield input[type="file"]::file-selector-button {
+  margin-right: 12px; min-height: 34px; padding: 0 14px; cursor: pointer;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--sunken);
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.filefield input[type="file"]::file-selector-button:hover { border-color: var(--navy300); }
+.filefield a { font-weight: 600; }
+
+/* The row of buttons that closes a form. */
+.form-actions {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding-top: 4px;
+}
+.form-actions .spacer { flex: 1; }
 
 .inp, input[type=text], input[type=email], input[type=password], input[type=number],
 input[type=date], input[type=datetime-local], input[type=time], input[type=search],

@@ -23,7 +23,7 @@
         </div>
       {% endif %}
     </div>
-    <div style="display:flex;gap:10px">
+    <div class="form-actions">
       <a class="btn btn-sec" href="{% if project %}{% url 'projects-detail' project.pk %}{% else %}{% url 'projects-list' %}{% endif %}">Cancel</a>
       <button class="btn btn-pri" type="submit">Schedule the job</button>
     </div>
