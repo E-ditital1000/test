@@ -103,7 +103,8 @@ row that already exists instead of creating a second one.
 <script>
 (function () {
   "use strict";
-  var KEY = "clock-queue";
+  // Namespaced: this shares a device with whatever else the browser holds.
+  var KEY = "a1.clock.queue";
   var ENDPOINT = "{% url 'hr-clock-event' %}";
 
   function paint(queue) {

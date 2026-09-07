@@ -74,22 +74,25 @@ class ShellBehaviourTests(StaticLiveServerTestCase):
         cls._playwright.stop()
         super().tearDownClass()
 
-    @classmethod
-    def setUpTestData(cls):
+    def setUp(self):
+        # A live-server case runs on TransactionTestCase, which truncates
+        # tables between tests and never calls setUpTestData — so the
+        # fixtures are built per test rather than once.
+        super().setUp()
         call_command("seed_permissions", verbosity=0)
         PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
         PolicySetting.objects.create(key=PolicySetting.LATE_AFTER_MINUTES, value="15")
         CorrectionReason.objects.create(code="forgot", label="Forgot to clock in")
 
-        cls.password = "Testing!12345"
-        cls.worker = User.objects.create_user(
+        self.password = "Testing!12345"
+        self.worker = User.objects.create_user(
             username="tech@test.local", email="tech@test.local",
-            password=cls.password, first_name="Moses", last_name="Toe",
+            password=self.password, first_name="Moses", last_name="Toe",
         )
-        cls.worker.must_reset_password = False
-        cls.worker.save(update_fields=["must_reset_password"])
-        UserRole.objects.create(user=cls.worker, role=Role.objects.get(name="Technician"))
-        Employee.objects.create(user=cls.worker, staff_id="A1-002")
+        self.worker.must_reset_password = False
+        self.worker.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=self.worker, role=Role.objects.get(name="Technician"))
+        Employee.objects.create(user=self.worker, staff_id="A1-002")
 
     def _page(self):
         context = self.browser.new_context()
@@ -174,19 +177,19 @@ class OfflineClockTests(StaticLiveServerTestCase):
         cls._playwright.stop()
         super().tearDownClass()
 
-    @classmethod
-    def setUpTestData(cls):
+    def setUp(self):
+        super().setUp()
         call_command("seed_permissions", verbosity=0)
         PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
-        cls.password = "Testing!12345"
-        cls.worker = User.objects.create_user(
+        self.password = "Testing!12345"
+        self.worker = User.objects.create_user(
             username="tech2@test.local", email="tech2@test.local",
-            password=cls.password, first_name="Sarah", last_name="Gbah",
+            password=self.password, first_name="Sarah", last_name="Gbah",
         )
-        cls.worker.must_reset_password = False
-        cls.worker.save(update_fields=["must_reset_password"])
-        UserRole.objects.create(user=cls.worker, role=Role.objects.get(name="Technician"))
-        cls.employee = Employee.objects.create(user=cls.worker, staff_id="A1-003")
+        self.worker.must_reset_password = False
+        self.worker.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=self.worker, role=Role.objects.get(name="Technician"))
+        self.employee = Employee.objects.create(user=self.worker, staff_id="A1-003")
 
     def _signed_in(self):
         context = self.browser.new_context()
@@ -215,9 +218,10 @@ class OfflineClockTests(StaticLiveServerTestCase):
                 0,
                 "nothing should have reached the server while offline",
             )
-            queued = page.evaluate("localStorage.getItem('a1.clock.queue')")
-            self.assertTrue(queued and "client_uuid" in queued,
-                            "the event must be queued on the device")
+            queued = page.evaluate("() => window.A1.store.get('a1.clock.queue')")
+            self.assertTrue(queued, "the event must be queued on the device")
+            self.assertIn("client_uuid", queued[0],
+                          "the queued event must carry the id it was created with")
             self.assertTrue(page.locator("#queue-banner").is_visible(),
                             "the technician must be told it is held on the phone")
 
