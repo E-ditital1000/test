@@ -152,3 +152,67 @@ def attention_queue(user, limit=12):
 
     items.sort(key=lambda item: item.waiting_since)
     return items[:limit]
+
+
+def attention_count(user):
+    """
+    Just the number, for the bell in the header.
+
+    The full queue builds objects and resolves URLs; this runs on every page
+    load, so it counts rows and stops there. It must agree with
+    `attention_queue` — the same permissions and the same scoping — or the
+    badge sends people to a list that does not match it.
+    """
+    total = 0
+
+    if user_has_permission(user, "review_assessment"):
+        from fieldjobs.models import Assessment
+
+        submitted = apply_scope(
+            Assessment.objects.filter(state=Assessment.SUBMITTED),
+            user,
+            "review_assessment",
+            own_team_filter=Q(technician__employee__supervisor__user=user),
+        )
+        total += sum(
+            1 for a in submitted if a.approval_state not in ("approved", "returned")
+        )
+
+    if user_has_permission(user, "assign_ticket"):
+        from crm.models import Ticket
+
+        total += Ticket.objects.unassigned().count()
+
+    if user_has_permission(user, "approve_requisition"):
+        from finance.views import _pending_requisitions
+
+        is_executive = user_has_permission(user, "view_executive_dashboard")
+        total += sum(
+            1 for r in _pending_requisitions()
+            if is_executive or not r.requires_executive_approval()
+        )
+
+    if user_has_permission(user, "view_invoices"):
+        from finance.models import Invoice
+
+        total += sum(
+            1 for invoice in Invoice.objects.filter(
+                state__in=[Invoice.SENT, Invoice.PART_PAID]
+            ).prefetch_related("lines", "payments")
+            if invoice.days_overdue > 0
+        )
+
+    if user_has_permission(user, "correct_attendance"):
+        from hr.models import AttendanceDay, Employee
+
+        team = apply_scope(
+            Employee.objects.filter(is_active=True),
+            user,
+            "correct_attendance",
+            own_team_filter=Q(supervisor__user=user),
+        )
+        total += AttendanceDay.objects.filter(
+            employee__in=team, still_clocked_in=True, date__lt=timezone.localdate()
+        ).count()
+
+    return total

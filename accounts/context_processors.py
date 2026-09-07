@@ -31,6 +31,22 @@ def nav(request):
     if user is None:
         return {}
     match = getattr(request, "resolver_match", None)
+
+    # The bell in the header. Counted rather than built, because this runs on
+    # every page load.
+    attention = 0
+    if user.is_authenticated:
+        from dashboard.services import attention_count
+
+        attention = attention_count(user)
+
+    # What to call this person under their name in the header. Their roles,
+    # because the system has no job titles of its own — a role IS what they
+    # can do here.
+    role_label = ""
+    if user.is_authenticated:
+        names = list(user.user_roles.values_list("role__name", flat=True))
+        role_label = ", ".join(names) if names else "No role assigned"
     return {
         "nav_items": visible_items(user),
         "nav_tabs": visible_tabs(user),
@@ -38,5 +54,7 @@ def nav(request):
         # form still lights up its module in the sidebar.
         "nav_active": active_module(getattr(match, "url_name", "")),
         "tab_active": active_tab(getattr(match, "url_name", "")),
+        "attention_count": attention,
+        "user_role_label": role_label,
         "perms_held": PermissionLookup(user),
     }

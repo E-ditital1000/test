@@ -167,3 +167,27 @@ def is_datetime(value):
     import datetime
 
     return isinstance(value, datetime.datetime)
+
+
+@register.filter
+def a1waited(since):
+    """
+    How long something has been waiting, compactly: `2d 4h`, `1h 50m`, `6m`.
+
+    Django's `timesince` gives "1 hour, 50 minutes", which wraps in a narrow
+    column and makes a list of waits impossible to scan. The design
+    specification's own mockups use this short form.
+    """
+    if since is None:
+        return ""
+    delta = timezone.now() - since
+    seconds = int(delta.total_seconds())
+    if seconds < 60:
+        return "just now"
+    minutes, hours = seconds // 60, seconds // 3600
+    days = seconds // 86400
+    if days:
+        return f"{days}d {hours % 24}h"
+    if hours:
+        return f"{hours}h {minutes % 60:02d}m"
+    return f"{minutes}m"

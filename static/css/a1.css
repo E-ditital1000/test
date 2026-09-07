@@ -72,6 +72,12 @@
    -------------------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* A component that sets `display` otherwise beats the browser's handling of
+   the `hidden` attribute, and renders while it is meant to be hidden. Every
+   panel this system toggles from JavaScript sets display, so this rule is
+   what makes `el.hidden = true` mean what it says. */
+[hidden] { display: none !important; }
+
 html, body { height: 100%; }
 
 body {
@@ -198,7 +204,125 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .a1-who b { display: block; font-size: 14px; font-weight: 600; color: #fff; }
 .a1-who a { color: var(--gold300); font-size: 12px; font-weight: 600; }
 
+/* Collapsed rail. Same geometry as the 1024 breakpoint, but chosen rather
+   than forced — the toggle is remembered per device, so somebody working on
+   a dense table keeps their width. */
+body.nav-collapsed { --sidebar-w: 68px; }
+body.nav-collapsed .a1-side { padding: 20px 10px; align-items: center; }
+body.nav-collapsed .a1-nav .lbl,
+body.nav-collapsed .a1-brand .wordmark,
+body.nav-collapsed .a1-who span,
+body.nav-collapsed .a1-who b { display: none; }
+body.nav-collapsed .a1-nav { justify-content: center; padding: 0; width: 48px; }
+body.nav-collapsed .a1-who { padding: 8px; background: none; text-align: center; }
+body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
+
 .a1-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* --------------------------------------------------------------------------
+   Global header — search, today, the attention bell, and who you are.
+   Sits above the page title bar: this row is about the whole system, the one
+   below it is about the screen you are on.
+   -------------------------------------------------------------------------- */
+.a1-top {
+  flex: none; background: var(--card); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; padding: 10px var(--pad-x);
+  position: sticky; top: 0; z-index: 20;
+}
+
+.a1-burger {
+  flex: none; width: 40px; height: 40px; border-radius: var(--r-ctl);
+  border: 1px solid var(--border); background: var(--card); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  flex-direction: column; padding: 0;
+}
+.a1-burger i { display: block; width: 16px; height: 2px; border-radius: 2px; background: var(--text2); }
+.a1-burger:hover { border-color: var(--line); }
+
+.a1-search { flex: 1; max-width: 420px; position: relative; display: flex; align-items: center; }
+.a1-search svg { position: absolute; left: 14px; fill: var(--muted); pointer-events: none; }
+.a1-search input[type="search"] {
+  width: 100%; min-height: 40px; padding: 0 74px 0 42px; font-size: 14px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--page);
+}
+.a1-search input[type="search"]:focus { background: var(--card); padding-left: 41px; }
+.a1-search .kbd {
+  position: absolute; right: 10px; display: inline-flex; align-items: center; gap: 2px;
+  font-size: 11px; font-weight: 600; color: var(--muted); background: var(--card);
+  border: 1px solid var(--border); border-radius: 6px; padding: 3px 7px;
+  pointer-events: none; font-variant-numeric: tabular-nums;
+}
+
+.a1-top .spacer { flex: 1; }
+
+.a1-datechip {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px;
+  padding: 0 12px; border-radius: var(--r-ctl); border: 1px solid transparent;
+  font-size: 14px; font-weight: 500; color: var(--text); white-space: nowrap;
+}
+.a1-datechip svg { fill: var(--text2); flex: none; }
+
+.a1-bell {
+  position: relative; flex: none; width: 40px; height: 40px; border-radius: var(--r-ctl);
+  border: 1px solid transparent; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.a1-bell:hover { background: var(--sunken); }
+.a1-bell svg { fill: var(--text2); }
+/* Red, not gold: gold is the committing action and this is a status. */
+.a1-bell .dot {
+  position: absolute; top: 6px; right: 6px; min-width: 16px; height: 16px;
+  border-radius: 8px; background: var(--red); color: #fff; font-size: 10px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; border: 2px solid var(--card); font-variant-numeric: tabular-nums;
+}
+
+.a1-user {
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
+  padding: 0 8px 0 4px; border-radius: var(--r-ctl); border: 1px solid transparent;
+  background: none; cursor: pointer; text-align: left;
+}
+.a1-user:hover { background: var(--sunken); }
+.a1-avatar {
+  position: relative; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--navy); color: var(--gold); display: flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; letter-spacing: .02em;
+}
+.a1-avatar .online {
+  position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px;
+  border-radius: 50%; background: var(--green); border: 2px solid var(--card);
+}
+.a1-user .who-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.a1-user .who-name b { font-size: 13px; font-weight: 600; line-height: 1.25; white-space: nowrap; }
+.a1-user .who-name span { font-size: 12px; color: var(--muted); line-height: 1.25; white-space: nowrap; }
+.a1-user .caret { fill: var(--muted); flex: none; }
+
+/* The sign-out menu under the avatar. */
+.a1-usermenu { position: relative; }
+.a1-usermenu .sheet {
+  position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; z-index: 30;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--r-card);
+  box-shadow: 0 18px 40px -18px rgba(17, 4, 58, .28), 0 2px 6px rgba(17, 4, 58, .06);
+  padding: 8px; display: flex; flex-direction: column; gap: 2px;
+}
+.a1-usermenu .sheet .meta { padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.a1-usermenu .sheet .meta b { display: block; font-size: 14px; font-weight: 600; }
+.a1-usermenu .sheet .meta span { font-size: 12px; color: var(--muted); }
+.a1-usermenu .sheet a,
+.a1-usermenu .sheet button {
+  display: flex; align-items: center; min-height: 40px; padding: 0 10px; gap: 8px;
+  border-radius: 8px; font-size: 14px; background: none; border: 0; width: 100%;
+  text-align: left; cursor: pointer; color: var(--text);
+}
+.a1-usermenu .sheet a:hover,
+.a1-usermenu .sheet button:hover { background: var(--sunken); text-decoration: none; }
+.a1-usermenu .sheet button.danger { color: var(--red); }
+
+@media (max-width: 900px) {
+  .a1-top { padding: 10px 16px; gap: 10px; }
+  .a1-search { max-width: none; }
+  .a1-search .kbd, .a1-datechip span, .a1-user .who-name { display: none; }
+}
 .a1-bar {
   min-height: var(--topbar-h); flex: none; background: var(--card);
   border-bottom: 1px solid var(--border); display: flex; align-items: center;
@@ -582,6 +706,27 @@ input[type=checkbox], input[type=radio] {
    Mobile — field surfaces. Connectivity is assumed absent, not present.
    -------------------------------------------------------------------------- */
 .phone { display: flex; flex-direction: column; min-height: 100vh; background: var(--page); }
+
+/* The field surfaces are designed for a phone held one-handed. On a desktop
+   they are presented in a phone-width column rather than stretched: a 44 px
+   control spread across 1900 px is neither usable nor honest about what the
+   screen is for, and a supervisor opening a technician's view should see
+   what the technician sees. */
+@media (min-width: 901px) {
+  body.is-field { background: var(--sunken); }
+  body.is-field .phone {
+    max-width: 430px;
+    margin: 24px auto;
+    min-height: calc(100vh - 48px);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 18px 40px -18px rgba(17, 4, 58, .28), 0 2px 6px rgba(17, 4, 58, .06);
+  }
+  /* Sticky bottom is measured against the viewport, which is taller than
+     this column — pin the tab bar to the column instead. */
+  body.is-field .a1-tabs { position: static; }
+}
 .phead { background: var(--navy); padding: 18px 20px 20px; }
 .phead b {
   display: block; font-size: 22px; line-height: 30px; font-weight: 700;

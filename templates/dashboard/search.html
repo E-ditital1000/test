@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Search — A1 360{% endblock %}
+
+{% block page_title %}{% if query %}Results for &ldquo;{{ query }}&rdquo;{% else %}Search{% endif %}{% endblock %}
+{% block page_sub %}
+  {% if query %}
+    {{ total }} match{{ total|pluralize:"es" }} across the modules your role reaches
+  {% else %}
+    Tickets, customers, projects, invoices and employees
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% if not query %}
+    {% include "shell/_empty.html" with icon="dashboard" heading="Search the system" body="Type a reference, a customer, a person or an amount into the box at the top. Results only ever include records your role can already open — search is not a way around a permission." %}
+
+  {% elif sections %}
+    {% for section in sections %}
+      <div class="card">
+        <div class="hd">
+          <b>{{ section.label }}</b>
+          <span class="meta">{{ section.hits|length }} shown</span>
+        </div>
+        {% for hit in section.hits %}
+          <a class="row-i" href="{{ hit.url }}" style="text-decoration:none;color:inherit">
+            <div class="two g">
+              <b>{{ hit.label }}</b>
+              <span>{{ hit.detail }}</span>
+            </div>
+            <span class="pill p-clos">{{ hit.kind }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% endfor %}
+
+    <p class="t-small dim">
+      Each section shows the first few matches. Open the module itself to
+      search it in full.
+    </p>
+
+  {% else %}
+    {% url 'global-search' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="dashboard" search_term=query clear_url=clear_url %}
+    <p class="t-small dim">
+      Search only reads the modules your role reaches, so a record you cannot
+      open will not appear here even if it exists.
+    </p>
+  {% endif %}
+{% endblock %}

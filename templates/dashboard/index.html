@@ -43,7 +43,7 @@
           <span>{{ item.detail }}</span>
         </div>
         <span class="{% if item.tone == 'over' %}bad{% else %}warn{% endif %} t-small" style="width:120px">
-          waiting {{ item.waiting_since|timesince }}
+          waiting {{ item.waiting_since|a1waited }}
         </span>
         <span class="pill {% if item.tone == 'over' %}p-over{% else %}p-wait{% endif %}">
           <i></i>{{ item.kind }}

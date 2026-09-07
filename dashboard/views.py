@@ -17,6 +17,7 @@ from crm.models import Ticket
 from fieldjobs.models import Assessment, FieldJob
 from projects.models import Project
 
+from .search import search
 from .services import attention_queue
 
 
@@ -182,5 +183,25 @@ def command_view(request):
             "queue": queue,
             "months": months,
             "today": today,
+        },
+    )
+
+
+@require_permission("view_dashboard")
+def global_search(request):
+    """
+    The header search. Every section is gated on the permission that governs
+    the module it reads and scoped the way that module scopes itself, so this
+    can never become the way somebody sees a record the screens refuse them.
+    """
+    query = request.GET.get("q", "").strip()
+    sections = search(request.user, query)
+    return render(
+        request,
+        "dashboard/search.html",
+        {
+            "query": query,
+            "sections": sections,
+            "total": sum(len(section["hits"]) for section in sections),
         },
     )

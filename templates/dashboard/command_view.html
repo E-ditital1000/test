@@ -31,7 +31,7 @@
     <a class="metric {% if queue %}alert{% endif %}" href="#attention"
        style="text-decoration:none;color:inherit">
       <span>Pending your approval</span><b>{{ queue|length }}</b>
-      <em>{% if queue %}oldest waiting {{ queue.0.waiting_since|timesince }}{% else %}nothing blocked{% endif %}</em>
+      <em>{% if queue %}oldest waiting {{ queue.0.waiting_since|a1waited }}{% else %}nothing blocked{% endif %}</em>
     </a>
     <div class="metric {% if on_time_pct != None and on_time_pct < 90 %}alert{% elif on_time_pct %}ok{% endif %}">
       <span>On-time completion</span>
@@ -85,7 +85,7 @@
             <span>{{ item.detail }}</span>
           </div>
           <span class="{% if item.tone == 'over' %}bad{% else %}warn{% endif %} t-small" style="width:96px">
-            {{ item.waiting_since|timesince }}
+            {{ item.waiting_since|a1waited }}
           </span>
         </a>
       {% empty %}

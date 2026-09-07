@@ -62,6 +62,8 @@ ENDPOINTS = {
     "finance-expense-create": "log_expense",
     "finance-invoice-create": "issue_invoice",
     "finance-requisitions": "approve_requisition",
+    # Wave 3 / shell
+    "global-search": "view_dashboard",
 }
 
 # Endpoints the matrix cannot GET meaningfully: they only accept POST, so a

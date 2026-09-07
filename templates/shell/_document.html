@@ -19,7 +19,7 @@
   <link rel="apple-touch-icon" href="{% static 'img/a1-mark.png' %}">
   {% block head_extra %}{% endblock %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 {% include "shell/_icons.html" %}
 {% block body %}{% endblock %}
 

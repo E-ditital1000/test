@@ -23,7 +23,7 @@
             </span>
           </div>
           <span class="warn t-small" style="width:110px">
-            waiting {{ assessment.submitted_at|timesince }}
+            waiting {{ assessment.submitted_at|a1waited }}
           </span>
           <span class="pill p-wait"><i></i>Awaiting approval</span>
           <a class="btn btn-sec btn-sm" href="{% url 'approvals-assessment-review' assessment.pk %}">
