@@ -33,6 +33,7 @@ class ContactForm(forms.ModelForm):
     class Meta:
         model = Contact
         fields = ["name", "job_title", "phone", "email", "is_primary"]
+        labels = {"is_primary": "Main contact for this customer"}
 
 
 class TicketForm(forms.ModelForm):

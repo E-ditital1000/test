@@ -15,6 +15,7 @@ class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice
         fields = ["project", "due_on", "notes"]
+        labels = {"due_on": "Payment due"}
         widgets = {
             "due_on": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 2}),
@@ -44,6 +45,7 @@ class PaymentForm(forms.ModelForm):
     class Meta:
         model = Payment
         fields = ["amount", "paid_on", "method", "reference"]
+        labels = {"paid_on": "Date paid", "reference": "Payment reference"}
         widgets = {"paid_on": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, **kwargs):
@@ -60,6 +62,7 @@ class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
         fields = ["project", "category", "item", "amount", "incurred_on", "receipt"]
+        labels = {"incurred_on": "Date of the cost", "item": "What was bought"}
         widgets = {"incurred_on": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, **kwargs):

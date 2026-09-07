@@ -556,11 +556,19 @@ td.acts .btn + .btn { margin-left: 6px; }
    Forms — focus thickens the border and adds a soft ring. An error keeps its
    message, not just a red edge.
    -------------------------------------------------------------------------- */
-/* Fields flow in a wrapping row, so short ones pair up on a wide screen
-   rather than each taking a full line with dead space beside it. */
-.form-rows { display: flex; flex-wrap: wrap; gap: 16px; }
-.form-rows > * { flex: 1 1 100%; min-width: 0; }
-.form-rows > .narrow { flex: 1 1 210px; }
+/* Two columns by default.
+   A form of single-file full-width inputs makes the reader travel the whole
+   width of the screen for a six-character staff ID, and pushes everything
+   below it off the fold. Fields pair up and wrap down to one column on a
+   narrow screen without a media query.
+
+   Anything that genuinely needs the width — prose, a file drop, a group of
+   ticks — asks for it with .wide. */
+.form-rows { display: flex; flex-wrap: wrap; gap: 16px 20px; }
+.form-rows > * { flex: 1 1 260px; min-width: 0; }
+.form-rows > .wide { flex: 1 1 100%; }
+/* Short enough that two of them still leave room for a third. */
+.form-rows > .narrow { flex: 1 1 170px; }
 
 .fld { display: flex; flex-direction: column; gap: 6px; border: 0; padding: 0; margin: 0; }
 .fld > label,

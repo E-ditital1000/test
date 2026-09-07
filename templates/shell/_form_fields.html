@@ -9,9 +9,10 @@ Four kinds need their own treatment, and got it wrong before:
   clearablefile           a bare file input is unstyled and unreadable
   everything else         label above the control
 
-Short fields — numbers, dates, checkboxes — are marked narrow so they pair up
-on a wide screen instead of each taking a full row and leaving a column of
-dead space beside them.
+Fields pair into two columns by default, because a form of full-width inputs
+makes the reader cross the whole screen for a six-character staff ID. Prose,
+file drops and groups of ticks ask for the full width with .wide; numbers and
+dates take even less with .narrow.
 
 An error keeps its message, not just a red edge, and the message is tied to
 the input with aria-describedby so a screen reader reaches it too.
@@ -35,7 +36,7 @@ the input with aria-describedby so a screen reader reaches it too.
       </div>
 
     {% elif field.widget_type == "checkboxselectmultiple" or field.widget_type == "radioselect" %}
-      <fieldset class="fld {% if field.errors %}has-error{% endif %}">
+      <fieldset class="fld wide {% if field.errors %}has-error{% endif %}">
         <legend>
           {{ field.label }}{% if field.field.required %}<abbr title="required" aria-label="required"> *</abbr>{% endif %}
         </legend>
@@ -52,7 +53,7 @@ the input with aria-describedby so a screen reader reaches it too.
       </fieldset>
 
     {% else %}
-      <div class="fld {% if field.widget_type == 'number' or field.widget_type == 'date' or field.widget_type == 'datetime' %}narrow{% endif %} {% if field.errors %}has-error{% endif %}">
+      <div class="fld{% if field.widget_type == 'textarea' or field.widget_type == 'clearablefile' %} wide{% elif field.widget_type == 'number' or field.widget_type == 'date' %} narrow{% endif %}{% if field.errors %} has-error{% endif %}">
         <label for="{{ field.id_for_label }}">
           {{ field.label }}{% if field.field.required %}<abbr title="required" aria-label="required"> *</abbr>{% endif %}
         </label>

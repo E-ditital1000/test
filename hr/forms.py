@@ -25,6 +25,15 @@ class EmployeeForm(forms.ModelForm):
             "is_active",
         ]
         widgets = {"start_date": forms.DateInput(attrs={"type": "date"})}
+        labels = {
+            "staff_id": "Staff ID",
+            "is_active": "Currently employed",
+            "user": "Sign-in account",
+        }
+        help_texts = {
+            "user": "The account this person signs in with.",
+            "supervisor": "Whose roll-call they appear on.",
+        }
 
     def clean_supervisor(self):
         supervisor = self.cleaned_data.get("supervisor")
