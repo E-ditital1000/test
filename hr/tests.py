@@ -11,6 +11,7 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, tag
+from django.urls import reverse
 from django.utils import timezone
 
 from config.models import CorrectionReason, PolicySetting
@@ -342,3 +343,117 @@ class ClockScreenTests(TestCase):
         # No pay, rate or salary column exists anywhere in it.
         for banned in ("salary", "rate", "pay", "wage"):
             self.assertNotIn(banned, header)
+
+
+class AttendanceReachabilityTests(TestCase):
+    """
+    HR could create an employee and never see a day of their attendance.
+
+    Every attendance screen existed, worked, and was correctly gated -- and
+    nothing anywhere linked to any of them. The sidebar's one HR entry goes
+    to the register, and the register was a dead end. A permission that
+    cannot be reached is not a permission anybody has.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        call_command("seed_permissions", verbosity=0)
+        PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
+        PolicySetting.objects.create(key=PolicySetting.LATE_AFTER_MINUTES, value="15")
+
+        from accounts.models import Role, UserRole
+
+        def person(email, role):
+            user = User.objects.create_user(
+                username=email, email=email, password="Testing!12345",
+            )
+            user.must_reset_password = False
+            user.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=user, role=Role.objects.get(name=role))
+            return user
+
+        cls.hr = person("hr@test.local", "HR")
+        cls.executive = person("exec@test.local", "Executive")
+        cls.worker = person("worker@test.local", "Technician")
+        cls.employee = Employee.objects.create(user=cls.worker, staff_id="A1-100")
+
+    def _as(self, user):
+        self.client.force_login(user)
+
+    # -- the complaint ----------------------------------------------------
+
+    def test_hr_can_open_every_attendance_screen(self):
+        self._as(self.hr)
+        for name, args in (
+            ("hr-roll-call", []),
+            ("hr-monthly-report", []),
+            ("hr-employee-attendance", [self.employee.pk]),
+        ):
+            with self.subTest(screen=name):
+                response = self.client.get(reverse(name, args=args))
+                self.assertEqual(
+                    response.status_code, 200,
+                    f"HR holds the permission for {name} and must be able to load it",
+                )
+
+    def test_the_register_links_hr_to_the_attendance_screens(self):
+        """
+        Gated, working and unreachable is the same as absent to the person
+        using it, so the links are worth asserting and not just the routes.
+        """
+        self._as(self.hr)
+        body = self.client.get(reverse("hr-employees")).content.decode()
+
+        self.assertIn(reverse("hr-roll-call"), body, "no way through to roll-call")
+        self.assertIn(reverse("hr-monthly-report"), body, "no way through to the report")
+        self.assertIn(
+            reverse("hr-employee-attendance", args=[self.employee.pk]), body,
+            "no way to one employee's own record from the register",
+        )
+
+    # -- reading a record is not changing one -----------------------------
+
+    def _an_event(self):
+        return AttendanceEvent.objects.create(
+            employee=self.employee, kind=AttendanceEvent.CLOCK_IN,
+            client_uuid=uuid.uuid4(), device_timestamp=timezone.now(),
+            location_unavailable=True,
+        )
+
+    def test_an_executive_can_read_a_record_without_the_right_to_change_it(self):
+        """
+        Executive holds view_attendance_records over everyone and
+        correct_attendance over nobody. The record screen used to demand the
+        second, so they could see a roll-call and never open a row of it.
+        """
+        event = self._an_event()
+        correct_url = reverse("hr-correction-create", args=[event.pk])
+
+        self._as(self.executive)
+        response = self.client.get(
+            reverse("hr-employee-attendance", args=[self.employee.pk])
+        )
+        self.assertEqual(response.status_code, 200, "an Executive must be able to read it")
+        self.assertNotIn(
+            correct_url, response.content.decode(),
+            "an Executive must not be offered a correction they cannot make",
+        )
+
+        # ...and the same screen does offer it to someone who can, which is
+        # what makes the assertion above mean anything.
+        self._as(self.hr)
+        body = self.client.get(
+            reverse("hr-employee-attendance", args=[self.employee.pk])
+        ).content.decode()
+        self.assertIn(correct_url, body, "HR must still be offered the correction")
+
+    def test_correcting_is_still_refused_without_the_permission(self):
+        event = self._an_event()
+        self._as(self.executive)
+        response = self.client.get(reverse("hr-correction-create", args=[event.pk]))
+        self.assertEqual(
+            response.status_code, 403,
+            "reading a record must not carry the right to change it",
+        )

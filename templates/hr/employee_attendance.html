@@ -5,6 +5,9 @@
 {% block page_title %}{{ employee|a1register_name }} — attendance{% endblock %}
 {% block page_sub %}{{ employee.staff_id }} · every event, with its corrections{% endblock %}
 {% block page_actions %}
+  {% if perms_held.view_employees %}
+    <a class="btn btn-sec" href="{% url 'hr-employees' %}">Employee register</a>
+  {% endif %}
   <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Back to roll-call</a>
 {% endblock %}
 
@@ -45,7 +48,9 @@
                 </span>
               {% endfor %}
             </div>
-            <a class="btn btn-sec btn-sm" href="{% url 'hr-correction-create' event.pk %}">Correct</a>
+            {% if can_correct %}
+              <a class="btn btn-sec btn-sm" href="{% url 'hr-correction-create' event.pk %}">Correct</a>
+            {% endif %}
           </div>
         {% empty %}
           <div class="blank" style="padding:32px">

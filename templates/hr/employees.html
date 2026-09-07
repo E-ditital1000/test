@@ -5,6 +5,21 @@
 {% block page_title %}Employee register{% endblock %}
 {% block page_sub %}Deactivation preserves all history · no pay or salary data is held here{% endblock %}
 {% block page_actions %}
+  {% comment %}
+  The register is where HR lands from the sidebar, and it was the only HR
+  screen with a way in. Roll-call, a person's own record and the monthly
+  report all existed, all worked, and could not be reached from anywhere --
+  so HR could create an employee and never see a day of their attendance.
+  Shown per permission, so a Supervisor who has attendance rights but no
+  register rights is unaffected and an Executive gets the report without
+  the correction trail.
+  {% endcomment %}
+  {% if perms_held.view_attendance_records %}
+    <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Daily roll-call</a>
+  {% endif %}
+  {% if perms_held.view_attendance_reports %}
+    <a class="btn btn-sec" href="{% url 'hr-monthly-report' %}">Monthly report</a>
+  {% endif %}
   {% if perms_held.manage_employees %}
     <a class="btn btn-pri" href="{% url 'hr-employee-create' %}">Add employee</a>
   {% endif %}
@@ -55,6 +70,12 @@
                   {% endif %}
                 </td>
                 <td class="acts">
+                  {% comment %} The way to one person's attendance from the register --
+                     the question "how has this employee been turning up" starts
+                     here far more often than it starts at a roll-call date. {% endcomment %}
+                  {% if perms_held.view_attendance_records %}
+                    <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-attendance' employee.pk %}">Attendance</a>
+                  {% endif %}
                   {% if perms_held.manage_employees %}
                     <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-edit' employee.pk %}">Edit</a>
                     {% if employee.is_active %}

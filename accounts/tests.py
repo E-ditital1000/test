@@ -12,6 +12,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
 from django.conf import settings
+from accounts.seed_data import SYSTEM_ROLE_NAMES
 from django.test import SimpleTestCase, TestCase, tag
 from django.urls import reverse
 from django.utils import timezone
@@ -611,3 +612,51 @@ class StylesheetCascadeTests(SimpleTestCase):
             "[hidden] { display: none !important; }", self.css,
             "removing !important here renders every assessment step at once",
         )
+
+
+class NavigationLandsSomewhereAllowedTests(TestCase):
+    """
+    Navigation is generated from permissions, and each module links to the
+    first target the user actually holds. That rule exists precisely so a
+    module never points somewhere its own user is refused -- but the mapping
+    is hand-written, and one entry had drifted: the HR module sent anyone
+    with `view_attendance_records` to the employee register, which is gated
+    on `view_employees`. A Supervisor holds the first and not the second, so
+    their only HR link answered 403.
+
+    Nothing caught it, because every route was correctly gated and every
+    permission correctly granted. The bug was in the join between them. So
+    this walks it: for every seeded role, every link the shell would render
+    must be a page that role can open.
+    """
+
+    def _user_for(self, role_name):
+        user = User.objects.create_user(
+            username=f"{role_name}@nav.test", email=f"{role_name}@nav.test",
+            password="Testing!12345",
+        )
+        user.must_reset_password = False
+        user.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=user, role=Role.objects.get(name=role_name))
+        return user
+
+    def test_every_role_can_open_every_link_its_own_shell_offers(self):
+        from accounts.navigation import visible_items, visible_tabs
+
+        call_command("seed_permissions", verbosity=0)
+
+        for role_name in sorted(SYSTEM_ROLE_NAMES):
+            user = self._user_for(role_name)
+            self.client.force_login(user)
+
+            links = list(visible_items(user)) + list(visible_tabs(user))
+            self.assertTrue(links, f"{role_name} is offered no navigation at all")
+
+            for item in links:
+                with self.subTest(role=role_name, module=item.label):
+                    response = self.client.get(reverse(item.url_name))
+                    self.assertNotEqual(
+                        response.status_code, 403,
+                        f"the shell offers {role_name} '{item.label}' -> "
+                        f"{item.url_name}, and that page refuses them",
+                    )

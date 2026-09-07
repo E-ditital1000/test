@@ -10,6 +10,9 @@
            style="min-height:40px;max-width:180px">
     <button class="btn btn-sec" type="submit">Show</button>
   </form>
+  {% if perms_held.view_employees %}
+    <a class="btn btn-sec" href="{% url 'hr-employees' %}">Employee register</a>
+  {% endif %}
   {% if perms_held.view_attendance_reports %}
     <a class="btn btn-sec" href="{% url 'hr-monthly-report' %}">Monthly report</a>
   {% endif %}
@@ -65,9 +68,10 @@
                   {% endif %}
                 </td>
                 <td class="acts">
-                  {% if can_correct %}
-                    <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-attendance' row.employee.pk %}">Review</a>
-                  {% endif %}
+                  {% comment %} Anyone who can read this page can read the record behind a
+                     row. Correcting one is a separate right, asked for on that
+                     screen and not here. {% endcomment %}
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-employee-attendance' row.employee.pk %}">Review</a>
                 </td>
               </tr>
             {% endfor %}

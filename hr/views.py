@@ -258,15 +258,23 @@ def roll_call(request):
             "rows": rows,
             "on_date": on_date,
             "counts": counts,
-            "can_correct": user_has_permission(request.user, "correct_attendance"),
         },
     )
 
 
-@require_permission("correct_attendance")
+@require_permission("view_attendance_records")
 def employee_attendance(request, pk):
-    """One person's event log, with every correction visible against it."""
-    employee = get_object_or_404(_team_for(request.user, "correct_attendance"), pk=pk)
+    """
+    One person's event log, with every correction visible against it.
+
+    Gated on viewing, not correcting. It used to require correct_attendance,
+    which meant an Executive -- who holds view_attendance_records over
+    everyone and correct_attendance over nobody -- could see the roll-call
+    summary and never open a single person behind it. Reading a record and
+    changing one are different rights; the correction controls below are
+    still the second.
+    """
+    employee = get_object_or_404(_team_for(request.user, "view_attendance_records"), pk=pk)
     events = (
         AttendanceEvent.objects.filter(employee=employee)
         .prefetch_related("corrections__reason", "corrections__corrected_by")
@@ -279,6 +287,7 @@ def employee_attendance(request, pk):
             "employee": employee,
             "events": events,
             "days": AttendanceDay.objects.filter(employee=employee).order_by("-date")[:14],
+            "can_correct": user_has_permission(request.user, "correct_attendance"),
         },
     )
 

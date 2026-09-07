@@ -65,7 +65,11 @@ NAV_ITEMS = [
     )),
     NavItem("HR", "hr", (
         ("view_employees", "hr-employees"),
-        ("view_attendance_records", "hr-employees"),
+        # Not hr-employees. A Supervisor holds attendance rights over their
+        # own team and no right to the register at all, so pointing this at
+        # the register sent them to a screen that refuses them -- the one
+        # case the "first target they actually hold" rule exists to prevent.
+        ("view_attendance_records", "hr-roll-call"),
         ("clock_in_out", "hr-clock"),
     )),
     NavItem("Settings", "settings", (
