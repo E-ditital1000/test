@@ -13,6 +13,9 @@ whitenoise==6.7.0
 psycopg2-binary==2.9.12
 reportlab==4.2.5
 Pillow==10.4.0
+# Renders the attendance QR codes HR prints and sticks on a wall. Pure
+# Python; Pillow above turns the matrix into the PNG that gets printed.
+qrcode==7.4.2
 pytest==8.3.3
 pytest-django==4.9.0
 

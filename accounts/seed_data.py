@@ -61,6 +61,7 @@ ROLE_GRANTS = {
         ("view_attendance_records", SCOPE_ALL),
         ("correct_attendance", SCOPE_ALL),
         ("view_attendance_reports", SCOPE_ALL),
+        ("manage_attendance_codes", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
     ],
 

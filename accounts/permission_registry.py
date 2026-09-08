@@ -69,6 +69,7 @@ PERMISSIONS = [
     ("correct_attendance", "hr", "Correct an attendance event, with a mandatory reason"),
     ("view_attendance_reports", "hr", "View the monthly attendance report"),
     ("clock_in_out", "hr", "Clock in and out, and view own attendance history"),
+    ("manage_attendance_codes", "hr", "Create, print and revoke the attendance QR codes employees scan"),
 ]
 
 PERMISSION_CODES = {code for code, _module, _description in PERMISSIONS}

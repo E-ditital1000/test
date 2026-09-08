@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from django import forms
+from django.utils import timezone
 
 from config.models import CorrectionReason
 
-from .models import AttendanceCorrection, Employee
+from .models import AttendanceCode, AttendanceCorrection, Employee
 
 
 class EmployeeForm(forms.ModelForm):
@@ -84,3 +87,40 @@ class AttendanceCorrectionForm(forms.Form):
         ):
             self.add_error("corrected_timestamp", "Amending a time needs the corrected time.")
         return cleaned
+
+
+class AttendanceCodeForm(forms.ModelForm):
+    """
+    A code HR prints and posts. The expiry is mandatory and defaulted rather
+    than left open: a printed code is a shared secret, and the expiry is the
+    only thing that limits one that has been photographed.
+    """
+
+    class Meta:
+        model = AttendanceCode
+        fields = ["description", "location_name", "expires_at"]
+        widgets = {"expires_at": forms.DateTimeInput(attrs={"type": "datetime-local"})}
+        labels = {
+            "description": "What this code is for",
+            "location_name": "Where it will be posted",
+            "expires_at": "Stops working at",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Four weeks is long enough not to be a chore and short enough that a
+        # photographed code stops being useful within a payroll cycle.
+        default = timezone.localtime() + timedelta(days=28)
+        self.fields["expires_at"].initial = default.strftime("%Y-%m-%dT%H:%M")
+        self.fields["expires_at"].help_text = (
+            "After this moment the code stops working and you print a new one. "
+            "Keep it short: a photograph of a printed code works as well as the paper."
+        )
+
+    def clean_expires_at(self):
+        expires_at = self.cleaned_data["expires_at"]
+        if expires_at <= timezone.now():
+            raise forms.ValidationError(
+                "That moment has already passed, so the code would never work."
+            )
+        return expires_at

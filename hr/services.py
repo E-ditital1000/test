@@ -4,6 +4,7 @@ source: this module is the single routine that rebuilds it from the
 append-only event log plus corrections, and `hr.tests` proves that wiping
 the table and rebuilding reconstructs it identically.
 """
+import uuid
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
@@ -12,7 +13,7 @@ from django.utils import timezone
 
 from config.models import PolicySetting
 
-from .models import AttendanceCorrection, AttendanceDay, AttendanceEvent
+from .models import AttendanceCode, AttendanceCorrection, AttendanceDay, AttendanceEvent
 
 
 def _late_policy():
@@ -176,6 +177,27 @@ def open_clock_in(employee, on_date=None):
     return open_in
 
 
+def resolve_code(raw):
+    """
+    Find the code a phone scanned or a person typed.
+
+    The QR encodes the token; the wall also shows a short code for when a
+    camera will not start. Both are the same secret, so both resolve here
+    and neither is treated as weaker than the other.
+    """
+    value = (raw or "").strip()
+    if not value:
+        return None
+
+    code = AttendanceCode.objects.filter(short_code__iexact=value).first()
+    if code is not None:
+        return code
+    try:
+        return AttendanceCode.objects.filter(token=uuid.UUID(value)).first()
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 @transaction.atomic
 def record_clock_event(
     *,
@@ -188,6 +210,8 @@ def record_clock_event(
     accuracy_m=None,
     location_unavailable=False,
     recorded_by=None,
+    attendance_code=None,
+    require_code=True,
 ):
     """
     Append one clock event, idempotently.
@@ -198,12 +222,41 @@ def record_clock_event(
     whole offline-sync contract: resubmission is safe.
 
     A missing GPS fix never blocks the event; it is recorded with
-    `location_unavailable` instead.
+    `location_unavailable` instead. A missing or dead attendance code DOES
+    block it: the code is the thing the employee had to be in front of, and
+    an event with no code proves nothing at all.
+
+    `require_code=False` exists for a supervisor recording on somebody's
+    behalf, where there was never a scan to record.
     """
     existing = AttendanceEvent.objects.filter(client_uuid=client_uuid).first()
     if existing is not None:
         # Already synced. Not an error — the phone is retrying.
         return existing, False
+
+    when = device_timestamp or timezone.now()
+
+    if require_code:
+        if attendance_code is None:
+            raise ClockError(
+                "Scan the attendance code posted at your location, or type the "
+                "short code printed under it."
+            )
+        # Judged at the moment of the scan, not now: an event taken with no
+        # signal reaches the server later, and refusing it because the code
+        # expired during the drive back would throw away a real event that a
+        # real person really recorded.
+        status = attendance_code.status_at(when)
+        if status == AttendanceCode.REVOKED:
+            raise ClockError(
+                "That code has been withdrawn. Ask HR for the current one at "
+                "your location."
+            )
+        if status == AttendanceCode.EXPIRED:
+            raise ClockError(
+                "That code had already expired when you scanned it. Ask HR "
+                "for the current one at your location."
+            )
 
     if kind == AttendanceEvent.CLOCK_OUT and open_clock_in(employee) is None:
         raise ClockError(
@@ -220,12 +273,13 @@ def record_clock_event(
         employee=employee,
         kind=kind,
         client_uuid=client_uuid,
-        device_timestamp=device_timestamp or timezone.now(),
+        device_timestamp=when,
         latitude=latitude,
         longitude=longitude,
         accuracy_m=accuracy_m,
         location_unavailable=location_unavailable or latitude is None,
         recorded_by=recorded_by,
+        attendance_code=attendance_code,
     )
     rebuild_attendance_days(
         employee=employee,

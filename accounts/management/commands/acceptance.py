@@ -51,6 +51,10 @@ SCENARIOS = [
     ("Attention queue",
      "Ranked by how long each item waited, and never shows what the viewer "
      "cannot clear"),
+    ("Attendance codes",
+     "A clock event needs the code posted at the location; the expiry is "
+     "judged at the scan, so an event held offline still counts, and "
+     "withdrawal takes effect at once"),
     ("JavaScript parses",
      "Every script this system ships, including the offline layer and the "
      "service worker, is parsed rather than trusted"),

@@ -13,6 +13,9 @@
   {% if perms_held.view_employees %}
     <a class="btn btn-sec" href="{% url 'hr-employees' %}">Employee register</a>
   {% endif %}
+  {% if perms_held.manage_attendance_codes %}
+    <a class="btn btn-sec" href="{% url 'hr-codes' %}">Attendance codes</a>
+  {% endif %}
   {% if perms_held.view_attendance_reports %}
     <a class="btn btn-sec" href="{% url 'hr-monthly-report' %}">Monthly report</a>
   {% endif %}

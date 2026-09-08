@@ -23,15 +23,17 @@ box without them still runs the rest of the suite:
 import os
 import time
 import unittest
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.management import call_command
 from django.test import tag
+from django.utils import timezone
 
 from accounts.models import Role, UserRole
 from config.models import CorrectionReason, PolicySetting
-from hr.models import AttendanceEvent, Employee
+from hr.models import AttendanceCode, AttendanceEvent, Employee
 
 User = get_user_model()
 
@@ -94,6 +96,13 @@ class ShellBehaviourTests(StaticLiveServerTestCase):
         self.worker.save(update_fields=["must_reset_password"])
         UserRole.objects.create(user=self.worker, role=Role.objects.get(name="Technician"))
         Employee.objects.create(user=self.worker, staff_id="A1-002")
+        # The clock screen is reached by scanning the code posted at the
+        # location, so these tests arrive the same way a technician does.
+        self.code = AttendanceCode.objects.create(
+            description="Main office",
+            location_name="Ganta yard",
+            expires_at=timezone.now() + timedelta(days=28),
+        )
 
     def _page(self):
         context = self.browser.new_context()
@@ -129,7 +138,7 @@ class ShellBehaviourTests(StaticLiveServerTestCase):
         """
         context, page = self._page()
         try:
-            page.goto(f"{self.live_server_url}/hr/clock/")
+            page.goto(f"{self.live_server_url}/hr/clock/?code={self.code.token}")
             page.wait_for_load_state("networkidle")
             self.assertFalse(
                 page.locator("#queue-banner").is_visible(),
@@ -191,6 +200,13 @@ class OfflineClockTests(StaticLiveServerTestCase):
         self.worker.save(update_fields=["must_reset_password"])
         UserRole.objects.create(user=self.worker, role=Role.objects.get(name="Technician"))
         self.employee = Employee.objects.create(user=self.worker, staff_id="A1-003")
+        # Clocking needs the code posted where the crew works. Scanning the QR
+        # is what puts it on the query string, so the tests arrive the same way.
+        self.code = AttendanceCode.objects.create(
+            description="Main office",
+            location_name="Ganta yard",
+            expires_at=timezone.now() + timedelta(days=28),
+        )
 
     def _events(self):
         """
@@ -232,7 +248,7 @@ class OfflineClockTests(StaticLiveServerTestCase):
     def test_a_clock_event_taken_offline_syncs_once_when_the_network_returns(self):
         context, page = self._signed_in()
         try:
-            page.goto(f"{self.live_server_url}/hr/clock/")
+            page.goto(f"{self.live_server_url}/hr/clock/?code={self.code.token}")
             page.wait_for_load_state("networkidle")
 
             # Go offline, then clock in. The event must be kept on the device.
@@ -275,7 +291,7 @@ class OfflineClockTests(StaticLiveServerTestCase):
         """A denied or absent fix records the event marked location unavailable."""
         context, page = self._signed_in()
         try:
-            page.goto(f"{self.live_server_url}/hr/clock/")
+            page.goto(f"{self.live_server_url}/hr/clock/?code={self.code.token}")
             page.wait_for_load_state("networkidle")
             page.click("button.act")
 

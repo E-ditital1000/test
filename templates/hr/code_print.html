@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Print {{ code.short_code }} — A1 360{% endblock %}
+
+{% block page_title %}Print this code{% endblock %}
+{% block page_sub %}{{ code.description }} · {{ code.location_name }}{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-codes' %}">All codes</a>
+  <button class="btn btn-pri" type="button" onclick="window.print()">Print</button>
+{% endblock %}
+
+{% comment %}
+The sheet that goes on the wall. Large QR, and the short code beneath it at a
+size that can be read across a room and typed one-handed — a camera that will
+not start in the rain is the normal case, not the exception.
+{% endcomment %}
+
+{% block content %}
+  <div class="card print-sheet" style="max-width:640px;margin:0 auto">
+    <div class="stack" style="align-items:center;text-align:center;gap:20px;padding:32px 24px">
+      <div>
+        <p class="t-label">A-1 Technical Engineering Solutions</p>
+        <p class="t-h20" style="margin-top:4px">Clock in and out here</p>
+      </div>
+
+      <img src="{% url 'hr-code-image' code.pk %}"
+           alt="QR code for {{ code.location_name }}"
+           width="280" height="280"
+           style="display:block;width:280px;height:280px;image-rendering:pixelated">
+
+      <div>
+        <p class="t-label">Or type this code</p>
+        <p class="mono" style="font-size:40px;font-weight:700;letter-spacing:.06em;line-height:1.1">
+          {{ code.short_code }}
+        </p>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:16px;width:100%">
+        <p class="t-body-b">{{ code.location_name }}</p>
+        <p class="t-small dim">{{ code.description }}</p>
+        <p class="t-small dim mono" style="margin-top:8px">
+          Stops working {{ code.expires_at|a1datetime }}
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card no-print" style="max-width:640px;margin:0 auto">
+    <div class="note">
+      Post this where the crew arrives, not where only a supervisor can reach
+      it. When it expires, print the replacement <em>before</em> the old one
+      stops working — an employee standing in front of a dead code cannot
+      clock in, and the correction that fixes it costs a supervisor more time
+      than the printing did.
+    </div>
+  </div>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  @media print {
+    /* One code per page, and nothing else on it. */
+    .a1-side, .a1-bar, .no-print, .msg { display: none !important; }
+    .a1-content { padding: 0; }
+    .print-sheet { border: none; box-shadow: none; max-width: none; }
+    @page { margin: 18mm; }
+  }
+</style>
+{% endblock %}

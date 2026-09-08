@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Attendance codes — A1 360{% endblock %}
+
+{% block page_title %}Attendance codes{% endblock %}
+{% block page_sub %}Printed and posted where crews clock · scanning one is what records an event{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Roll-call</a>
+  <a class="btn btn-pri" href="{% url 'hr-code-create' %}">New code</a>
+{% endblock %}
+
+{% block content %}
+  {% if expiring_soon %}
+    <div class="msg msg-warning">
+      {{ expiring_soon|length }} code{{ expiring_soon|pluralize }} expire{{ expiring_soon|pluralize:"s," }}
+      within two days. Print the replacement before the crew turns up to one that has stopped working.
+    </div>
+  {% endif %}
+
+  {% if live %}
+    <div class="card">
+      <div class="hd">
+        <b>In use</b>
+        <span class="meta">{{ live|length }} live</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:820px">
+          <thead>
+            <tr>
+              <th scope="col">Short code</th>
+              <th scope="col">What &amp; where</th>
+              <th scope="col">Expires</th>
+              <th scope="col" class="num">Scans</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for code in live %}
+              <tr>
+                <td><b class="mono" style="font-size:15px">{{ code.short_code }}</b></td>
+                <td>
+                  <div class="two">
+                    <b>{{ code.description }}</b>
+                    <span>{{ code.location_name }}</span>
+                  </div>
+                </td>
+                <td class="mono {% if code in expiring_soon %}warn{% endif %}">
+                  {{ code.expires_at|a1datetime }}
+                </td>
+                <td class="num">{{ code.scan_count }}</td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-code-print' code.pk %}">Print</a>
+                  <form method="post" action="{% url 'hr-code-revoke' code.pk %}" style="display:inline">
+                    {% csrf_token %}
+                    <button class="btn btn-gho btn-sm" style="color:var(--red)" type="submit">Withdraw</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        A code proves whoever clocked had it in front of them. It does not
+        prove they were on site — a photograph of a printed code works as well
+        as the paper until it expires. The GPS fix on each event and the scan
+        list here are what make misuse visible afterwards.
+      </div>
+    </div>
+  {% else %}
+    {% url 'hr-code-create' as create_url %}
+    {% include "shell/_empty.html" with icon="hr" heading="No codes in use" body="Nobody can clock in or out until there is a live code posted where they work. Create one for each location, print it, and stick it where the crew arrives." primary_label="Create the first code" primary_url=create_url %}
+  {% endif %}
+
+  {% if dead %}
+    <div class="card compact">
+      <div class="hd"><b>Withdrawn and expired</b><span class="meta">Kept for the record</span></div>
+      <div class="scroll-x">
+        <table style="min-width:760px">
+          <thead>
+            <tr>
+              <th scope="col">Short code</th>
+              <th scope="col">What &amp; where</th>
+              <th scope="col">State</th>
+              <th scope="col" class="num">Scans</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for code in dead %}
+              <tr style="background:var(--sunken)">
+                <td class="mono dim2">{{ code.short_code }}</td>
+                <td>{{ code.description }} · <span class="dim">{{ code.location_name }}</span></td>
+                <td>
+                  {% if code.status == "revoked" %}
+                    <span class="pill p-over"><i></i>Withdrawn {{ code.revoked_at|a1date }}</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Expired {{ code.expires_at|a1date }}</span>
+                  {% endif %}
+                </td>
+                <td class="num dim">{{ code.scan_count }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Dead codes are never deleted. The events recorded from them stay
+        readable, and so does what they were for.
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

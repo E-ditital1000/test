@@ -32,6 +32,51 @@ row that already exists instead of creating a second one.
 
     <div class="fgrid">
       <div class="fmain">
+    {% comment %}
+    A clock event needs the code posted where the crew works. Scanning the QR
+    opens this screen with the token on the query string; typing the short
+    code does the same thing, because a camera that will not start in the
+    rain is the normal case and not the exception.
+    {% endcomment %}
+    {% if scanned_code and scanned_status == "active" %}
+      <div class="mc ok">
+        <p class="t-label" style="color:var(--green)">Code recognised</p>
+        <p class="t-m-action">{{ scanned_code.location_name }}</p>
+        <p class="t-m-meta dim2">{{ scanned_code.description }} &middot; <span class="mono">{{ scanned_code.short_code }}</span></p>
+      </div>
+    {% elif scanned_code %}
+      <div class="mc warnbox">
+        <p class="t-label" style="color:var(--gold700)">
+          {% if scanned_status == "revoked" %}Code withdrawn{% else %}Code expired{% endif %}
+        </p>
+        <p class="t-m-meta" style="color:var(--text2)">
+          {{ scanned_code.location_name }} &middot; <span class="mono">{{ scanned_code.short_code }}</span>.
+          Ask HR for the current code at your location.
+        </p>
+      </div>
+    {% elif scanned_raw %}
+      <div class="mc warnbox">
+        <p class="t-label" style="color:var(--gold700)">Code not recognised</p>
+        <p class="t-m-meta" style="color:var(--text2)">
+          Check the short code printed under the QR, or ask HR for the current one.
+        </p>
+      </div>
+    {% endif %}
+
+    <div class="mc" style="gap:10px">
+      <p class="t-label">Attendance code</p>
+      <input type="text" id="code-input" inputmode="text" autocapitalize="characters"
+             autocomplete="off" spellcheck="false"
+             placeholder="Scan the QR, or type it"
+             aria-label="Attendance code from the poster at your location"
+             value="{% if scanned_code %}{{ scanned_code.short_code }}{% else %}{{ scanned_raw }}{% endif %}"
+             style="font-size:20px;letter-spacing:.06em;text-transform:uppercase">
+      <p class="t-m-meta dim">
+        Point your camera at the code on the wall, or type the short code
+        printed under it. You cannot clock without one.
+      </p>
+    </div>
+
     {% if open_since %}
       <div class="mc ok">
         <p class="t-label" style="color:var(--green)">Elapsed today</p>
@@ -174,14 +219,28 @@ row that already exists instead of creating a second one.
       event.preventDefault();
       var button = form.querySelector("button");
       var original = button.textContent;
+
+      var codeField = document.getElementById("code-input");
+      if (codeField && !codeField.value.trim()) {
+        // Say so here rather than queueing an event the server will refuse.
+        codeField.focus();
+        alert("Scan the attendance code at your location, or type the short "
+              + "code printed under it.");
+        return;
+      }
+
       button.disabled = true;
       button.textContent = "Saving…";
 
       A1.locate().then(function (fix) {
+        var codeField = document.getElementById("code-input");
         var item = {
           kind: form.dataset.kind,
           client_uuid: A1.uuid(),
-          device_timestamp: new Date().toISOString()
+          device_timestamp: new Date().toISOString(),
+          // Queued with the event, so a scan made with no signal still
+          // reaches the server with the code it was taken from.
+          code: codeField ? codeField.value.trim() : ""
         };
         if (fix.unavailable) {
           item.location_unavailable = "1";

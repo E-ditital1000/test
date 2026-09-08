@@ -132,7 +132,17 @@ def clock(request):
     protection rather than surveillance.
     """
     employee = Employee.objects.filter(user=request.user).select_related("user").first()
-    context = {"employee": employee, "tab_active": "clock"}
+
+    # A scan arrives as ?code=<token> from the QR on the wall. Resolve it so
+    # the screen can confirm which location it is for before anybody taps.
+    scanned = services.resolve_code(request.GET.get("code"))
+    context = {
+        "employee": employee,
+        "tab_active": "clock",
+        "scanned_code": scanned,
+        "scanned_status": scanned.status if scanned else None,
+        "scanned_raw": (request.GET.get("code") or "").strip(),
+    }
 
     if employee is not None:
         open_in = services.open_clock_in(employee)
@@ -196,6 +206,18 @@ def clock_event(request):
     except ValueError:
         accuracy = None
 
+    # The QR encodes the token; the wall also carries a short code to type
+    # when a camera will not start. Either resolves to the same record.
+    scanned = (request.POST.get("code") or "").strip()
+    attendance_code = services.resolve_code(scanned)
+    if scanned and attendance_code is None:
+        return answer(
+            False,
+            "That code was not recognised. Check the short code printed under "
+            "the QR, or ask HR for the current one.",
+            409,
+        )
+
     try:
         event, created = services.record_clock_event(
             employee=employee,
@@ -206,6 +228,7 @@ def clock_event(request):
             longitude=decimal_or_none("longitude"),
             accuracy_m=accuracy,
             location_unavailable=request.POST.get("location_unavailable") == "1",
+            attendance_code=attendance_code,
         )
     except services.ClockError as error:
         # An actionable error, not a stack trace: a clock-out with no open

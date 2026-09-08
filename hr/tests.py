@@ -16,7 +16,13 @@ from django.utils import timezone
 
 from config.models import CorrectionReason, PolicySetting
 
-from .models import AttendanceCorrection, AttendanceDay, AttendanceEvent, Employee
+from .models import (
+    AttendanceCode,
+    AttendanceCorrection,
+    AttendanceDay,
+    AttendanceEvent,
+    Employee,
+)
 from .services import rebuild_attendance_days
 
 User = get_user_model()
@@ -216,9 +222,16 @@ class ClockScreenTests(TestCase):
         self.employee = Employee.objects.create(
             user=self.worker, staff_id="A1-002", supervisor=self.sup_employee
         )
+        # Clocking needs the code posted where the crew works. These tests are
+        # about the clock rules, so they supply a good one and vary the rest.
+        self.code = AttendanceCode.objects.create(
+            description="Main office",
+            location_name="Ganta yard",
+            expires_at=timezone.now() + timedelta(days=28),
+        )
 
     def _post(self, kind, client_uuid, **extra):
-        payload = {"kind": kind, "client_uuid": client_uuid}
+        payload = {"kind": kind, "client_uuid": client_uuid, "code": self.code.short_code}
         payload.update(extra)
         return self.client.post(
             "/hr/clock/event/", payload, headers={"x-requested-with": "XMLHttpRequest"}
@@ -457,3 +470,219 @@ class AttendanceReachabilityTests(TestCase):
             response.status_code, 403,
             "reading a record must not carry the right to change it",
         )
+
+
+class AttendanceCodeTests(TestCase):
+    """
+    The codes HR prints and posts, and what a clock event does with one.
+
+    The claim being defended is narrow: a code proves whoever clocked had it
+    in front of them. These tests hold the edges of that claim — the expiry
+    is judged at the scan, withdrawal is immediate, and a used code cannot be
+    deleted out from under its events.
+    """
+
+    def setUp(self):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+
+        call_command("seed_permissions", verbosity=0)
+        PolicySetting.objects.create(key=PolicySetting.WORKDAY_START, value="08:00")
+        PolicySetting.objects.create(key=PolicySetting.LATE_AFTER_MINUTES, value="15")
+
+        self.hr_user = User.objects.create_user(
+            username="hr@test.local", email="hr@test.local", password="Testing!12345"
+        )
+        self.worker = User.objects.create_user(
+            username="emp@test.local", email="emp@test.local", password="Testing!12345"
+        )
+        for user, role in ((self.hr_user, "HR"), (self.worker, "Employee")):
+            user.must_reset_password = False
+            user.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=user, role=Role.objects.get(name=role))
+
+        self.employee = Employee.objects.create(user=self.worker, staff_id="A1-100")
+        self.code = AttendanceCode.objects.create(
+            description="Main office",
+            location_name="Ganta yard",
+            expires_at=timezone.now() + timedelta(days=28),
+        )
+
+    def _clock(self, kind="in", code=None, when=None, client_uuid=None):
+        payload = {
+            "kind": kind,
+            "client_uuid": client_uuid or str(uuid.uuid4()),
+            "location_unavailable": "1",
+        }
+        if code is not None:
+            payload["code"] = code
+        if when is not None:
+            payload["device_timestamp"] = when.isoformat()
+        return self.client.post(
+            "/hr/clock/event/", payload, headers={"x-requested-with": "XMLHttpRequest"}
+        )
+
+    # -- the code itself --------------------------------------------------
+
+    def test_a_short_code_avoids_characters_people_misread(self):
+        """It is typed off a wall, in the rain, on a phone keyboard."""
+        for _ in range(40):
+            short = AttendanceCode.new_short_code()
+            self.assertNotRegex(short, r"[O0I1]", f"{short} contains a look-alike")
+            self.assertRegex(short, r"^[A-Z2-9]{3}-[A-Z2-9]{3}$")
+
+    def test_short_codes_are_unique(self):
+        codes = {
+            AttendanceCode.objects.create(
+                description="d", location_name="l",
+                expires_at=timezone.now() + timedelta(days=1),
+            ).short_code
+            for _ in range(25)
+        }
+        self.assertEqual(len(codes), 25)
+
+    def test_withdrawal_beats_expiry(self):
+        """A code HR pulled is pulled, whatever the clock says."""
+        code = AttendanceCode.objects.create(
+            description="d", location_name="l",
+            expires_at=timezone.now() - timedelta(days=1),
+        )
+        code.revoked_at = timezone.now()
+        code.save(update_fields=["revoked_at"])
+        self.assertEqual(code.status, AttendanceCode.REVOKED)
+
+    # -- clocking ---------------------------------------------------------
+
+    @tag("acceptance")
+    def test_a_clock_event_without_a_code_is_refused(self):
+        self.client.force_login(self.worker)
+        response = self._clock()
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Scan the attendance code", response.json()["message"])
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def test_an_unknown_code_is_refused_and_says_what_to_do(self):
+        self.client.force_login(self.worker)
+        response = self._clock(code="ZZZ-999")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("not recognised", response.json()["message"])
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    @tag("acceptance")
+    def test_the_event_records_which_code_it_came_from(self):
+        self.client.force_login(self.worker)
+        self._clock(code=self.code.short_code)
+        event = AttendanceEvent.objects.get()
+        self.assertEqual(event.attendance_code, self.code)
+
+    def test_the_token_and_the_short_code_both_work_and_case_does_not_matter(self):
+        self.client.force_login(self.worker)
+        self.assertEqual(self._clock(code=self.code.short_code.lower()).status_code, 200)
+        self.assertEqual(
+            self._clock(kind="out", code=str(self.code.token)).status_code, 200
+        )
+        self.assertEqual(AttendanceEvent.objects.count(), 2)
+
+    # -- the offline edge, which is the point of judging at the scan ------
+
+    @tag("acceptance")
+    def test_an_event_scanned_before_expiry_is_accepted_when_it_syncs_after(self):
+        """
+        A phone with no signal reaches the server later. Refusing the event
+        because the code expired during the drive back would throw away a
+        real event that a real person really recorded.
+        """
+        code = AttendanceCode.objects.create(
+            description="Temporary", location_name="Site gate",
+            expires_at=timezone.now() - timedelta(hours=1),
+        )
+        self.client.force_login(self.worker)
+        scanned_at = timezone.now() - timedelta(hours=6)   # while it was live
+
+        response = self._clock(code=code.short_code, when=scanned_at)
+        self.assertEqual(response.status_code, 200, response.json())
+        self.assertEqual(AttendanceEvent.objects.count(), 1)
+
+    @tag("acceptance")
+    def test_an_event_scanned_after_expiry_is_refused(self):
+        code = AttendanceCode.objects.create(
+            description="Temporary", location_name="Site gate",
+            expires_at=timezone.now() - timedelta(hours=1),
+        )
+        self.client.force_login(self.worker)
+        response = self._clock(code=code.short_code)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("expired", response.json()["message"])
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    @tag("acceptance")
+    def test_a_withdrawn_code_stops_working_immediately(self):
+        self.client.force_login(self.hr_user)
+        self.client.post(f"/hr/codes/{self.code.pk}/revoke/", {"reason": "Photographed"})
+
+        self.client.force_login(self.worker)
+        response = self._clock(code=self.code.short_code)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("withdrawn", response.json()["message"])
+        self.assertEqual(AttendanceEvent.objects.count(), 0)
+
+    def test_revoking_is_written_to_the_audit_log(self):
+        from accounts.models import AuditEntry
+
+        self.client.force_login(self.hr_user)
+        self.client.post(f"/hr/codes/{self.code.pk}/revoke/", {"reason": "Photographed"})
+        entry = AuditEntry.objects.filter(action="attendance_code.revoked").latest("id")
+        self.assertEqual(entry.actor, self.hr_user)
+        self.assertEqual(entry.reason, "Photographed")
+
+    def test_a_used_code_cannot_be_deleted_out_from_under_its_events(self):
+        from django.db.models import ProtectedError
+
+        self.client.force_login(self.worker)
+        self._clock(code=self.code.short_code)
+        with self.assertRaises(ProtectedError):
+            self.code.delete()
+
+    # -- the screens ------------------------------------------------------
+
+    def test_only_the_code_permission_reaches_the_code_screens(self):
+        self.client.force_login(self.worker)
+        for path in ("/hr/codes/", "/hr/codes/new/", f"/hr/codes/{self.code.pk}/print/"):
+            self.assertEqual(self.client.get(path).status_code, 403, path)
+
+        self.client.force_login(self.hr_user)
+        for path in ("/hr/codes/", "/hr/codes/new/", f"/hr/codes/{self.code.pk}/print/"):
+            self.assertEqual(self.client.get(path).status_code, 200, path)
+
+    def test_the_printed_sheet_carries_the_qr_and_the_typed_code(self):
+        self.client.force_login(self.hr_user)
+        body = self.client.get(f"/hr/codes/{self.code.pk}/print/").content.decode()
+        self.assertIn(self.code.short_code, body)
+        self.assertIn(f"/hr/codes/{self.code.pk}/qr.png", body)
+        self.assertIn(self.code.location_name, body)
+
+    def test_the_qr_encodes_a_link_a_phone_camera_can_open(self):
+        self.client.force_login(self.hr_user)
+        response = self.client.get(f"/hr/codes/{self.code.pk}/qr.png")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertTrue(response.content.startswith(b"\x89PNG"))
+        # A revoked code must not sit in a proxy.
+        self.assertIn("no-store", response["Cache-Control"])
+
+    def test_scanning_opens_the_clock_with_the_location_confirmed(self):
+        self.client.force_login(self.worker)
+        body = self.client.get(f"/hr/clock/?code={self.code.token}").content.decode()
+        self.assertIn(self.code.location_name, body)
+        self.assertIn(self.code.short_code, body)
+
+    def test_an_expiry_in_the_past_is_refused_at_the_form(self):
+        from .forms import AttendanceCodeForm
+
+        form = AttendanceCodeForm({
+            "description": "d", "location_name": "l",
+            "expires_at": (timezone.now() - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M"),
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("expires_at", form.errors)

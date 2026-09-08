@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}New attendance code — A1 360{% endblock %}
+
+{% block page_title %}New attendance code{% endblock %}
+{% block page_sub %}Printed and posted where a crew clocks{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        A code proves whoever clocked had it in front of them &mdash; not that
+        they were on site. A photograph of a printed code works as well as the
+        paper does, which is why the expiry is required rather than optional:
+        it is the only thing that limits one that has leaked. Keep it short and
+        reprint.
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="{% url 'hr-codes' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Create and print</button>
+    </div>
+  </form>
+{% endblock %}
