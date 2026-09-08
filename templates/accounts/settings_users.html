@@ -67,6 +67,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=users noun="user" plural="users" %}
     </div>
   {% elif query %}
     {% url 'settings-users' as clear_url %}

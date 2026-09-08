@@ -46,6 +46,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=entries noun="entry" plural="entries" %}
     </div>
   {% elif query %}
     {% url 'settings-audit-log' as clear_url %}

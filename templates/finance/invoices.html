@@ -76,6 +76,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=invoices noun="invoice" plural="invoices" %}
       <div class="note">
         No total on this screen is stored. Each is summed from the invoice
         lines and the payments recorded against them, so every figure traces

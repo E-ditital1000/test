@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 from config.models import StatusOption
 from config.references import next_reference
@@ -58,7 +59,7 @@ def customers(request):
         request,
         "crm/customers.html",
         {
-            "customers": register,
+            "customers": paginate(request, register),
             "query": query,
             "show_inactive": show_inactive,
             "total_customers": Customer.objects.count(),
@@ -200,7 +201,7 @@ def tickets(request):
         request,
         "crm/tickets.html",
         {
-            "tickets": rows.order_by("-created_at"),
+            "tickets": paginate(request, rows.order_by("-created_at")),
             "query": query,
             "active_filter": active_filter,
             "active_filter_label": FILTERS[active_filter],

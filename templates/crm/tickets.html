@@ -30,7 +30,7 @@
   {% if tickets %}
     <div class="card">
       <div class="scroll-x">
-        <table style="min-width:960px">
+        <table style="min-width:860px">
           <thead>
             <tr>
               <th scope="col">Ticket</th>
@@ -47,7 +47,7 @@
                 <td>
                   <a href="{% url 'crm-ticket-detail' ticket.pk %}" class="two" style="text-decoration:none">
                     <b class="mono">{{ ticket.reference }}</b>
-                    <span>{{ ticket.description|truncatechars:52 }}</span>
+                    <span>{{ ticket.description|truncatechars:40 }}</span>
                   </a>
                 </td>
                 <td>
@@ -67,7 +67,7 @@
                       {% csrf_token %}
                       <input type="hidden" name="next" value="{{ request.get_full_path }}">
                       <select name="assigned_to" aria-label="Assign {{ ticket.reference }}"
-                              style="min-height:36px;max-width:170px;font-size:13px">
+                              style="min-height:36px;max-width:132px;font-size:13px">
                         <option value="">Assign to…</option>
                         {% for choice in assign_form.assigned_to.field.queryset %}
                           <option value="{{ choice.pk }}">{{ choice.get_full_name|default:choice.email }}</option>
@@ -96,6 +96,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=tickets noun="ticket" plural="tickets" %}
     </div>
   {% elif query or active_filter != "all" %}
     {% url 'crm-tickets' as clear_url %}

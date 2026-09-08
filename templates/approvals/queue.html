@@ -3,7 +3,7 @@
 {% block title %}Assessment review — A1 360{% endblock %}
 
 {% block page_title %}Assessment review{% endblock %}
-{% block page_sub %}{{ waiting|length }} waiting · oldest first, so the longest-blocked job is always on top{% endblock %}
+{% block page_sub %}{{ waiting.paginator.count }} waiting · oldest first, so the longest-blocked job is always on top{% endblock %}
 
 {% block content %}
   {% if waiting %}
@@ -31,6 +31,7 @@
           </a>
         </div>
       {% endfor %}
+      {% include "shell/_pager.html" with page=waiting noun="assessment" plural="assessments" %}
     </div>
   {% else %}
     {% include "shell/_empty.html" with icon="field" heading="Nothing waiting on you" body="Every assessment your crews have submitted has been dealt with. New ones appear here the moment a technician's phone syncs — including work they filled in with no signal earlier in the day." %}

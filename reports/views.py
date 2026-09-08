@@ -20,6 +20,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 
 from .reports import REPORTS, available_to, compute_totals
@@ -65,7 +66,9 @@ def index(request, key=None):
         {
             "reports": reachable,
             "report": report,
-            "rows": rows,
+            # The table is paged; the totals are not. They are summed from
+            # every row the report produced, so page 2 does not change them.
+            "rows": paginate(request, rows),
             "totals": totals,
             "year": year,
             "month": month,

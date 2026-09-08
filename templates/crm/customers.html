@@ -67,6 +67,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=customers noun="customer" plural="customers" %}
     </div>
   {% elif query or show_inactive %}
     {% url 'crm-customers' as clear_url %}

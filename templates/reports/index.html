@@ -58,7 +58,7 @@
           <div class="hd">
             <b>{{ report.label }}</b>
             <span class="meta">
-              {{ rows|length }} row{{ rows|length|pluralize }}
+              {{ rows.paginator.count }} row{{ rows.paginator.count|pluralize }}
               {% if report.period %} · {{ report.label }} for {{ month }}/{{ year }}{% endif %}
             </span>
           </div>
@@ -110,6 +110,7 @@
                 {% endif %}
               </table>
             </div>
+            {% include "shell/_pager.html" with page=rows noun="row" plural="rows" %}
             <div class="note">
               {{ report.description }} The totals are summed from the rows above,
               not queried separately — so this report cannot disagree with itself.

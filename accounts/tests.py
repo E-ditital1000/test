@@ -6,6 +6,7 @@ every gated endpoint and is correctly allowed or refused, and a custom role
 created at runtime reaches exactly the endpoints it was granted and no
 others. The guard rails from section 5 are tested alongside them.
 """
+import re
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
@@ -728,4 +729,120 @@ class TemplateInheritanceTests(TestCase):
             {},
             "These blocks are declared but never rendered: "
             + "; ".join(f"{page}: {', '.join(names)}" for page, names in orphans.items()),
+        )
+
+
+class PaginationTests(TestCase):
+    """
+    Every list that can grow is paged, and the pager tells the truth.
+
+    Before this, several lists were capped with a slice — `entries[:300]` —
+    which looks like paging and is not: the rows past the cap were simply
+    unreachable and nothing on the screen said so.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from config.models import ServiceType, StatusOption
+        from crm.models import Customer, Ticket
+
+        call_command("seed_permissions", verbosity=0)
+        cls.admin = make_user("admin@test.local", ["Admin"])
+
+        service_type = ServiceType.objects.create(code="solar", name="Solar")
+        status = StatusOption.objects.create(
+            kind=StatusOption.TICKET, code="new", label="New", is_default=True
+        )
+        customer = Customer.objects.create(name="Ducor Hotel")
+        # Two pages and a bit, so first, middle and last all differ.
+        for index in range(55):
+            Ticket.objects.create(
+                reference=f"TKT-{index:04d}", customer=customer,
+                service_type=service_type, status=status,
+                description=f"Row {index}", raised_by=cls.admin,
+            )
+
+    def _showing(self, response):
+        import re
+
+        match = re.search(r"Showing\s+([\d]+)–([\d]+)\s+of\s+(\d+)", response.content.decode())
+        return tuple(int(g) for g in match.groups()) if match else None
+
+    def test_a_long_list_is_paged_rather_than_dumped(self):
+        from config.pagination import PER_PAGE
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("crm-tickets"))
+        self.assertEqual(self._showing(response), (1, PER_PAGE, 55))
+
+    def test_the_total_is_the_whole_list_not_the_page(self):
+        """A range without a total tells a reader nothing about what is left."""
+        self.client.force_login(self.admin)
+        first, last, total = self._showing(self.client.get(reverse("crm-tickets")))
+        self.assertEqual(total, 55)
+        self.assertLess(last, total)
+
+    def test_later_pages_show_the_rows_the_first_page_did_not(self):
+        self.client.force_login(self.admin)
+        page_one = self.client.get(reverse("crm-tickets"))
+        page_two = self.client.get(reverse("crm-tickets"), {"page": 2})
+        self.assertEqual(self._showing(page_two)[0], self._showing(page_one)[1] + 1)
+
+        refs_one = set(re.findall(r"TKT-\d{4}", page_one.content.decode()))
+        refs_two = set(re.findall(r"TKT-\d{4}", page_two.content.decode()))
+        self.assertTrue(refs_one and refs_two)
+        self.assertEqual(refs_one & refs_two, set(), "pages must not repeat rows")
+
+    def test_a_bad_page_number_still_shows_the_list(self):
+        """
+        A stale bookmark or a hand-typed URL should show rows, not a 404.
+        """
+        self.client.force_login(self.admin)
+        for value in ("abc", "0", "-3", ""):
+            with self.subTest(page=value):
+                response = self.client.get(reverse("crm-tickets"), {"page": value})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(self._showing(response)[0], 1)
+
+        over = self.client.get(reverse("crm-tickets"), {"page": 999})
+        self.assertEqual(over.status_code, 200)
+        # Past the end lands on the last page, which is where the rows are.
+        self.assertEqual(self._showing(over)[1], 55)
+
+    def test_a_filter_survives_the_click_to_page_two(self):
+        """
+        A pager that drops the search sends the reader back to the top of an
+        unfiltered list, which is worse than no pager.
+        """
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("crm-tickets"), {"q": "Row"})
+        body = response.content.decode()
+        self.assertIn("q=Row", body, "the pager link must carry the search term")
+
+        second = self.client.get(reverse("crm-tickets"), {"q": "Row", "page": 2})
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(self._showing(second)[2], 55)
+
+    def test_no_list_view_silently_truncates_with_a_slice(self):
+        """
+        A slice on a list a user is meant to work through hides rows with no
+        way to reach them. Paging is the honest version of that cap.
+        """
+        import pathlib
+        import re as _re
+
+        offenders = []
+        for module in pathlib.Path(".").glob("*/views.py"):
+            source = module.read_text(encoding="utf-8")
+            for name, slice_expr in _re.findall(
+                r'"(\w+)":\s*([\w.]+\[:\d+\])', source
+            ):
+                # Capped glances are fine when the screen says so; these are
+                # the ones a reader is meant to work through.
+                if name in {"tickets", "customers", "projects", "employees",
+                            "users", "entries", "invoices", "expenses", "rows"}:
+                    offenders.append(f"{module.as_posix()}: {name} = {slice_expr}")
+
+        self.assertEqual(
+            offenders, [], "These lists are truncated rather than paged: " + "; ".join(offenders)
         )

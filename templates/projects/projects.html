@@ -69,6 +69,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=projects noun="project" plural="projects" %}
     </div>
   {% elif query or stage %}
     {% url 'projects-list' as clear_url %}

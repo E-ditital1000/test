@@ -16,6 +16,7 @@ from django.db import transaction
 from django.db.models import F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 from fieldjobs.models import Assessment
@@ -59,7 +60,9 @@ def queue(request):
         request,
         "approvals/queue.html",
         {
-            "waiting": waiting,
+            "waiting": paginate(request, waiting),
+            # Recently decided is a glance, not a list to work through, so it
+            # stays capped rather than paged -- and says so on the screen.
             "decided": decided[:20],
             "can_decide": user_has_permission(request.user, "approve_assessment"),
         },

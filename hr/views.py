@@ -20,6 +20,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 
 from accounts import audit
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
@@ -61,7 +62,7 @@ def employees(request):
         request,
         "hr/employees.html",
         {
-            "employees": register,
+            "employees": paginate(request, register),
             "query": query,
             "show_inactive": show_inactive,
             "total_employees": Employee.objects.count(),

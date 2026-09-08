@@ -1,0 +1,40 @@
+{% comment %}
+The footer of a paged list, as the design specification draws it: the range
+and the total on the left, the two controls on the right.
+
+The total is the point. "Showing 1–25" alone tells a reader nothing about
+whether they have seen the list; "of 312" tells them they have not, and how
+far off they are.
+
+Params: page (a Django Page from config.pagination.paginate), noun, plural
+{% endcomment %}
+{% if page.paginator.count %}
+  <div class="row-i foot">
+    <span class="g dim t-small">
+      Showing {{ page.start_index }}–{{ page.end_index }}
+      of {{ page.paginator.count }}
+      {% if page.paginator.count == 1 %}{{ noun|default:"row" }}{% else %}{{ plural|default:"rows" }}{% endif %}
+      {% if page.paginator.num_pages > 1 %}
+        · page {{ page.number }} of {{ page.paginator.num_pages }}
+      {% endif %}
+    </span>
+
+    {% if page.paginator.num_pages > 1 %}
+      {% comment %}
+      Absent rather than disabled at the ends: there is no condition under
+      which "Previous" on page one becomes usable, and a dead control is
+      just something to click at.
+      {% endcomment %}
+      {% if page.has_previous %}
+        <a class="btn btn-sec btn-sm"
+           href="?{% if page.base_query %}{{ page.base_query }}&amp;{% endif %}{{ page.param }}={{ page.previous_page_number }}"
+           rel="prev">Previous</a>
+      {% endif %}
+      {% if page.has_next %}
+        <a class="btn btn-sec btn-sm"
+           href="?{% if page.base_query %}{{ page.base_query }}&amp;{% endif %}{{ page.param }}={{ page.next_page_number }}"
+           rel="next">Next</a>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endif %}

@@ -21,7 +21,7 @@
     <div class="card">
       <div class="hd">
         <b>In use</b>
-        <span class="meta">{{ live|length }} live</span>
+        <span class="meta">{{ live.paginator.count }} live</span>
       </div>
       <div class="scroll-x">
         <table style="min-width:820px">
@@ -60,6 +60,7 @@
           </tbody>
         </table>
       </div>
+      {% include "shell/_pager.html" with page=live noun="code" plural="codes" %}
       <div class="note">
         A code proves whoever clocked had it in front of them. It does not
         prove they were on site — a photograph of a printed code works as well

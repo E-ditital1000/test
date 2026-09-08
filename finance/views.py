@@ -18,6 +18,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 from approvals.models import Approval, latest_decisions
 from config.models import PolicySetting
@@ -58,7 +59,7 @@ def invoices(request):
         request,
         "finance/invoices.html",
         {
-            "invoices": rows,
+            "invoices": paginate(request, rows),
             "query": query,
             "outstanding": outstanding,
             "overdue_total": sum((i.outstanding for i in overdue), Decimal("0")),
@@ -209,7 +210,7 @@ def expenses(request):
         request,
         "finance/expenses.html",
         {
-            "expenses": rows,
+            "expenses": paginate(request, rows),
             "query": query,
             "total": sum((e.amount for e in rows), Decimal("0")),
             "this_month": sum(

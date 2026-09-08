@@ -22,6 +22,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
+from config.pagination import paginate
+
 from . import audit, services
 from .decorators import require_permission
 from .forms import (
@@ -184,7 +186,7 @@ def settings_users(request):
         request,
         "accounts/settings_users.html",
         {
-            "users": users,
+            "users": paginate(request, users),
             "query": query,
             "roles": Role.objects.all(),
             # "Nothing matches" must say how many records exist in total,
@@ -354,7 +356,9 @@ def audit_log(request):
         request,
         "accounts/audit_log.html",
         {
-            "entries": entries[:300],
+            # Was a [:300] slice, which hid everything past it with no
+            # way to reach it. The log is the one place that must not do that.
+            "entries": paginate(request, entries),
             "query": query,
             "total_entries": AuditEntry.objects.count(),
         },

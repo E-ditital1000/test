@@ -23,6 +23,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts import audit
+from config.pagination import paginate
 from accounts.decorators import require_permission
 
 from .forms import AttendanceCodeForm
@@ -50,7 +51,7 @@ def codes(request):
         request,
         "hr/codes.html",
         {
-            "live": live,
+            "live": paginate(request, live),
             "dead": dead[:25],
             "expiring_soon": [c for c in live if c.expires_at <= soon],
             "form": AttendanceCodeForm(),

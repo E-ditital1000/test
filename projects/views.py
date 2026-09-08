@@ -16,6 +16,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from config.pagination import paginate
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
@@ -62,7 +63,7 @@ def project_list(request):
         request,
         "projects/projects.html",
         {
-            "projects": rows.order_by("-created_at"),
+            "projects": paginate(request, rows.order_by("-created_at")),
             "query": query,
             "stage": stage,
             "stages": Project.STAGES,
