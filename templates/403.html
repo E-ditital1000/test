@@ -15,13 +15,16 @@ alternative is a support call.
 {% block page_sub %}The server refused this request{% endblock %}
 
 {% block content %}
-  {% url 'dashboard-index' as back %}
-  {% include "shell/_deny.html" with permission_label=missing_permission role_name=role_names back_url=back back_label="Back to dashboard" %}
-{% endblock %}
-
-{% comment %} A signed-out visitor reaching a refusal gets the same explanation rather
-   than the shell's empty anonymous branch. {% endcomment %}
-{% block anon_content %}
-  {% url 'login' as back %}
-  {% include "shell/_deny.html" with heading="You need to sign in" permission_label="an account with the right role" back_url=back back_label="Go to sign in" %}
+  {% comment %}
+  Both cases in one block. The shell always renders signed-in chrome now, so
+  a separate anonymous block would render nowhere — which is exactly what it
+  was doing.
+  {% endcomment %}
+  {% if user.is_authenticated %}
+    {% url 'dashboard-index' as back %}
+    {% include "shell/_deny.html" with permission_label=missing_permission role_name=role_names back_url=back back_label="Back to dashboard" %}
+  {% else %}
+    {% url 'login' as back %}
+    {% include "shell/_deny.html" with heading="You need to sign in" permission_label="an account with the right role" back_url=back back_label="Go to sign in" %}
+  {% endif %}
 {% endblock %}

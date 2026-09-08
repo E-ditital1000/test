@@ -1,4 +1,4 @@
-{% extends "shell/field.html" %}
+{% extends "base.html" %}
 {% load a1 %}
 {% block title %}{{ job.reference }} — A1 360{% endblock %}
 
@@ -12,10 +12,10 @@ Arrivals are shown against each person rather than as a separate list. Who is
 on the crew and who has turned up is one question asked twice.
 {% endcomment %}
 
-{% block phone_title %}{{ job.reference }}{% endblock %}
-{% block phone_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
+{% block page_title %}{{ job.reference }}{% endblock %}
+{% block page_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
 
-{% block phone_actions %}
+{% block page_actions %}
   <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
 {% endblock %}
 
@@ -100,7 +100,7 @@ on the crew and who has turned up is one question asked twice.
         <a class="act act-gold" href="{% url 'fieldjobs-assessment' job.pk %}">Start the site assessment</a>
         <p class="t-m-meta dim">
           The questions come from the service type. You can fill this in with no
-          signal — it saves on the phone and uploads by itself.
+          signal — it saves on the device and uploads by itself.
         </p>
       {% elif not is_lead %}
         <div class="mc" style="gap:6px">

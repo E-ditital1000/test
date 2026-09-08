@@ -663,3 +663,69 @@ class NavigationLandsSomewhereAllowedTests(TestCase):
                         f"the shell offers {role_name} '{item.label}' -> "
                         f"{item.url_name}, and that page refuses them",
                     )
+
+
+class TemplateInheritanceTests(TestCase):
+    """
+    A block a page declares that no shell above it renders is dead markup:
+    it costs nothing to write, produces no error, and simply never appears.
+
+    That is how the field screens lost their title bars and their back button
+    when they moved from the phone shell to the office one — the block names
+    changed and nothing said so.
+    """
+
+    SHELLS = {"base.html", "shell/_document.html"}
+
+    @staticmethod
+    def _read(path):
+        import io as _io
+
+        return _io.open(path, encoding="utf-8").read()
+
+    @classmethod
+    def _blocks(cls, path):
+        import re
+
+        return set(re.findall(r"\{%\s*block\s+(\w+)", cls._read(path)))
+
+    @classmethod
+    def _extends(cls, path):
+        import re
+
+        match = re.search(r'\{%\s*extends\s+"([^"]+)"', cls._read(path))
+        return match.group(1) if match else None
+
+    def test_every_block_a_page_declares_is_rendered_by_its_shell(self):
+        import pathlib
+
+        root = pathlib.Path("templates")
+        defined = {t.relative_to(root).as_posix(): self._blocks(t) for t in root.rglob("*.html")}
+
+        orphans = {}
+        for template in sorted(root.rglob("*.html")):
+            name = template.relative_to(root).as_posix()
+            # A shell declares blocks for its children rather than filling
+            # them, so it is exempt from its own rule.
+            if name in self.SHELLS:
+                continue
+            parent = self._extends(template)
+            if parent is None:
+                continue
+
+            available, seen, cursor = set(), set(), parent
+            while cursor and cursor in defined and cursor not in seen:
+                seen.add(cursor)
+                available |= defined[cursor]
+                cursor = self._extends(root / cursor)
+
+            missing = self._blocks(template) - available
+            if missing:
+                orphans[name] = sorted(missing)
+
+        self.assertEqual(
+            orphans,
+            {},
+            "These blocks are declared but never rendered: "
+            + "; ".join(f"{page}: {', '.join(names)}" for page, names in orphans.items()),
+        )

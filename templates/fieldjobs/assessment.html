@@ -1,4 +1,4 @@
-{% extends "shell/field.html" %}
+{% extends "base.html" %}
 {% load a1 %}
 {% block title %}Site assessment — A1 360{% endblock %}
 
@@ -7,7 +7,7 @@ The one screen with NO tab bar. A multi-step form holding unsaved local
 answers must not offer a one-tap exit — progress and Back are the only
 navigation.
 
-Everything is filled in on the device. Answers persist to this phone as they
+Everything is filled in on the device. Answers persist to it as they
 are typed, so closing the app or losing power does not lose the work, and the
 whole assessment reaches the server as one payload carrying the UUID it was
 created with. Submitting twice cannot create two records.
@@ -15,8 +15,8 @@ created with. Submitting twice cannot create two records.
 
 {% block tabs %}{% endblock %}
 
-{% block phone_title %}Site assessment{% endblock %}
-{% block phone_sub %}{{ job.reference }} · questions come from {{ job.service_type.name }}{% endblock %}
+{% block page_title %}Site assessment{% endblock %}
+{% block page_sub %}{{ job.reference }} · questions come from {{ job.service_type.name }}{% endblock %}
 
 {% block content %}
   {% if already_submitted %}
@@ -41,7 +41,7 @@ created with. Submitting twice cannot create two records.
 
   {% else %}
     <div class="ban" id="offline-banner" hidden>
-      <i></i><span id="offline-text">No signal · answers are saved on this phone</span>
+      <i></i><span id="offline-text">No signal · answers are saved on this device</span>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:8px">
@@ -123,7 +123,7 @@ created with. Submitting twice cannot create two records.
           <textarea id="a-notes" rows="3" placeholder="Anything the office should know"></textarea>
         </div>
         <div class="mc warnbox">
-          <p class="t-label" style="color:var(--gold700)">Saved on this phone</p>
+          <p class="t-label" style="color:var(--gold700)">Saved on this device</p>
           <p class="t-m-meta" style="color:var(--text2)">
             It uploads by itself when signal returns. Submitting twice cannot
             create two records — each submission carries its own ID.
@@ -270,7 +270,7 @@ created with. Submitting twice cannot create two records.
       });
       return persist();
     }).then(paintPhotos).catch(function () {
-      alert("That photograph could not be saved on this phone. Try taking a smaller one.");
+      alert("That photograph could not be saved on this device. Try a smaller one.");
     });
     event.target.value = "";
   });
@@ -344,7 +344,7 @@ created with. Submitting twice cannot create two records.
         return true;
       });
     }).catch(function () {
-      banner("No signal · saved on this phone, it will upload by itself", true);
+      banner("No signal · saved on this device, it will upload by itself", true);
       return false;
     });
   }
@@ -391,7 +391,7 @@ created with. Submitting twice cannot create two records.
     if (draft.notes) document.getElementById("a-notes").value = draft.notes;
     paintPhotos();
     show(0);
-    if (!navigator.onLine) banner("No signal · answers are saved on this phone", true);
+    if (!navigator.onLine) banner("No signal · answers are saved on this device", true);
     // Reopened after submitting with no signal? Finish the job.
     if (draft.device_timestamp) push();
   });

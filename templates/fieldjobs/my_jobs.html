@@ -1,4 +1,5 @@
-{% extends "shell/field.html" %}
+{% extends "base.html" %}
+
 {% load a1 %}
 {% block title %}Today&rsquo;s jobs — A1 360{% endblock %}
 
@@ -17,8 +18,8 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
 901px, so on a phone this renders exactly the flat stack it always did.
 {% endcomment %}
 
-{% block phone_title %}Today · {{ today|a1date }}{% endblock %}
-{% block phone_sub %}{{ user.get_full_name|default:user.email }} · Technician{% endblock %}
+{% block page_title %}Today · {{ today|a1date }}{% endblock %}
+{% block page_sub %}{{ user.get_full_name|default:user.email }} · Technician{% endblock %}
 
 {% block content %}
   {% comment %} With nothing in the rail the grid would leave an empty column
@@ -73,7 +74,7 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
         <div class="mc ok">
           <p class="t-label" style="color:var(--green)">All done</p>
           <p class="t-m-action">Every job today is finished</p>
-          <p class="t-m-meta dim2">{{ done_today|length }} completed. Anything still waiting to upload shows on the Sync tab.</p>
+          <p class="t-m-meta dim2">{{ done_today|length }} completed. Anything still waiting to upload shows under Sync.</p>
         </div>
         <div class="fcards">
           {% for job in done_today %}

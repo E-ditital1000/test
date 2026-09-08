@@ -1,4 +1,4 @@
-{% extends "shell/field.html" %}
+{% extends "base.html" %}
 {% load a1 %}
 {% block title %}Clock — A1 360{% endblock %}
 
@@ -12,8 +12,8 @@ it was created with, so re-sending after a dropped connection resolves to the
 row that already exists instead of creating a second one.
 {% endcomment %}
 
-{% block phone_title %}{% a1greeting %}, {{ user.first_name|default:user.email }}{% endblock %}
-{% block phone_sub %}
+{% block page_title %}{% a1greeting %}, {{ user.first_name|default:user.email }}{% endblock %}
+{% block page_sub %}
   {% if employee %}{{ employee.staff_id }} · {{ employee.department|default:"A-1 Technical" }}{% else %}A-1 Technical{% endif %}
 {% endblock %}
 
@@ -27,24 +27,24 @@ row that already exists instead of creating a second one.
     901px the record moves alongside the button instead of below it.
     {% endcomment %}
     <div class="ban" id="queue-banner" hidden>
-      <i></i><span id="queue-text">Saved on this phone</span>
+      <i></i><span id="queue-text">Saved on this device</span>
     </div>
 
     <div class="fgrid">
       <div class="fmain">
-    {% comment %}
-    A clock event needs the code posted where the crew works. Scanning the QR
-    opens this screen with the token on the query string; typing the short
-    code does the same thing, because a camera that will not start in the
-    rain is the normal case and not the exception.
-    {% endcomment %}
-    {% if scanned_code and scanned_status == "active" %}
+      {% comment %}
+      A clock event needs the code posted where the crew works. Scanning the QR
+      opens this screen with the token on the query string; typing the short
+      code does the same thing, because a camera that will not start in the
+      rain is the normal case and not the exception.
+      {% endcomment %}
+      {% if scanned_code and scanned_status == "active" %}
       <div class="mc ok">
         <p class="t-label" style="color:var(--green)">Code recognised</p>
         <p class="t-m-action">{{ scanned_code.location_name }}</p>
         <p class="t-m-meta dim2">{{ scanned_code.description }} &middot; <span class="mono">{{ scanned_code.short_code }}</span></p>
       </div>
-    {% elif scanned_code %}
+      {% elif scanned_code %}
       <div class="mc warnbox">
         <p class="t-label" style="color:var(--gold700)">
           {% if scanned_status == "revoked" %}Code withdrawn{% else %}Code expired{% endif %}
@@ -54,16 +54,16 @@ row that already exists instead of creating a second one.
           Ask HR for the current code at your location.
         </p>
       </div>
-    {% elif scanned_raw %}
+      {% elif scanned_raw %}
       <div class="mc warnbox">
         <p class="t-label" style="color:var(--gold700)">Code not recognised</p>
         <p class="t-m-meta" style="color:var(--text2)">
           Check the short code printed under the QR, or ask HR for the current one.
         </p>
       </div>
-    {% endif %}
+      {% endif %}
 
-    <div class="mc" style="gap:10px">
+      <div class="mc" style="gap:10px">
       <p class="t-label">Attendance code</p>
       <input type="text" id="code-input" inputmode="text" autocapitalize="characters"
              autocomplete="off" spellcheck="false"
@@ -75,9 +75,9 @@ row that already exists instead of creating a second one.
         Point your camera at the code on the wall, or type the short code
         printed under it. You cannot clock without one.
       </p>
-    </div>
+      </div>
 
-    {% if open_since %}
+      {% if open_since %}
       <div class="mc ok">
         <p class="t-label" style="color:var(--green)">Elapsed today</p>
         <p class="big" id="elapsed" data-since="{{ open_since|date:'c' }}">{{ elapsed_minutes|a1hours }}</p>
@@ -106,7 +106,7 @@ row that already exists instead of creating a second one.
           {% endif %}
         </p>
         <p class="t-m-meta dim">
-          Two taps. GPS is captured at the moment you tap, never continuously —
+          Two taps. GPS is captured at the moment you clock, never continuously —
           and if no fix arrives the clock still records.
         </p>
       </div>
@@ -172,7 +172,7 @@ row that already exists instead of creating a second one.
       banner.hidden = false;
       document.getElementById("queue-text").textContent =
         queue.length + " event" + (queue.length === 1 ? "" : "s") +
-        " saved on this phone · will upload when there is signal";
+        " saved on this device · will upload when there is signal";
     } else {
       banner.hidden = true;
     }

@@ -825,11 +825,14 @@ input[type=checkbox], input[type=radio] {
 
 /* Mobile bottom tabs — generated from permissions, exactly like the sidebar.
    An Employee who only clocks in gets two tabs, not four with two greyed out. */
+/* The phone's navigation. The sidebar does this job above 900px, so the bar
+   is hidden there rather than being two navigations arguing on one screen. */
 .a1-tabs {
   margin-top: auto; position: sticky; bottom: 0; flex: none; background: var(--navy);
-  border-top: 1px solid var(--navy600); display: flex; padding: 8px 6px 22px;
+  border-top: 1px solid var(--navy600); display: none; padding: 8px 6px 22px;
   --icon-cut: var(--navy);
 }
+@media (max-width: 900px) { .a1-tabs { display: flex; } }
 .a1-tab {
   flex: 1; min-width: 0; min-height: 56px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 4px; border-radius: 12px;
@@ -919,32 +922,7 @@ input[type=checkbox], input[type=radio] {
 @media (min-width: 901px) {
   body.is-field { background: var(--page); }
 
-  /* --- the top bar -----------------------------------------------------
-     The tab bar is last in the document so that a phone gets it under the
-     thumb and a screen reader meets the page before the navigation.
-     `order` lifts it to the top of the screen without moving it in the
-     document, so both of those stay true. */
-  body.is-field .a1-tabs {
-    order: -1; position: sticky; top: 0; z-index: 30;
-    margin-top: 0; height: 62px; padding: 0 var(--pad-x);
-    align-items: center; gap: 4px;
-    border-top: none; border-bottom: 1px solid var(--navy600);
-  }
-  body.is-field .a1-tab {
-    flex: none; flex-direction: row; gap: 9px;
-    min-height: 40px; padding: 0 15px; border-radius: 999px;
-  }
-  body.is-field .a1-tab svg { width: 18px; height: 18px; }
-  body.is-field .a1-tab span { font-size: 13px; line-height: 18px; }
-  body.is-field .a1-badge {
-    position: static; top: auto; left: auto; margin-left: 2px; border: none;
-  }
 
-  .ftop-brand {
-    display: flex; align-items: center; gap: 10px; flex: none;
-    margin-right: 20px; text-decoration: none;
-  }
-  .ftop-brand img { width: 30px; height: 30px; border-radius: 8px; display: block; }
   .ftop-brand b {
     display: block; font-size: 15px; line-height: 18px; color: #fff; letter-spacing: -.2px;
   }
@@ -1003,7 +981,7 @@ input[type=checkbox], input[type=radio] {
 
   /* A 64 px control spanning a desk monitor is not a bigger target, it is a
      stretched one. Here the primary action sizes to its own label. */
-  body.is-field .act {
+  .a1-content .act {
     width: auto; align-self: flex-start;
     min-height: 46px; padding: 0 26px; font-size: 16px;
   }
@@ -1018,7 +996,7 @@ input[type=checkbox], input[type=radio] {
      implicit. Two flex children cannot be got wrong that way. */
   .fhero { flex-direction: row; align-items: center; gap: 28px; padding: 22px 24px; }
   .fhero-t { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 0; }
-  body.is-field .fhero .act { flex: none; align-self: center; }
+  .a1-content .fhero .act { flex: none; align-self: center; }
 
   .fempty { padding: 56px 8px; }
   .fempty-in .t-m-meta { max-width: 42ch; }
@@ -1034,8 +1012,8 @@ input[type=checkbox], input[type=radio] {
     gap: 14px; align-items: start;
   }
   .a-step > .t-label { grid-column: 1 / -1; }
-  body.is-field .mrow2 { grid-template-columns: auto auto; justify-content: flex-end; gap: 12px; }
-  body.is-field .mrow2 .btn { min-width: 140px; }
+  .a1-content .mrow2 { grid-template-columns: auto auto; justify-content: flex-end; gap: 12px; }
+  .a1-content .mrow2 .btn { min-width: 140px; }
 }
 
 /* Between the phone and a real desktop -- a small laptop, a tablet held
