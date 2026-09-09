@@ -8,6 +8,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, time, timedelta
 
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 
@@ -390,3 +391,84 @@ def monthly_summary(year, month, team=None):
         )
     rows.sort(key=lambda row: row["employee"].staff_id)
     return {"first": first, "last": last, "rows": rows}
+
+
+# --------------------------------------------------------------------------
+# Taking somebody on
+# --------------------------------------------------------------------------
+
+@transaction.atomic
+def onboard_employee(*, actor, data, roles):
+    """
+    Create the person, their sign-in and their access in one transaction.
+
+    Either all three exist afterwards or none of them do. Half-done onboarding
+    is the failure this replaces: an account with no employee record cannot
+    clock in, and an employee record with no account cannot sign in, and
+    whoever was interrupted has no way to tell which they are looking at.
+
+    Returns (employee, temporary_password). The password is shown once and
+    never stored in readable form -- the forced reset replaces it at first
+    sign-in, so nobody but the new starter ever knows the lasting one.
+    """
+    from django.contrib.auth import get_user_model
+    from django.utils.crypto import get_random_string
+
+    from accounts import audit
+    from accounts.models import UserRole
+    from accounts.permissions import forget_permissions
+    from accounts.services import can_grant_role
+
+    from .models import Employee
+
+    User = get_user_model()
+
+    # Re-checked here, not just narrowed in the form: the queryset is a
+    # convenience for the person filling it in, never the control.
+    for role in roles:
+        if not can_grant_role(actor, role):
+            raise PermissionDenied(
+                f"You cannot assign '{role.name}' because it holds permissions "
+                "you do not hold yourself."
+            )
+
+    email = data["email"].strip().lower()
+    temporary = get_random_string(12)
+
+    user = User(
+        username=email,
+        email=email,
+        first_name=data["first_name"].strip(),
+        last_name=data["last_name"].strip(),
+        must_reset_password=True,
+    )
+    user.set_password(temporary)
+    user.save()
+
+    employee = Employee.objects.create(
+        user=user,
+        staff_id=data["staff_id"].strip(),
+        job_title=data.get("job_title", "").strip(),
+        department=data.get("department", "").strip(),
+        phone=data.get("phone", "").strip(),
+        supervisor=data.get("supervisor"),
+        start_date=data.get("start_date"),
+    )
+
+    for role in roles:
+        UserRole.objects.get_or_create(user=user, role=role)
+    forget_permissions(user)
+
+    audit.record_change(
+        actor=actor,
+        action="employee.onboarded",
+        target=employee,
+        before=None,
+        after={
+            "staff_id": employee.staff_id,
+            "email": user.email,
+            "roles": sorted(role.name for role in roles),
+        },
+        reason=data.get("reason", "") or "Onboarded through the HR register",
+    )
+    return employee, temporary

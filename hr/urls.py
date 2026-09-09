@@ -4,7 +4,9 @@ from . import code_views, views
 
 urlpatterns = [
     path("hr/employees/", views.employees, name="hr-employees"),
-    path("hr/employees/new/", views.employee_edit, name="hr-employee-create"),
+    # Taking somebody on: person, sign-in and access in one act.
+    path("hr/employees/new/", views.employee_onboard, name="hr-employee-create"),
+    # Editing an existing record; the account already exists by then.
     path("hr/employees/<int:pk>/edit/", views.employee_edit, name="hr-employee-edit"),
     path("hr/employees/<int:pk>/deactivate/", views.employee_deactivate, name="hr-employee-deactivate"),
 

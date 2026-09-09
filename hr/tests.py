@@ -686,3 +686,168 @@ class AttendanceCodeTests(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn("expires_at", form.errors)
+
+
+class OnboardingTests(TestCase):
+    """
+    Taking somebody on is one act, and the thing that makes it safe is that
+    it cannot be used to hand out power the person doing it does not have.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+
+        call_command("seed_permissions", verbosity=0)
+
+        def make(email, role):
+            person = User.objects.create_user(
+                username=email, email=email, password="Testing!12345"
+            )
+            person.must_reset_password = False
+            person.save(update_fields=["must_reset_password"])
+            UserRole.objects.create(user=person, role=Role.objects.get(name=role))
+            return person
+
+        cls.hr = make("hr@test.local", "HR")
+        cls.admin = make("admin@test.local", "Admin")
+        cls.supervisor = make("sup@test.local", "Supervisor")
+
+    def _payload(self, **overrides):
+        from accounts.models import Role
+
+        payload = {
+            "first_name": "Moses",
+            "last_name": "Toe",
+            "email": "moses.toe@a1technical.test",
+            "phone": "0770442118",
+            "staff_id": "A1-0017",
+            "job_title": "Technician",
+            "department": "Field ops",
+            "supervisor": "",
+            "start_date": "",
+            "roles": [Role.objects.get(name="Employee").pk],
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_one_submission_creates_the_person_the_signin_and_the_access(self):
+        from hr.models import Employee
+
+        self.client.force_login(self.hr)
+        response = self.client.post(reverse("hr-employee-create"), self._payload())
+        self.assertEqual(response.status_code, 302)
+
+        employee = Employee.objects.get(staff_id="A1-0017")
+        account = employee.user
+
+        # All three, from one form.
+        self.assertEqual(account.email, "moses.toe@a1technical.test")
+        self.assertEqual(account.username, "moses.toe@a1technical.test")
+        self.assertEqual(employee.department, "Field ops")
+        self.assertEqual(
+            [r.role.name for r in account.user_roles.all()], ["Employee"]
+        )
+
+        # They can sign in, and are made to choose their own password first.
+        self.assertTrue(account.must_reset_password)
+        self.assertTrue(account.has_usable_password())
+
+    def test_the_temporary_password_is_shown_once_and_is_not_guessable(self):
+        self.client.force_login(self.hr)
+        response = self.client.post(
+            reverse("hr-employee-create"), self._payload(), follow=True
+        )
+        message = " ".join(str(m) for m in response.context["messages"])
+        self.assertIn("Temporary password:", message)
+
+        secret = message.split("Temporary password:")[1].split()[0]
+        self.assertGreaterEqual(len(secret), 10)
+        # Not derived from anything on the form.
+        for guessable in ("Moses", "Toe", "A1-0017", "moses.toe"):
+            self.assertNotIn(guessable.lower(), secret.lower())
+
+    def test_nothing_is_half_created_when_the_form_is_wrong(self):
+        """
+        An account with no employee record cannot clock in; an employee record
+        with no account cannot sign in. Neither should ever exist.
+        """
+        from hr.models import Employee
+
+        self.client.force_login(self.hr)
+        self.client.post(
+            reverse("hr-employee-create"), self._payload(staff_id="")
+        )
+        self.assertFalse(User.objects.filter(email="moses.toe@a1technical.test").exists())
+        self.assertFalse(Employee.objects.filter(staff_id="A1-0017").exists())
+
+    def test_a_duplicate_email_is_refused_with_an_actionable_message(self):
+        self.client.force_login(self.hr)
+        self.client.post(reverse("hr-employee-create"), self._payload())
+        response = self.client.post(
+            reverse("hr-employee-create"), self._payload(staff_id="A1-0018")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already signs in with that address")
+        self.assertEqual(
+            User.objects.filter(email="moses.toe@a1technical.test").count(), 1
+        )
+
+    # -- the guard --------------------------------------------------------
+
+    @tag("acceptance")
+    def test_onboarding_cannot_be_used_to_hand_out_power_you_lack(self):
+        """
+        The screen shows the temporary password, so creating an Admin would
+        be creating one and knowing how to sign in as it. HR must not be able
+        to, however the request is shaped.
+        """
+        from accounts.models import Role
+        from hr.models import Employee
+
+        admin_role = Role.objects.get(name="Admin")
+        self.client.force_login(self.hr)
+        response = self.client.post(
+            reverse("hr-employee-create"), self._payload(roles=[admin_role.pk])
+        )
+
+        self.assertEqual(response.status_code, 200, "the post must not succeed")
+        self.assertFalse(Employee.objects.filter(staff_id="A1-0017").exists())
+        self.assertFalse(User.objects.filter(email="moses.toe@a1technical.test").exists())
+
+    def test_the_form_only_offers_roles_the_creator_could_grant(self):
+        from accounts.services import assignable_roles
+
+        offered = {role.name for role in assignable_roles(self.hr)}
+        self.assertIn("Employee", offered)
+        self.assertNotIn("Admin", offered)
+        self.assertNotIn("Finance", offered)
+
+        # Somebody holding everything is narrowed by nothing.
+        self.assertIn("Admin", {role.name for role in assignable_roles(self.admin)})
+
+    @tag("acceptance")
+    def test_assigning_a_role_anywhere_respects_the_same_rule(self):
+        """
+        Narrowing the form is a convenience. The rule lives in the service, so
+        it holds for the Settings screen and any future caller too.
+        """
+        from django.core.exceptions import PermissionDenied
+
+        from accounts import services
+        from accounts.models import Role
+
+        with self.assertRaises(PermissionDenied):
+            services.assign_role(
+                actor=self.hr,
+                user=self.supervisor,
+                role=Role.objects.get(name="Admin"),
+            )
+
+    def test_a_supervisor_cannot_take_anybody_on(self):
+        self.client.force_login(self.supervisor)
+        self.assertEqual(
+            self.client.get(reverse("hr-employee-create")).status_code, 403
+        )

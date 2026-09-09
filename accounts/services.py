@@ -122,10 +122,39 @@ def _write_grants(role, grants):
     )
 
 
+def assignable_roles(actor):
+    """
+    The roles this actor may put on somebody else: the ones whose every
+    permission the actor already holds.
+
+    Creating a role has always been guarded this way. Assigning one was not,
+    which left the guard easy to walk around -- anyone who could manage users
+    could hand out the Admin role and inherit it back. Composing power and
+    conferring it are the same act, so they answer to the same rule.
+    """
+    return [
+        role
+        for role in Role.objects.prefetch_related("permissions").order_by("-is_system", "name")
+        if can_grant_role(actor, role)
+    ]
+
+
+def can_grant_role(actor, role):
+    return all(
+        user_has_permission(actor, permission.code)
+        for permission in role.permissions.all()
+    )
+
+
 @transaction.atomic
 def assign_role(*, actor, user, role, reason=""):
     if not user_has_permission(actor, "manage_users"):
         raise PermissionDenied("missing permission: manage_users")
+    if not can_grant_role(actor, role):
+        raise PermissionDenied(
+            f"You cannot assign '{role.name}' because it holds permissions you "
+            "do not hold yourself."
+        )
     before = {"roles": sorted(r.role.name for r in user.user_roles.all())}
     UserRole.objects.get_or_create(user=user, role=role)
     # The map is stale the moment a grant changes.

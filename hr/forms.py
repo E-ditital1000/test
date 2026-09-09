@@ -1,11 +1,16 @@
 from datetime import timedelta
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 
+from accounts.models import Role
+from accounts.services import assignable_roles
 from config.models import CorrectionReason
 
 from .models import AttendanceCode, AttendanceCorrection, Employee
+
+User = get_user_model()
 
 
 class EmployeeForm(forms.ModelForm):
@@ -17,8 +22,10 @@ class EmployeeForm(forms.ModelForm):
 
     class Meta:
         model = Employee
+        # No "user": the sign-in account is bound when the person is taken on
+        # and never repointed. Moving a record to a different account would
+        # silently move somebody's whole attendance history with it.
         fields = [
-            "user",
             "staff_id",
             "job_title",
             "department",
@@ -31,10 +38,8 @@ class EmployeeForm(forms.ModelForm):
         labels = {
             "staff_id": "Staff ID",
             "is_active": "Currently employed",
-            "user": "Sign-in account",
         }
         help_texts = {
-            "user": "The account this person signs in with.",
             "supervisor": "Whose roll-call they appear on.",
         }
 
@@ -124,3 +129,84 @@ class AttendanceCodeForm(forms.ModelForm):
                 "That moment has already passed, so the code would never work."
             )
         return expires_at
+
+
+class EmployeeOnboardingForm(forms.Form):
+    """
+    Taking somebody on is one act, so it is one form.
+
+    Before this it was three, spread across two modules: create the sign-in
+    account in Settings, create the employee record in HR, then go back and
+    grant a role. Worse, the middle step demanded an account that only
+    Settings could make -- so the HR person whose job this is could not
+    finish it, and it fell to an Admin every time.
+
+    The three sections below are the three questions actually being asked:
+    who is this, what do they do, and what may they reach.
+    """
+
+    # -- who they are -----------------------------------------------------
+    first_name = forms.CharField(max_length=150, label="First name")
+    last_name = forms.CharField(max_length=150, label="Surname")
+    email = forms.EmailField(
+        label="Work email",
+        help_text="This is what they sign in with. A temporary password is "
+        "issued on save and they must replace it at first sign-in.",
+    )
+    phone = forms.CharField(max_length=40, required=False, label="Phone")
+
+    # -- what they do -----------------------------------------------------
+    staff_id = forms.CharField(max_length=30, label="Staff ID")
+    job_title = forms.CharField(max_length=80, required=False, label="Job title")
+    department = forms.CharField(max_length=80, required=False)
+    supervisor = forms.ModelChoiceField(
+        queryset=Employee.objects.none(),
+        required=False,
+        label="Supervisor",
+        empty_label="Nobody yet",
+        help_text="Whose roll-call they appear on.",
+    )
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Start date",
+    )
+
+    # -- what they may reach ----------------------------------------------
+    roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Access",
+        help_text="Everything this person can do comes from the roles ticked "
+        "here. Most field staff need only Technician; office staff who just "
+        "clock in and out need only Employee.",
+    )
+
+    def __init__(self, *args, actor=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.actor = actor
+        self.fields["supervisor"].queryset = Employee.objects.filter(
+            is_active=True
+        ).select_related("user")
+        # You cannot confer power you do not hold, so the list only offers
+        # roles this person could grant. An HR user sees Technician and
+        # Employee; they do not see Admin, and posting it would be refused
+        # server-side anyway.
+        self.fields["roles"].queryset = Role.objects.filter(
+            pk__in=[r.pk for r in assignable_roles(actor)]
+        ) if actor is not None else Role.objects.none()
+
+    def clean_email(self):
+        email = self.cleaned_data["email"].strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                "Somebody already signs in with that address. If they already "
+                "work here, edit their record instead of creating a second one."
+            )
+        return email
+
+    def clean_staff_id(self):
+        staff_id = self.cleaned_data["staff_id"].strip()
+        if Employee.objects.filter(staff_id__iexact=staff_id).exists():
+            raise forms.ValidationError("That staff ID is already on the register.")
+        return staff_id

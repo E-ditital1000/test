@@ -11,6 +11,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -25,7 +26,7 @@ from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
 from . import services
-from .forms import AttendanceCorrectionForm, EmployeeForm
+from .forms import AttendanceCorrectionForm, EmployeeForm, EmployeeOnboardingForm
 from .models import AttendanceDay, AttendanceEvent, Employee
 
 
@@ -68,6 +69,39 @@ def employees(request):
             "total_employees": Employee.objects.count(),
         },
     )
+
+
+@require_permission("manage_employees")
+def employee_onboard(request):
+    """
+    One screen for taking somebody on: the person, their sign-in and their
+    access, created together or not at all.
+
+    Gated on manage_employees rather than manage_users, because this is the
+    HR person's job and they do not hold manage_users. What stops it being a
+    way around that permission is the role list: it only offers roles whose
+    permissions the creator already holds, checked again in the service.
+    """
+    form = EmployeeOnboardingForm(request.POST or None, actor=request.user)
+    if request.method == "POST" and form.is_valid():
+        try:
+            employee, temporary = services.onboard_employee(
+                actor=request.user,
+                data=form.cleaned_data,
+                roles=list(form.cleaned_data["roles"]),
+            )
+        except PermissionDenied as error:
+            messages.error(request, str(error))
+        else:
+            messages.success(
+                request,
+                f"{employee.full_name} is on the register and can sign in as "
+                f"{employee.user.email}. Temporary password: {temporary} - give "
+                "it to them directly; they must replace it at first sign-in.",
+            )
+            return redirect("hr-employees")
+
+    return render(request, "hr/employee_onboard.html", {"form": form})
 
 
 @require_permission("manage_employees")
