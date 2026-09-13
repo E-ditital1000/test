@@ -71,6 +71,7 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --dur-enter: 240ms;
   --dur-exit: 160ms;
+  --dur-press: 160ms;
 }
 
 /* --------------------------------------------------------------------------
@@ -246,7 +247,9 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
   flex-direction: column; padding: 0;
 }
 .a1-burger i { display: block; width: 16px; height: 2px; border-radius: 2px; background: var(--text2); }
-.a1-burger:hover { border-color: var(--line); }
+@media (hover: hover) and (pointer: fine) {
+  .a1-burger:hover { border-color: var(--line); }
+}
 
 .a1-search { flex: 1; max-width: 420px; position: relative; display: flex; align-items: center; }
 .a1-search svg { position: absolute; left: 14px; fill: var(--muted); pointer-events: none; }
@@ -276,7 +279,9 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
   border: 1px solid transparent; background: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-.a1-bell:hover { background: var(--sunken); }
+@media (hover: hover) and (pointer: fine) {
+  .a1-bell:hover { background: var(--sunken); }
+}
 .a1-bell svg { fill: var(--text2); }
 /* Red, not gold: gold is the committing action and this is a status. */
 .a1-bell .dot {
@@ -291,7 +296,9 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
   padding: 0 8px 0 4px; border-radius: var(--r-ctl); border: 1px solid transparent;
   background: none; cursor: pointer; text-align: left;
 }
-.a1-user:hover { background: var(--sunken); }
+@media (hover: hover) and (pointer: fine) {
+  .a1-user:hover { background: var(--sunken); }
+}
 .a1-avatar {
   position: relative; flex: none; width: 36px; height: 36px; border-radius: 50%;
   background: var(--navy); color: var(--gold); display: flex; align-items: center;
@@ -354,16 +361,29 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
   min-height: 40px; padding: 0 18px; border-radius: var(--r-ctl);
   font-size: 14px; font-weight: 600; white-space: nowrap;
   border: 1px solid transparent; background: none; cursor: pointer;
-  text-decoration: none; transition: filter .12s ease, background-color .12s ease;
+  text-decoration: none;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    filter .12s ease, background-color .12s ease;
 }
-.btn:hover { text-decoration: none; filter: brightness(.93); }
-.btn:active { filter: brightness(.86); transform: translateY(1px); }
+.btn:hover { text-decoration: none; }
+/* The press shrinks rather than nudging down a pixel: the whole control
+   answers the finger, not just its bottom edge. It stays subtle (0.97) —
+   a button that visibly jumps is louder than the action it confirms. */
+.btn:active { filter: brightness(.86); transform: scale(0.97); }
 
 .btn-pri { background: var(--gold); color: var(--navy); }
 .btn-sec { background: var(--card); color: var(--text); border-color: var(--line); }
 .btn-gho { color: var(--navy600); }
-.btn-gho:hover { background: var(--sunken); filter: none; }
 .btn-dgr { background: var(--red); color: #fff; }
+
+/* Hover only where there is a real pointer. A tap on a phone fires :hover
+   and then leaves it stuck on, so a technician would see the button they
+   just pressed stay darkened as if it were still doing something. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { filter: brightness(.93); }
+  .btn-gho:hover { background: var(--sunken); filter: none; }
+}
 
 .btn-wide { width: 100%; }
 .btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
@@ -389,6 +409,35 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
 @media (prefers-reduced-motion: reduce) {
   .btn.is-loading::before { animation-duration: 2.4s; }
   .a1-skel { animation: none; }
+}
+
+/* --------------------------------------------------------------------------
+   Press feedback for everything else a finger or cursor presses.
+   Same curve and duration as .btn, so the whole system answers a press in
+   one voice. Deliberately not here: the sidebar and bottom tabs. They load a
+   new page, and the page arriving is the feedback.
+   -------------------------------------------------------------------------- */
+.chip, .opt, .demo-row, .a1-burger, .a1-bell, .a1-user, .toast-close {
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.chip:active, .opt:active, .demo-row:active,
+.a1-burger:active, .a1-bell:active, .a1-user:active, .toast-close:active {
+  transform: scale(0.97);
+}
+/* The big field actions are full-width: 3% of a 400px button is 12px of
+   travel, which reads as a lurch. A smaller ratio gives the same feel. */
+.act { transition: transform var(--dur-press) var(--ease-out); }
+.act:active { transform: scale(0.985); }
+
+/* The assessment choices are tapped, so they should say they can be. */
+.opt { cursor: pointer; }
+
+/* Reduced motion keeps the colour response and drops the size change. */
+@media (prefers-reduced-motion: reduce) {
+  .btn:active, .act:active, .chip:active, .opt:active, .demo-row:active,
+  .a1-burger:active, .a1-bell:active, .a1-user:active, .toast-close:active {
+    transform: none;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -861,7 +910,9 @@ input[type=checkbox], input[type=radio] {
   min-height: 48px; padding: 8px 12px; border-radius: var(--r-ctl);
   background: var(--card); border: 1px solid var(--border); cursor: pointer;
 }
-.demo-row:hover { border-color: var(--gold700); }
+@media (hover: hover) and (pointer: fine) {
+  .demo-row:hover { border-color: var(--gold700); }
+}
 .demo-role { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .demo-role b { font-size: 14px; font-weight: 600; }
 .demo-role span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
