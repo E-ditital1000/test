@@ -1,0 +1,156 @@
+{% comment %}
+The result of an action, as a toast rather than a box pushed into the page.
+
+Which ones stay until closed
+----------------------------
+Successes and notes leave on their own after a few seconds. Errors and
+warnings do not: something went wrong and the reader has to see it. Neither
+does anything tagged `sticky` — which is what carries a one-time temporary
+password. An auto-dismissing toast would take the only copy of that password
+away while HR glanced at the new starter, and nobody could sign in.
+
+Why the script is inline, right here
+------------------------------------
+The toasts are hidden until this script opens them. If the script came from
+a separate file and that request failed on a weak connection, they would
+stay hidden forever. Inline, it arrives with the page or not at all, and it
+runs before the browser paints the stack, so there is no flash. If it never
+runs, [data-armed] is never set and every message stays plainly visible in
+the page, exactly as before.
+{% endcomment %}
+{% if messages %}
+<section class="toasts" data-toasts aria-label="Notifications">
+  {% for message in messages %}
+    {% with level=message.level_tag|default:"info" %}
+    <div class="toast toast-{{ level }}"
+         role="{% if level == 'error' or level == 'warning' %}alert{% else %}status{% endif %}"
+         data-toast
+         {% if level == 'error' or level == 'warning' or 'sticky' in message.extra_tags %}data-sticky{% endif %}>
+      <span class="toast-ic" aria-hidden="true">
+        {% if level == "success" %}
+          <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 0a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm4.7 6.3a1 1 0 0 0-1.4 0L8.5 11 6.7 9.3a1 1 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4 0l5.5-5.5a1 1 0 0 0 0-1.4z"/></svg>
+        {% elif level == "error" or level == "warning" %}
+          <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 0a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 13.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5zM10 4a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V5a1 1 0 0 0-1-1z"/></svg>
+        {% else %}
+          <svg width="20" height="20" viewBox="0 0 20 20"><path d="M10 0a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 8a1 1 0 0 0-1 1v6a1 1 0 1 0 2 0V9a1 1 0 0 0-1-1zm0-4a1.25 1.25 0 1 0 0 2.5A1.25 1.25 0 0 0 10 4z"/></svg>
+        {% endif %}
+      </span>
+      <div class="toast-body">
+        {{ message }}
+        {% if 'sticky' in message.extra_tags and level != 'error' and level != 'warning' %}
+          {# Says why it has not gone, so it reads as deliberate. #}
+          <span class="toast-hint">Stays until you close it.</span>
+        {% endif %}
+      </div>
+      <button type="button" class="toast-close" data-toast-close aria-label="Dismiss notification">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1.3 0 7 5.6 12.7 0 14 1.3 8.4 7l5.6 5.7-1.3 1.3L7 8.4 1.3 14 0 12.7 5.6 7 0 1.3z"/></svg>
+      </button>
+    </div>
+    {% endwith %}
+  {% endfor %}
+</section>
+<script>
+(function () {
+  "use strict";
+  var stack = document.currentScript && document.currentScript.previousElementSibling;
+  if (!stack || !stack.hasAttribute("data-toasts")) return;
+
+  // Armed before the first paint of the stack, so it floats and starts
+  // hidden rather than appearing in the page and then jumping.
+  stack.setAttribute("data-armed", "");
+
+  var DISMISS_AFTER = 5000;   // long enough to read two lines, short enough not to linger
+  var STAGGER = 50;           // several arriving at once cascade rather than land as one block
+
+  // Declared at function scope, not inside the try below: a function
+  // declaration in a block is a syntax error to an older strict-mode
+  // engine, and a script that does not parse never arms at all.
+  function reveal(toast) { toast.setAttribute("data-state", "open"); }
+
+  function remove(toast) {
+    if (toast.parentNode) toast.parentNode.removeChild(toast);
+    if (!stack.querySelector("[data-toast]") && stack.parentNode) {
+      stack.parentNode.removeChild(stack);
+    }
+  }
+
+  function dismiss(toast) {
+    if (!toast || toast.getAttribute("data-state") === "closing") return;
+    clearTimeout(toast._timer);
+    toast.setAttribute("data-state", "closing");
+    var done = false;
+    var finish = function () { if (!done) { done = true; remove(toast); } };
+    toast.addEventListener("transitionend", function (event) {
+      if (event.propertyName === "opacity") finish();
+    });
+    // transitionend is not guaranteed -- reduced motion, a hidden tab, or a
+    // browser that skips it -- so never leave a closed toast in the DOM.
+    setTimeout(finish, 400);
+  }
+
+  // A timer that pauses: the reader hovering, or tabbing to the close
+  // button, or switching away, is not the reader having read it.
+  function arm(toast) {
+    if (toast.hasAttribute("data-sticky")) return;
+    toast._remaining = DISMISS_AFTER;
+    toast._paused = 0;
+
+    var start = function () {
+      if (toast._paused) return;
+      toast._started = Date.now();
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(function () { dismiss(toast); }, toast._remaining);
+    };
+    toast._pause = function () {
+      toast._paused += 1;
+      if (toast._paused === 1) {
+        clearTimeout(toast._timer);
+        toast._remaining = Math.max(1000, toast._remaining - (Date.now() - toast._started));
+      }
+    };
+    toast._resume = function () {
+      toast._paused = Math.max(0, toast._paused - 1);
+      if (!toast._paused) start();
+    };
+
+    toast.addEventListener("mouseenter", toast._pause);
+    toast.addEventListener("mouseleave", toast._resume);
+    toast.addEventListener("focusin", toast._pause);
+    toast.addEventListener("focusout", toast._resume);
+    start();
+  }
+
+  var toasts = Array.prototype.slice.call(stack.querySelectorAll("[data-toast]"));
+
+  try {
+    document.addEventListener("visibilitychange", function () {
+      toasts.forEach(function (toast) {
+        if (!toast._pause || toast.getAttribute("data-state") === "closing") return;
+        if (document.hidden) toast._pause(); else toast._resume();
+      });
+    });
+
+    stack.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-toast-close]");
+      if (button) dismiss(button.closest("[data-toast]"));
+    });
+
+    // Two frames: the hidden starting state has to be committed before the
+    // open state is applied, or the browser skips straight to the end.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        toasts.forEach(function (toast, index) {
+          setTimeout(function () {
+            reveal(toast);
+            arm(toast);
+          }, index * STAGGER);
+        });
+      });
+    });
+  } catch (error) {
+    // Whatever went wrong, the messages must still be readable.
+    toasts.forEach(reveal);
+  }
+})();
+</script>
+{% endif %}

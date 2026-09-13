@@ -231,6 +231,7 @@ def user_edit(request, pk=None):
                 request,
                 "Account created. Temporary password: {} - the user must "
                 "change it at first login.".format(temporary),
+                extra_tags="sticky",
             )
         else:
             messages.success(request, "Account updated.")

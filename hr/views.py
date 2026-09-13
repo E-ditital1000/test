@@ -98,6 +98,7 @@ def employee_onboard(request):
                 f"{employee.full_name} is on the register and can sign in as "
                 f"{employee.user.email}. Temporary password: {temporary} - give "
                 "it to them directly; they must replace it at first sign-in.",
+                extra_tags="sticky",
             )
             return redirect("hr-employees")
 
