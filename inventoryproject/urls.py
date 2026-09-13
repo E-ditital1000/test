@@ -11,18 +11,30 @@ from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import TemplateView
 
+
+class ServiceWorkerView(TemplateView):
+    """
+    The worker trusts a static URL to mean fixed content only when the
+    filename carries a content hash. That is true in production (manifest
+    storage) and false in development, where /static/css/a1.css keeps its
+    name through every edit. Read at request time so tests can flip DEBUG.
+    """
+
+    template_name = "sw.js"
+    content_type = "application/javascript"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["hashed_static"] = not settings.DEBUG
+        return context
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
 
     # The service worker must be served from the site root: a worker's scope
     # is its own directory, and one under /static/ could not control the app.
-    path(
-        "sw.js",
-        TemplateView.as_view(
-            template_name="sw.js", content_type="application/javascript"
-        ),
-        name="service-worker",
-    ),
+    path("sw.js", ServiceWorkerView.as_view(), name="service-worker"),
     path(
         "manifest.webmanifest",
         TemplateView.as_view(

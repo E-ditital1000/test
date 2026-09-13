@@ -17,7 +17,13 @@
        shared phone cannot show the previous person's records after a logout.
    ========================================================================== */
 
-var VERSION = "a1-360-v1";
+// Bumped to v2 to evict every v1 cache: in development those held a1.css
+// cache-first under an unchanging name, so style changes never showed.
+var VERSION = "a1-360-v2";
+
+// Whether a static URL changes when its content does. True in production,
+// where filenames carry a hash; false in development, where they do not.
+var HASHED_STATIC = {% if hashed_static %}true{% else %}false{% endif %};
 var SHELL_CACHE = VERSION + "-shell";
 var PAGE_CACHE = VERSION + "-pages";
 
@@ -78,20 +84,34 @@ self.addEventListener("fetch", function (event) {
   // Never hold on to a file the technician uploaded or a CSV export.
   if (url.pathname.indexOf("/media/") === 0 || url.searchParams.get("export")) return;
 
-  // Static files change name when they change content, so serving from the
-  // cache first is safe and is what makes a cold start instant.
   if (isStatic(url)) {
-    event.respondWith(
-      caches.match(request).then(function (hit) {
-        return hit || fetch(request).then(function (response) {
-          if (response.ok) {
-            var copy = response.clone();
-            caches.open(SHELL_CACHE).then(function (c) { c.put(request, copy); });
-          }
-          return response;
-        });
-      })
-    );
+    var fromNetwork = function () {
+      return fetch(request).then(function (response) {
+        if (response.ok) {
+          var copy = response.clone();
+          caches.open(SHELL_CACHE).then(function (c) { c.put(request, copy); });
+        }
+        return response;
+      });
+    };
+
+    if (HASHED_STATIC) {
+      // A hashed name changes when the content does, so serving from the
+      // cache first is safe and is what makes a cold start instant.
+      event.respondWith(
+        caches.match(request).then(function (hit) { return hit || fromNetwork(); })
+      );
+    } else {
+      // Unhashed, a cached copy could be any older version of the file.
+      // Fetch first; the cache is only the offline fallback.
+      event.respondWith(
+        fromNetwork().catch(function () {
+          return caches.match(request).then(function (hit) {
+            return hit || Response.error();
+          });
+        })
+      );
+    }
     return;
   }
 

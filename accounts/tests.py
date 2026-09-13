@@ -440,6 +440,17 @@ class OfflineShellTests(TestCase):
         self.assertIn("/media/", source)
         self.assertIn("export", source)
 
+    def test_static_is_cache_first_only_when_filenames_are_hashed(self):
+        """
+        In development a1.css keeps its name through every edit. Served
+        cache-first there, the browser showed the first stylesheet it ever
+        saw and no style change reached the screen.
+        """
+        with self.settings(DEBUG=False):
+            self.assertIn("var HASHED_STATIC = true;", self.client.get("/sw.js").content.decode())
+        with self.settings(DEBUG=True):
+            self.assertIn("var HASHED_STATIC = false;", self.client.get("/sw.js").content.decode())
+
     def test_the_offline_page_renders_without_a_session(self):
         """It is served from the cache, so it cannot need the network."""
         response = self.client.get(reverse("offline"))
