@@ -125,9 +125,20 @@ class ShellBehaviourTests(StaticLiveServerTestCase):
             page.click("#user-toggle")
             self.assertTrue(menu.is_visible(), "clicking the avatar must open it")
 
-            # Clicking away closes it again.
+            # Clicking away closes it again. It fades out over a tenth of a
+            # second first, so wait for it to go rather than asserting at
+            # once; the timeout still fails a menu that never closes.
             page.click("body", position={"x": 5, "y": 400})
+            menu.wait_for(state="hidden", timeout=2000)
             self.assertFalse(menu.is_visible(), "clicking away must close it")
+
+            # From the keyboard it opens and closes with no animation at all.
+            page.focus("#user-toggle")
+            page.keyboard.press("Enter")
+            self.assertTrue(menu.is_visible(), "Enter on the avatar must open it")
+            self.assertIsNone(menu.get_attribute("data-motion"))
+            page.keyboard.press("Escape")
+            self.assertFalse(menu.is_visible(), "Escape must close it at once")
         finally:
             context.close()
 

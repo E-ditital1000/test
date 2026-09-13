@@ -189,25 +189,69 @@ Blocks a page fills in:
   });
 
   // -- the account menu --------------------------------------------------
+  // Opened with a pointer, it grows out of the avatar that opened it, so the
+  // eye goes from the button to the menu without a jump. Opened or closed
+  // from the keyboard, it appears and goes instantly: keyboard users move
+  // fast and repeat themselves, and motion there only reads as lag.
   var userToggle = document.getElementById("user-toggle");
   var sheet = document.getElementById("user-sheet");
+  var EXIT_MS = 100;   // matches --dur-pop-exit
+  var leaving = null;
 
-  function closeSheet() {
-    sheet.hidden = true;
+  function finishLeaving() {
+    clearTimeout(leaving);
+    leaving = null;
+  }
+
+  function openSheet(animate) {
+    finishLeaving();
+    if (animate && sheet.hidden) {
+      sheet.setAttribute("data-motion", "from");
+      sheet.hidden = false;
+      // Commit the starting state now, or the browser skips straight to
+      // the end and nothing is seen to grow.
+      void sheet.offsetWidth;
+    }
+    sheet.hidden = false;
+    // Also the reversal: reopened mid-close, it turns round from wherever
+    // it had got to instead of restarting.
+    sheet.removeAttribute("data-motion");
+    userToggle.setAttribute("aria-expanded", "true");
+  }
+
+  function closeSheet(animate) {
+    if (sheet.hidden || (leaving && animate)) return;
     userToggle.setAttribute("aria-expanded", "false");
+    if (!animate) {
+      finishLeaving();
+      sheet.hidden = true;
+      sheet.removeAttribute("data-motion");
+      return;
+    }
+    sheet.setAttribute("data-motion", "leaving");
+    leaving = setTimeout(function () {
+      leaving = null;
+      sheet.hidden = true;
+      sheet.removeAttribute("data-motion");
+    }, EXIT_MS + 20);
   }
 
   userToggle.addEventListener("click", function (event) {
     event.stopPropagation();
-    var open = sheet.hidden;
-    sheet.hidden = !open;
-    userToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    // A click from Enter or Space reports no pointer detail.
+    var animate = event.detail !== 0;
+    if (sheet.hidden || leaving) openSheet(animate); else closeSheet(animate);
   });
   document.addEventListener("click", function (event) {
-    if (!sheet.hidden && !sheet.contains(event.target)) closeSheet();
+    if (!sheet.hidden && !sheet.contains(event.target)) closeSheet(true);
   });
   document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") closeSheet();
+    if (event.key === "Escape" && !sheet.hidden) {
+      // Hand focus back to the button, rather than dropping it on the page.
+      var hadFocus = sheet.contains(document.activeElement);
+      closeSheet(false);
+      if (hadFocus) userToggle.focus();
+    }
 
     // Ctrl+K / Cmd+K focuses search, as the hint in the box promises.
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
