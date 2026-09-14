@@ -89,7 +89,11 @@ Blocks a page fills in:
         <button class="a1-user" type="button" id="user-toggle"
                 aria-haspopup="true" aria-expanded="false" aria-controls="user-sheet">
           <span class="a1-avatar">
-            {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}
+            {% if user_photo_url %}
+              <img src="{{ user_photo_url }}" alt="" width="36" height="36">
+            {% else %}
+              {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}
+            {% endif %}
             <span class="online" aria-hidden="true"></span>
           </span>
           <span class="who-name">
@@ -106,10 +110,13 @@ Blocks a page fills in:
             <b>{{ user.get_full_name|default:user.email }}</b>
             <span>{{ user.email }}</span>
           </div>
+          <a href="{% url 'profile' %}">My profile</a>
           {% if perms_held.clock_in_out %}
             <a href="{% url 'hr-clock' %}">My clock</a>
           {% endif %}
-          <a href="{% url 'password-reset-required' %}">Change my password</a>
+          {# The profile's own form asks for the current password; the forced reset does not. #}
+          <a href="{% url 'profile-security' %}">Change my password</a>
+          <a href="{% url 'profile-activity' %}">My activity</a>
           {# Logout is a POST: Django refuses a GET, and a link would 405. #}
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}

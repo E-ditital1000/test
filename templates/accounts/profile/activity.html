@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Activity — My profile — A1 360{% endblock %}
+
+{% block page_title %}My profile{% endblock %}
+{% block page_sub %}What you have done in the system, and what has been done to your account.{% endblock %}
+
+{% block content %}
+  {% include "accounts/profile/_header.html" %}
+
+  {% if entries %}
+    <div class="card">
+      <div class="hd">
+        <b>Activity</b>
+        <span class="meta">From the audit log · newest first</span>
+      </div>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">When</th>
+              <th scope="col">What happened</th>
+              <th scope="col">By</th>
+              <th scope="col">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for entry in entries %}
+              <tr>
+                <td class="mono prof-when">{{ entry.created_at|a1datetime }}</td>
+                <td>{{ entry.label }}</td>
+                <td>
+                  {% if entry.by_someone_else %}
+                    {{ entry.actor|a1name }}
+                  {% elif entry.actor %}
+                    <span class="dim2">You</span>
+                  {% else %}
+                    <span class="dim">System</span>
+                  {% endif %}
+                </td>
+                <td class="t-small dim2">{{ entry.reason|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "shell/_pager.html" with page=entries noun="entry" plural="entries" %}
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="me" heading="Nothing recorded yet" body="When you approve, correct or change something, or somebody changes your account, it is listed here." %}
+  {% endif %}
+{% endblock %}

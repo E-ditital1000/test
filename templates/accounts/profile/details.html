@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}My profile — A1 360{% endblock %}
+
+{% block page_title %}My profile{% endblock %}
+{% block page_sub %}Your own details. Nothing here changes what you can do in the system.{% endblock %}
+
+{% block content %}
+  {% include "accounts/profile/_header.html" %}
+
+  <div class="prof-grid">
+    <form method="post" class="prof-main" novalidate>
+      {% csrf_token %}
+      {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+
+      <div class="card">
+        <div class="hd">
+          <b>Personal details</b>
+          <span class="meta">Not shown to colleagues</span>
+        </div>
+        <div class="stack">
+          {% include "shell/_form_fields.html" with form=form.personal_fields %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <b>Emergency contact</b>
+          <span class="meta">Who to call if something happens on site</span>
+        </div>
+        <div class="stack">
+          {% include "shell/_form_fields.html" with form=form.emergency_fields %}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <b>Social links</b>
+          <span class="meta">Optional</span>
+        </div>
+        <div class="stack">
+          {% include "shell/_form_fields.html" with form=form.social_fields %}
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-pri" type="submit">Save profile</button>
+        <a class="btn btn-gho" href="{% url 'profile' %}">Discard changes</a>
+      </div>
+    </form>
+
+    <aside class="prof-rail">
+      {% if not profile.photo or not profile.date_of_birth or not profile.personal_phone or not profile.has_emergency_contact %}
+        <div class="card">
+          <div class="hd"><b>Finish your profile</b></div>
+          <ul class="prof-todo">
+            <li class="{% if profile.photo %}done{% endif %}">A photo, so people on site know who to look for</li>
+            <li class="{% if profile.personal_phone %}done{% endif %}">A phone number you can be reached on</li>
+            <li class="{% if profile.has_emergency_contact %}done{% endif %}">An emergency contact</li>
+            <li class="{% if profile.date_of_birth %}done{% endif %}">Your date of birth</li>
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="hd">
+          <b>Work details</b>
+          <span class="meta">Kept by HR</span>
+        </div>
+        {% if employee %}
+          <dl>
+            <div class="kv"><dt>Staff ID</dt><dd class="mono">{{ employee.staff_id }}</dd></div>
+            <div class="kv"><dt>Job title</dt><dd>{{ employee.job_title|default:"—" }}</dd></div>
+            <div class="kv"><dt>Department</dt><dd>{{ employee.department|default:"—" }}</dd></div>
+            <div class="kv"><dt>Supervisor</dt><dd>{% if employee.supervisor %}{{ employee.supervisor.user|a1name }}{% else %}—{% endif %}</dd></div>
+            <div class="kv"><dt>Work phone</dt><dd>{{ employee.phone|default:"—" }}</dd></div>
+            <div class="kv"><dt>Started</dt><dd>{{ employee.start_date|a1date|default:"—" }}</dd></div>
+          </dl>
+          <div class="note">Something wrong here? Ask HR to correct it. These details decide your pay and who you report to, so you can't change them yourself.</div>
+        {% else %}
+          <div class="stack">
+            <p class="t-body dim2">This account has no employee record. That is normal for system and service accounts.</p>
+          </div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+{% endblock %}

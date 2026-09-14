@@ -1,0 +1,79 @@
+{% load a1 %}
+{% comment %}
+Who this is, at the top of every profile screen, and the three sections under
+it. The photo controls live here rather than in the Details form, so changing
+a photo never submits (or loses) half-typed details.
+{% endcomment %}
+<section class="card prof-hd" aria-label="Your profile">
+  <div class="prof-av" aria-hidden="true">
+    {% if profile.photo %}
+      <img src="{{ profile.photo.url }}" alt="" width="88" height="88">
+    {% else %}
+      {{ user.first_name|first|upper }}{{ user.last_name|first|upper|default:"" }}
+    {% endif %}
+  </div>
+
+  <div class="prof-id">
+    <b class="t-h20">{{ user.get_full_name|default:user.email }}</b>
+    <span class="t-body dim2">
+      {% if employee.job_title %}{{ employee.job_title }} · {% endif %}{{ user.email }}
+    </span>
+    <span class="prof-pills">
+      {% for role in roles %}
+        <span class="pill p-open">{{ role }}</span>
+      {% empty %}
+        <span class="pill p-clos">No role assigned</span>
+      {% endfor %}
+    </span>
+  </div>
+
+  {% if profile_tab == "details" %}
+    <div class="prof-photo">
+      <form method="post" action="{% url 'profile-photo' %}" enctype="multipart/form-data" data-photo-form>
+        {% csrf_token %}
+        <input class="sr-only" type="file" name="photo" id="photo-input"
+               accept="{{ photo_form.ACCEPT }}" required>
+        <label class="btn btn-sec" for="photo-input">
+          {% if profile.photo %}Change photo{% else %}Add a photo{% endif %}
+        </label>
+        {# Without the script below, choosing a file still needs a submit. #}
+        <button class="btn btn-pri" type="submit" data-photo-submit>Upload</button>
+      </form>
+      {% if profile.photo %}
+        <form method="post" action="{% url 'profile-photo-remove' %}">
+          {% csrf_token %}
+          <button class="btn btn-gho" type="submit">Remove</button>
+        </form>
+      {% endif %}
+      <span class="t-small dim prof-photo-help">{{ photo_form.photo.help_text }}</span>
+    </div>
+    <script>
+    (function () {
+      "use strict";
+      var form = document.querySelector("[data-photo-form]");
+      if (!form) return;
+      var input = form.querySelector("input[type=file]");
+      var submit = form.querySelector("[data-photo-submit]");
+      // Choosing the file is the decision; a second button to confirm it is
+      // one tap too many on a phone.
+      submit.hidden = true;
+      input.addEventListener("change", function () {
+        if (!input.files || !input.files.length) return;
+        submit.hidden = false;
+        submit.classList.add("is-loading");
+        submit.textContent = "Uploading";
+        form.submit();
+      });
+    })();
+    </script>
+  {% endif %}
+</section>
+
+<nav class="filters" aria-label="Profile sections">
+  <a class="chip {% if profile_tab == 'details' %}on{% endif %}" href="{% url 'profile' %}"
+     {% if profile_tab == 'details' %}aria-current="page"{% endif %}>Details</a>
+  <a class="chip {% if profile_tab == 'security' %}on{% endif %}" href="{% url 'profile-security' %}"
+     {% if profile_tab == 'security' %}aria-current="page"{% endif %}>Password &amp; sign-in</a>
+  <a class="chip {% if profile_tab == 'activity' %}on{% endif %}" href="{% url 'profile-activity' %}"
+     {% if profile_tab == 'activity' %}aria-current="page"{% endif %}>Activity</a>
+</nav>

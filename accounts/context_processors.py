@@ -44,9 +44,18 @@ def nav(request):
     # because the system has no job titles of its own — a role IS what they
     # can do here.
     role_label = ""
+    photo_url = ""
     if user.is_authenticated:
         names = list(user.user_roles.values_list("role__name", flat=True))
         role_label = ", ".join(names) if names else "No role assigned"
+
+        # The avatar in the header. One column, not the whole profile, since
+        # this runs on every page.
+        from .models import Profile
+
+        name = Profile.objects.filter(user=user).values_list("photo", flat=True).first()
+        if name:
+            photo_url = Profile._meta.get_field("photo").storage.url(name)
     return {
         "nav_items": visible_items(user),
         "nav_tabs": visible_tabs(user),
@@ -56,5 +65,6 @@ def nav(request):
         "tab_active": active_tab(getattr(match, "url_name", "")),
         "attention_count": attention,
         "user_role_label": role_label,
+        "user_photo_url": photo_url,
         "perms_held": PermissionLookup(user),
     }

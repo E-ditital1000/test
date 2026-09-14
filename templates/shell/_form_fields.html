@@ -65,7 +65,7 @@ the input with aria-describedby so a screen reader reaches it too.
         {% endif %}
 
         {% if field.help_text %}
-          <span class="help" id="{{ field.id_for_label }}_help">{{ field.help_text }}</span>
+          <span class="help" id="{{ field.id_for_label }}_helptext">{{ field.help_text }}</span>
         {% endif %}
         {% for error in field.errors %}
           <span class="err" id="{{ field.id_for_label }}_err">{{ error }}</span>

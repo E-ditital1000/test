@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Password and sign-in — My profile — A1 360{% endblock %}
+
+{% block page_title %}My profile{% endblock %}
+{% block page_sub %}Your password, and how your account has been signed in to.{% endblock %}
+
+{% block content %}
+  {% include "accounts/profile/_header.html" %}
+
+  <div class="prof-grid">
+    <form method="post" class="prof-main">
+      {% csrf_token %}
+      <div class="card">
+        <div class="hd">
+          <b>Change password</b>
+          <span class="meta">Other devices are signed out</span>
+        </div>
+        <div class="stack">
+          {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+          <div class="form-rows">
+            {% for field in form %}
+              <div class="fld {% if field.name == 'old_password' %}wide{% endif %} {% if field.errors %}has-error{% endif %}">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+                {% if field.help_text %}
+                  {# Django's own validator text, which is trusted HTML (a list). #}
+                  <span class="help">{{ field.help_text|safe }}</span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-pri" type="submit">Change password</button>
+      </div>
+    </form>
+
+    <aside class="prof-rail">
+      <div class="card">
+        <div class="hd"><b>Sign-in</b></div>
+        <dl>
+          <div class="kv"><dt>Sign-in email</dt><dd>{{ user.email }}</dd></div>
+          <div class="kv"><dt>This sign-in</dt><dd>{{ user.last_login|a1datetime|default:"—" }}</dd></div>
+          <div class="kv"><dt>Account created</dt><dd>{{ user.date_joined|a1date }}</dd></div>
+          <div class="kv">
+            <dt>Failed attempts</dt>
+            <dd>
+              {% if user.failed_login_attempts %}
+                <span class="warn">{{ user.failed_login_attempts }} since your last successful sign-in</span>
+              {% else %}
+                None
+              {% endif %}
+            </dd>
+          </div>
+        </dl>
+        <div class="note">
+          Your sign-in email is your username, so only an administrator can
+          change it. If you did not make a failed attempt shown here, change
+          your password now.
+        </div>
+      </div>
+    </aside>
+  </div>
+{% endblock %}

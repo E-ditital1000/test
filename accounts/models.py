@@ -108,3 +108,63 @@ class AuditEntry(models.Model):
 
     def __str__(self):
         return f"{self.action} on {self.target_type}:{self.target_id} by {self.actor}"
+
+
+def profile_photo_path(instance, filename):
+    """
+    A fresh random name every upload. A predictable path (the user's id)
+    would let anybody who has seen one photo guess the next person's, and a
+    reused name would be served from browser caches after a replacement.
+    """
+    import uuid
+
+    return f"profiles/{uuid.uuid4().hex}.jpg"
+
+
+class Profile(models.Model):
+    """
+    What a person says about themselves, kept apart from both the sign-in
+    identity (User) and the record HR keeps about them (hr.Employee).
+
+    Only the person edits it. Nothing here grants access to anything, and
+    nothing an employer relies on (staff ID, job title, supervisor) lives
+    here, so a person changing their own profile can never change what
+    they are allowed to do or how they are paid.
+    """
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+
+    photo = models.ImageField(upload_to=profile_photo_path, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    bio = models.CharField("About me", max_length=280, blank=True)
+    personal_phone = models.CharField(max_length=30, blank=True)
+    address = models.CharField("Home address", max_length=200, blank=True)
+
+    emergency_contact_name = models.CharField("Name", max_length=120, blank=True)
+    emergency_contact_relationship = models.CharField("Relationship", max_length=60, blank=True)
+    emergency_contact_phone = models.CharField("Phone", max_length=30, blank=True)
+
+    linkedin_url = models.URLField("LinkedIn", blank=True)
+    x_url = models.URLField("X (Twitter)", blank=True)
+    facebook_url = models.URLField("Facebook", blank=True)
+    website_url = models.URLField("Website", blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profile of {self.user}"
+
+    @property
+    def social_links(self):
+        """(label, url) for each link filled in, in display order."""
+        pairs = [
+            ("LinkedIn", self.linkedin_url),
+            ("X", self.x_url),
+            ("Facebook", self.facebook_url),
+            ("Website", self.website_url),
+        ]
+        return [(label, url) for label, url in pairs if url]
+
+    @property
+    def has_emergency_contact(self):
+        return bool(self.emergency_contact_name and self.emergency_contact_phone)

@@ -695,6 +695,7 @@ td.acts .btn + .btn { margin-left: 6px; }
 .form-actions .spacer { flex: 1; }
 
 .inp, input[type=text], input[type=email], input[type=password], input[type=number],
+input[type=tel], input[type=url],
 input[type=date], input[type=datetime-local], input[type=time], input[type=search],
 select, textarea {
   width: 100%; min-height: 46px; border: 1px solid var(--line);
@@ -885,6 +886,65 @@ input[type=checkbox], input[type=radio] {
   .toasts[data-armed] .toast,
   .toasts[data-armed] .toast[data-state="closing"] { transform: none; }
 }
+
+/* --------------------------------------------------------------------------
+   My profile
+   -------------------------------------------------------------------------- */
+.prof-hd { display: flex; align-items: center; gap: 20px; padding: 20px; flex-wrap: wrap; }
+.prof-av {
+  flex: none; width: 88px; height: 88px; border-radius: 50%; overflow: hidden;
+  background: var(--navy); color: var(--gold); display: flex; align-items: center;
+  justify-content: center; font-size: 30px; font-weight: 700; letter-spacing: .02em;
+}
+.prof-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.prof-id { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.prof-id .t-body { overflow-wrap: anywhere; }
+.prof-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+
+.prof-photo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prof-photo form { display: flex; gap: 8px; }
+.prof-photo-help { flex: 1 1 100%; }
+/* The file input is visually replaced by its label, so the label has to
+   show the focus the input actually holds. */
+.prof-photo input[type="file"]:focus-visible + label {
+  outline: 2px solid var(--focus-light); outline-offset: 2px;
+}
+
+.prof-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px; align-items: start;
+}
+.prof-main, .prof-rail { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* The rail is narrow: the register's 170px label column would leave an
+   email address nowhere to go. */
+.prof-rail .kv dt { width: 110px; }
+.prof-rail .kv dd { overflow-wrap: anywhere; }
+
+/* What is still missing. A done item stays, struck through, so filling one
+   in reads as progress rather than a line silently vanishing. */
+.prof-todo { list-style: none; margin: 0; padding: 0 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.prof-todo li { position: relative; padding-left: 28px; font-size: 14px; line-height: 20px; }
+.prof-todo li::before {
+  content: ""; position: absolute; left: 0; top: 1px; width: 18px; height: 18px;
+  border-radius: 50%; border: 2px solid var(--line); box-sizing: border-box;
+}
+.prof-todo li.done { color: var(--muted); text-decoration: line-through; }
+.prof-todo li.done::before { border-color: var(--green); background: var(--green); }
+
+.prof-when { white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .prof-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .prof-hd { gap: 14px; }
+  .prof-av { width: 64px; height: 64px; font-size: 22px; }
+  .prof-rail .kv { flex-direction: column; gap: 2px; }
+  .prof-rail .kv dt { width: auto; }
+}
+
+/* The header avatar, when a photo exists. */
+.a1-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 
 /* --------------------------------------------------------------------------
    Sign in — split panel
