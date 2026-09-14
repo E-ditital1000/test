@@ -123,6 +123,8 @@ def index(request):
             )
         )
 
+    from .birthdays import is_birthday_today, upcoming_birthdays
+
     queue = attention_queue(user)
     return render(
         request,
@@ -130,6 +132,8 @@ def index(request):
         {
             "tiles": tiles,
             "queue": queue,
+            "birthdays": upcoming_birthdays(),
+            "my_birthday": is_birthday_today(user),
             "today": timezone.localdate(),
             "is_executive": user_has_permission(user, "view_executive_dashboard"),
         },

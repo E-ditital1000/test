@@ -943,6 +943,11 @@ input[type=checkbox], input[type=radio] {
   .prof-rail .kv dt { width: auto; }
 }
 
+/* Birthdays on the dashboard. Today's is the one gold row: gold is the
+   system's "look here", and on this card that is who to go and see. */
+.row-i.bday.is-today { background: var(--gold100); }
+.bday-pill { background: var(--gold); color: var(--navy); }
+
 /* The header avatar, when a photo exists. */
 .a1-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 

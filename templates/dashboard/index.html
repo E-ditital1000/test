@@ -2,7 +2,7 @@
 {% load a1 %}
 {% block title %}Dashboard — A1 360{% endblock %}
 
-{% block page_title %}{% a1greeting %}, {{ user.first_name|default:user.email }}{% endblock %}
+{% block page_title %}{% if my_birthday %}Happy birthday{% else %}{% a1greeting %}{% endif %}, {{ user.first_name|default:user.email }}{% endblock %}
 {% block page_sub %}{{ today|date:"l" }} {{ today|a1date }} · every figure counted from source rows at request time{% endblock %}
 
 {% block page_actions %}
@@ -77,4 +77,39 @@
       {% endif %}
     {% endfor %}
   </div>
+
+  {% comment %}
+  Only when there is one this week. An empty "no birthdays" card on most
+  days would be clutter on the screen people open first.
+  {% endcomment %}
+  {% if birthdays %}
+    <div class="card">
+      <div class="hd">
+        <b>Birthdays this week</b>
+        <a class="meta" href="{% url 'profile' %}">Share or hide yours</a>
+      </div>
+      {% for birthday in birthdays %}
+        <div class="row-i bday{% if birthday.is_today %} is-today{% endif %}">
+          <span class="a1-avatar" aria-hidden="true">
+            {% if birthday.photo_url %}
+              <img src="{{ birthday.photo_url }}" alt="" width="36" height="36" loading="lazy">
+            {% else %}
+              {{ birthday.user.first_name|first|upper }}{{ birthday.user.last_name|first|upper|default:"" }}
+            {% endif %}
+          </span>
+          <div class="two g">
+            <b>{{ birthday.user.get_full_name|default:birthday.user.email }}{% if birthday.user == user %} (you){% endif %}</b>
+            {% if birthday.job_title %}<span>{{ birthday.job_title }}</span>{% endif %}
+          </div>
+          {% if birthday.is_today %}
+            <span class="pill bday-pill">Today</span>
+          {% elif birthday.is_tomorrow %}
+            <span class="t-small dim2">Tomorrow</span>
+          {% else %}
+            <span class="t-small dim2">{{ birthday.on|date:"D" }} {{ birthday.on|a1date }}</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 {% endblock %}

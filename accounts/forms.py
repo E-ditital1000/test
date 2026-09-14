@@ -110,7 +110,7 @@ def _age_on(born, today):
 
 class ProfileForm(forms.ModelForm):
     GROUPS = {
-        "personal": ["date_of_birth", "personal_phone", "address", "bio"],
+        "personal": ["date_of_birth", "show_birthday", "personal_phone", "address", "bio"],
         "emergency": [
             "emergency_contact_name", "emergency_contact_relationship",
             "emergency_contact_phone",
@@ -121,7 +121,7 @@ class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
         fields = [
-            "date_of_birth", "personal_phone", "address", "bio",
+            "date_of_birth", "show_birthday", "personal_phone", "address", "bio",
             "emergency_contact_name", "emergency_contact_relationship",
             "emergency_contact_phone",
             "linkedin_url", "x_url", "facebook_url", "website_url",

@@ -136,6 +136,13 @@ class Profile(models.Model):
 
     photo = models.ImageField(upload_to=profile_photo_path, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
+    # On by default, because A-1 marks birthdays. Only the day and month are
+    # ever shown to anyone else; the year, and so the age, never is.
+    show_birthday = models.BooleanField(
+        "Show my birthday to colleagues",
+        default=True,
+        help_text="Colleagues see the day and month on the dashboard. Never the year.",
+    )
     bio = models.CharField("About me", max_length=280, blank=True)
     personal_phone = models.CharField(max_length=30, blank=True)
     address = models.CharField("Home address", max_length=200, blank=True)
