@@ -195,6 +195,72 @@ def revoke_role(*, actor, user, role, reason=""):
     )
 
 
+# No 0/O, 1/l/I: a temporary password is read aloud or copied off a screen
+# by hand, and a character that could be two characters locks somebody out.
+TEMPORARY_PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def temporary_password():
+    from django.utils.crypto import get_random_string
+
+    return get_random_string(12, TEMPORARY_PASSWORD_ALPHABET)
+
+
+@transaction.atomic
+def issue_temporary_password(*, actor, user, reason=""):
+    """
+    For somebody who has forgotten their password or locked themselves out.
+
+    Returns the new temporary password, which the caller shows once. The
+    person must replace it at their next sign-in, and every session they
+    had open ends, since each was signed with the old password.
+
+    Setting somebody's password is signing in as them, so the same rule as
+    granting a role applies: you may only do it to an account whose every
+    permission you already hold. Otherwise anyone who manages users could
+    reset an Admin's password and walk in as that Admin.
+    """
+    if not user_has_permission(actor, "manage_users"):
+        raise PermissionDenied("missing permission: manage_users")
+    if user.pk == actor.pk:
+        raise ValidationError(
+            "Change your own password from My profile, where it asks for your current one."
+        )
+    if not user.is_active:
+        raise ValidationError("This account is deactivated. Reactivate it first.")
+
+    held_by_target = set(
+        Permission.objects.filter(role__user_roles__user=user).values_list("code", flat=True)
+    )
+    beyond_actor = sorted(c for c in held_by_target if not user_has_permission(actor, c))
+    if beyond_actor:
+        raise PermissionDenied(
+            "You cannot reset this password: the account holds permissions you "
+            "do not hold yourself ({}).".format(", ".join(beyond_actor))
+        )
+
+    before = {
+        "must_reset_password": user.must_reset_password,
+        "locked": user.is_locked_out(),
+    }
+    temporary = temporary_password()
+    user.set_password(temporary)
+    user.must_reset_password = True
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.save(update_fields=["password", "must_reset_password", "failed_login_attempts", "locked_until"])
+    # The password itself is never recorded, only that one was issued.
+    audit.record_change(
+        actor=actor,
+        action="user.temporary_password_issued",
+        target=user,
+        before=before,
+        after={"must_reset_password": True, "locked": False},
+        reason=reason,
+    )
+    return temporary
+
+
 @transaction.atomic
 def deactivate_user(*, actor, user, reason=""):
     """Accounts are deactivated, never deleted — history stays intact."""

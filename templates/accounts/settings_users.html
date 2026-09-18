@@ -52,11 +52,18 @@
                   {% if row.must_reset_password %}
                     <span class="pill p-wait"><i></i>Reset pending</span>
                   {% endif %}
+                  {% if row.is_locked_out %}
+                    <span class="pill p-over"><i></i>Locked out</span>
+                  {% endif %}
                 </td>
                 <td class="acts">
                   <a class="btn btn-sec btn-sm" href="{% url 'settings-user-edit' row.pk %}">Edit</a>
                   {% comment %} Absent, not disabled: there is no state in which you
                      deactivate an already-deactivated account. {% endcomment %}
+                  {% if row.is_active and row != user %}
+                    <a class="btn btn-sec btn-sm"
+                       href="{% url 'settings-user-temporary-password' row.pk %}">Reset password</a>
+                  {% endif %}
                   {% if row.is_active %}
                     <a class="btn btn-gho btn-sm" style="color:var(--red)"
                        href="{% url 'settings-user-deactivate' row.pk %}">Deactivate</a>

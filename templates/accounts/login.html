@@ -65,12 +65,13 @@
 
       {% if locked %}
         <div class="deny hint" style="border:0;border-radius:10px">
-          Ask any Admin to release it from <b>Settings &rarr; Users</b>.
-          The lock and the release are both written to the audit log.
+          Ask an Admin to <b>reset your password</b> from Settings &rarr; Users.
+          That releases the lock at once and gives you a password to use once.
         </div>
       {% else %}
         <div class="note" style="border-radius:10px">
-          First login forces a password reset.
+          <b>Forgotten your password?</b> Ask an Admin to reset it. You will get
+          a temporary one and choose your own when you sign in.
           {{ lockout_threshold }} failed attempts lock the account.
         </div>
       {% endif %}

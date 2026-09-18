@@ -18,6 +18,11 @@ urlpatterns = [
     path("settings/users/new/", views.user_edit, name="settings-user-create"),
     path("settings/users/<int:pk>/", views.user_edit, name="settings-user-edit"),
     path("settings/users/<int:pk>/deactivate/", views.user_deactivate, name="settings-user-deactivate"),
+    path(
+        "settings/users/<int:pk>/temporary-password/",
+        views.user_temporary_password,
+        name="settings-user-temporary-password",
+    ),
 
     path("settings/roles/", views.settings_roles, name="settings-roles"),
     path("settings/roles/new/", views.role_edit, name="settings-role-create"),

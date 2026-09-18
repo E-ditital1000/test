@@ -412,12 +412,10 @@ def onboard_employee(*, actor, data, roles):
     sign-in, so nobody but the new starter ever knows the lasting one.
     """
     from django.contrib.auth import get_user_model
-    from django.utils.crypto import get_random_string
-
     from accounts import audit
     from accounts.models import UserRole
     from accounts.permissions import forget_permissions
-    from accounts.services import can_grant_role
+    from accounts.services import can_grant_role, temporary_password
 
     from .models import Employee
 
@@ -433,7 +431,7 @@ def onboard_employee(*, actor, data, roles):
             )
 
     email = data["email"].strip().lower()
-    temporary = get_random_string(12)
+    temporary = temporary_password()
 
     user = User(
         username=email,

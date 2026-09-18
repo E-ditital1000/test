@@ -20,7 +20,6 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.crypto import get_random_string
 
 from config.pagination import paginate
 
@@ -97,7 +96,7 @@ def login_view(request):
             locked = True
             lock_message = (
                 "This account is locked after {} failed sign-ins. "
-                "It unlocks in {} minute(s), or an Admin can release it now.".format(
+                "It unlocks in {} minute(s), or an Admin can reset your password now.".format(
                     django_settings.LOGIN_LOCKOUT_THRESHOLD, remaining
                 )
             )
@@ -212,7 +211,7 @@ def user_edit(request, pk=None):
             user.username = form.cleaned_data["email"]
             # An admin never chooses somebody's lasting password: a
             # temporary one is issued and the forced reset replaces it.
-            temporary = get_random_string(12)
+            temporary = services.temporary_password()
             user.set_password(temporary)
             user.must_reset_password = True
         user.save()
@@ -268,6 +267,49 @@ def user_deactivate(request, pk):
             "title": "Deactivate {}?".format(user),
             "body": "The account keeps all of its history and can be reactivated.",
             "action_label": "Deactivate",
+            "cancel_url": reverse("settings-users"),
+        },
+    )
+
+
+@require_permission("manage_users")
+def user_temporary_password(request, pk):
+    """
+    The way back in for somebody who forgot their password or locked
+    themselves out. There is no emailed reset link: staff sign in with work
+    addresses that are not all read, and a link sent to an unread inbox
+    helps nobody on site. A person asks an administrator instead, in person
+    or by phone, and is handed a password that works once.
+    """
+    user = get_object_or_404(User, pk=pk)
+    if request.method == "POST":
+        try:
+            temporary = services.issue_temporary_password(
+                actor=request.user, user=user, reason=request.POST.get("reason", "")
+            )
+        except (ValidationError, PermissionDenied) as exc:
+            messages.error(request, getattr(exc, "messages", [str(exc)])[0])
+            return redirect("settings-users")
+        messages.success(
+            request,
+            "New temporary password for {}: {} - they must change it when they "
+            "next sign in. Any device they were signed in on has been signed "
+            "out.".format(user, temporary),
+            extra_tags="sticky",
+        )
+        return redirect("settings-users")
+    return render(
+        request,
+        "accounts/confirm.html",
+        {
+            "title": "Issue a temporary password for {}?".format(user),
+            "body": (
+                "Their current password stops working at once, any device they "
+                "are signed in on is signed out, and a sign-in lockout is "
+                "cleared. The new password is shown to you once; give it to "
+                "them directly. They choose their own at next sign-in."
+            ),
+            "action_label": "Issue temporary password",
             "cancel_url": reverse("settings-users"),
         },
     )
