@@ -1,0 +1,4 @@
+first_name,last_name,email,staff_id,phone,job_title,department,supervisor,start_date,roles
+Ada,Okafor,ada.okafor@a1.example,A1-001,+231 770 000 001,Supervisor,Operations,,2022-01-10,Supervisor|Employee
+Moses,Toe,moses.toe@a1.example,A1-014,+231 880 000 014,Electrician,Field,A1-001,2024-09-03,Technician|Employee
+Ruth,Doe,ruth.doe@a1.example,A1-020,,Receptionist,Office,,2025-02-17,Receptionist|Employee
