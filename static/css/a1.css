@@ -973,6 +973,9 @@ input[type=checkbox], input[type=radio] {
   border-radius: var(--r-card); padding: 32px; display: flex; flex-direction: column; gap: 18px;
 }
 .fbox.is-locked { border-color: var(--red); }
+/* The reference on the server-error page: read out over the phone. */
+.err-ref { border-radius: 10px; }
+.err-ref b { display: block; margin-top: 4px; font-size: 18px; letter-spacing: .12em; }
 
 /* Demo account switcher — development only, and it should look like scaffolding
    rather than part of the product: dashed edge, gold-tinted ground, never the

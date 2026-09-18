@@ -453,3 +453,38 @@ def permission_denied(request, exception=None):
         },
         status=403,
     )
+
+
+def server_error(request):
+    """
+    The designed 500. Django has already logged the traceback (logger
+    `django.request`) by the time this runs; this adds one line carrying a
+    short reference, printed next to it in the journal, and shows the same
+    reference on screen. "It says K7Q2MX" finds the right traceback in
+    seconds, where "it broke this morning" does not.
+
+    Nothing here may touch the database or the session: either could be
+    what failed. If rendering the page fails too, a bare response is still
+    better than none.
+    """
+    import logging
+
+    from django.http import HttpResponseServerError
+    from django.template.loader import render_to_string
+
+    reference = services.temporary_password()[:6].upper()
+    try:
+        user_id = getattr(request, "user", None) and request.user.pk
+    except Exception:
+        user_id = None
+    logging.getLogger("a1360.errors").error(
+        "Server error ref=%s %s %s user=%s",
+        reference, request.method, request.get_full_path(), user_id or "-",
+    )
+    try:
+        return HttpResponseServerError(render_to_string("500.html", {"error_ref": reference}))
+    except Exception:
+        return HttpResponseServerError(
+            "Something went wrong on the server. Reference: {}".format(reference),
+            content_type="text/plain",
+        )

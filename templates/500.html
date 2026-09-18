@@ -1,0 +1,56 @@
+{% load static %}<!doctype html>
+{% comment %}
+Shown when the server fails. Deliberately standalone rather than extending
+base.html or the document shell: whatever broke may be the database, the
+session, or the context processors those templates need, and an error page
+that errors shows the browser's blank one instead.
+
+No script either. The document shell's service-worker snippet would read
+the missing user as "signed out" and wipe a technician's offline pages.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11043A">
+  <title>Something went wrong — A1 360</title>
+  <link rel="stylesheet" href="{% static 'css/a1.css' %}">
+</head>
+<body>
+<main class="login">
+  <div class="lft on-navy">
+    <div class="brand-lockup">
+      <img src="{% static 'img/a1-mark.png' %}" alt="">
+      <b>A1 360</b>
+    </div>
+    <div>
+      <h5>That was our fault, not yours.</h5>
+      <p>
+        The server hit an error it did not expect. It has been recorded, with
+        the time and the screen you were on.
+      </p>
+    </div>
+    <p class="t-small">Phase One · Internal use only</p>
+  </div>
+
+  <div class="rgt">
+    <div class="fbox">
+      <b class="t-h24">Something went wrong</b>
+      <p class="t-body dim2">
+        Nothing you had already saved is lost. If you were saving a form, go
+        back and check whether it went through before sending it again.
+      </p>
+      {% if error_ref %}
+        <div class="note err-ref">
+          If it keeps happening, tell an Admin this reference:
+          <b class="mono">{{ error_ref }}</b>
+        </div>
+      {% endif %}
+      <div class="form-actions">
+        <a class="btn btn-pri" href="/">Go to the dashboard</a>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>

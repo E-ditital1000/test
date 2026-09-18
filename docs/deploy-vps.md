@@ -147,6 +147,23 @@ tar czf /var/backups/a1360-media-$(date +%F).tar.gz -C /srv/a1360 media
 Put both in cron and copy them **off the box**. A backup on the same disk as
 the thing it backs up is not a backup.
 
+## When somebody hits an error
+
+The error page shows them a six-character reference, such as `K7Q2MX`.
+Every error writes that reference and its full traceback to the journal:
+
+```bash
+# Find one somebody read out to you
+journalctl -u a1360 --since today | grep -A40 'ref=K7Q2MX'
+
+# Every server error in the last day
+journalctl -u a1360 --since '24 hours ago' | grep 'Server error ref='
+```
+
+The traceback is printed next to the `ref=` line. Only errors are logged
+from Django itself; ordinary 403s and 404s are in nginx's access log.
+Set `LOG_LEVEL=WARNING` in `.env` to quieten the app further.
+
 ## Things that will bite
 
 | Symptom | Cause |

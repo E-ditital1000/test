@@ -67,5 +67,9 @@ urlpatterns = [
 # permission that is missing and who can grant it.
 handler403 = "accounts.views.permission_denied"
 
+# The server error is designed too, and carries a reference that matches a
+# line in the log. See accounts.views.server_error.
+handler500 = "accounts.views.server_error"
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

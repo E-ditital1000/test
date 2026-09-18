@@ -243,6 +243,36 @@ LOGIN_LOCKOUT_THRESHOLD = 5
 LOGIN_LOCKOUT_MINUTES = 15
 SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 hours
 
+# --------------------------------------------------------------------------
+# Logging
+#
+# Everything goes to stderr. Under systemd that is the journal
+# (`journalctl -u a1360`), which already timestamps, rotates and keeps it;
+# a log file of our own would be one more thing to rotate and fill a disk.
+#
+# Without this, Django's default sends a production traceback only to
+# ADMINS by email, and with no ADMINS and no mail server set up, a crash in
+# the pilot would leave no trace anywhere.
+#
+# django is held at ERROR: its 403/404 warnings are already in the nginx
+# access log, and repeating them here buries the errors that matter.
+# --------------------------------------------------------------------------
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "{asctime} {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "stderr": {"class": "logging.StreamHandler", "formatter": "plain"},
+    },
+    "loggers": {
+        "django": {"handlers": ["stderr"], "level": "ERROR", "propagate": False},
+        "a1360": {"handlers": ["stderr"], "level": LOG_LEVEL, "propagate": False},
+    },
+}
+
 JAZZMIN_SETTINGS = {
     "site_header": "A1 Management System",
     "site_brand": "A1 Admin",
