@@ -25,6 +25,9 @@ Sign in and, **for their own company only**:
 | When | After the Phase One pilot; first item in Phase Two |
 | Money | Invoices and payments only. Never A-1's internal costs, expenses, requisitions, rates or profit. |
 | Documents and reports | Only those staff tick **Share with customer**. Nothing is shared by default. |
+| Email notifications | **Yes.** Needs an email service added to the system (below). |
+| Who may ask for work | **Only contacts marked as allowed to.** Every other login can see, not ask. |
+| Scheduled maintenance | **Its own kind of work:** a contract with recurring visits (below). |
 
 ## How it fits the system as built
 
@@ -62,6 +65,68 @@ their sites. It lands in the reception and operations queue that already
 exists, so nobody learns a new inbox. The customer sees their requests and
 each one's status.
 
+Only a contact marked **Can request work** (a new flag on `crm.Contact`,
+off by default, set by staff) sees the request form. For everyone else it
+is absent, not disabled, and the server refuses the request if it is posted
+anyway. This lets a customer's accounts clerk follow invoices without being
+able to commission work.
+
+## Email notifications
+
+The system sends no email today. Adding it is its own piece of work, and
+it also unlocks things staff have wanted, such as a password reset link by
+email.
+
+**How it sends.** Every email is written to an **outbox** table first and
+sent by a separate job (`manage.py send_outbox`, run every minute by a
+systemd timer). A slow or unreachable mail server then never slows down or
+breaks the screen that caused the email, a failed send is retried, and
+there is a record of what was sent to whom and when.
+
+**What it sends to customers:**
+
+| Event | Sent to |
+| --- | --- |
+| A field visit is booked, moved or cancelled | Contacts at that customer |
+| A project changes stage | Contacts at that customer |
+| An invoice is issued | Contacts at that customer |
+| A portal request is received, and when its status changes | The contact who raised it |
+| A shared document or report is added | Contacts at that customer |
+| Their portal login is created | That contact (instead of HR reading out a password) |
+
+Each contact can switch each kind off from the portal. Every email says what
+happened and links to the portal page; it never carries amounts, documents
+or anything else that should stay behind the sign-in.
+
+## Maintenance contracts
+
+Scheduled maintenance is **its own kind of work**, not a ticket raised each
+time.
+
+**A contract** (new model) belongs to a customer and names: the site or
+sites it covers, the service type, how often a visit is due (monthly,
+quarterly, twice a year, yearly), a start date and an end or renewal date,
+and who at A-1 owns it.
+
+**Visits are created from it.** A daily job (`manage.py schedule_maintenance`)
+creates each **field job** a set number of days before it is due, linked to
+the contract. From then on it is an ordinary field job: assigned, visited,
+assessed and approved exactly as today, so field crews learn nothing new. A
+visit that is missed or pushed back does not shift the next one; the
+schedule follows the contract, not the last visit.
+
+**Everyone can see where it stands.**
+
+- Staff: a contracts register with each contract's next due visit, visits
+  overdue, and contracts coming up for renewal. Overdue maintenance visits
+  join the attention queue.
+- The customer, in the portal: their contracts, the visit history against
+  each, and the next visit due. The next-visit reminder is one of their
+  email notifications.
+
+**New permissions:** `view_contracts`, `manage_contracts` (create, change,
+end). The contract and its visits are audited like every other record.
+
 ## Security checklist before it ships
 
 - [ ] Every portal view scoped through the one customer filter; tested with
@@ -74,13 +139,28 @@ each one's status.
       submission.
 - [ ] The HTTPS deployment is live; never over plain HTTP.
 
+## Suggested build order
+
+1. **Email service and outbox.** Everything else sends through it.
+2. **Portal sign-in, scoping and read-only screens**: projects, visits,
+   shared documents, invoices and payments.
+3. **Requests from the portal**, with the Can request work flag.
+4. **Maintenance contracts and the visit scheduler**, then their portal view.
+5. **Customer notifications**, event by event.
+
+Each step ships on its own with its tests, so the portal can open to
+customers after step 3 without waiting for contracts.
+
 ## Still open
 
-- **Notifications.** Should a customer get an email when a visit is booked,
-  a stage changes or an invoice is issued? Needs an email service, which the
-  system does not have yet.
-- **Who may request work.** Every portal login, or only a contact marked as
-  able to?
-- **Maintenance contracts.** Is scheduled maintenance its own kind of job
-  (recurring visits against a contract), or a ticket like any other? A
-  recurring schedule is a larger piece of work.
+- **Email provider and sender address.** An SMTP service (such as Postmark,
+  Mailgun or Amazon SES) and a sending domain, e.g. `notifications@a1…`, with
+  its SPF and DKIM records set so emails are not marked as spam. Somebody at
+  A-1 needs to own the account.
+- **How far ahead to create maintenance visits.** Suggested: 14 days before
+  they are due, so operations can plan crews.
+- **How maintenance is billed.** An invoice per visit, or a fixed amount per
+  month or year under the contract? This decides whether contracts need
+  their own invoicing rules.
+- **Who approves a scheduled visit.** Does a created maintenance visit go
+  straight onto the job list, or wait for a supervisor to confirm the date?
