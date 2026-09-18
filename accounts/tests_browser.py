@@ -53,11 +53,26 @@ def browser_available():
         return False
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            browser = p.chromium.launch(args=LOCAL_ONLY)
             browser.close()
         return True
     except Exception:
         return False
+
+
+# Chrome resolves no host name but localhost, where the test server runs.
+#
+# Every page asks Google for the Inter font, and a page does not finish
+# loading until that request does. On a slow or flaky connection that held
+# page loads past Playwright's 30-second limit and failed tests that had
+# nothing wrong with them. With this the lookup fails at once, the app is
+# tested on its own, and the stylesheet falls back to the system font, as a
+# phone with no signal would.
+#
+# Done in Chrome's resolver rather than with Playwright's request routing:
+# once routing is on, a form POST from a page a service worker controls can
+# hang with no response, and the clock screen is exactly that.
+LOCAL_ONLY = ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost"]
 
 
 class _OneRequestAtATime(ThreadedWSGIServer):
@@ -106,7 +121,7 @@ class ShellBehaviourTests(StaticLiveServerTestCase):
         os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
         super().setUpClass()
         cls._playwright = sync_playwright().start()
-        cls.browser = cls._playwright.chromium.launch()
+        cls.browser = cls._playwright.chromium.launch(args=LOCAL_ONLY)
 
     @classmethod
     def tearDownClass(cls):
@@ -222,12 +237,14 @@ class OfflineClockTests(StaticLiveServerTestCase):
     server exactly once when the network returns.
     """
 
+    server_thread_class = _SerialLiveServerThread
+
     @classmethod
     def setUpClass(cls):
         os.environ.setdefault("DJANGO_ALLOW_ASYNC_UNSAFE", "true")
         super().setUpClass()
         cls._playwright = sync_playwright().start()
-        cls.browser = cls._playwright.chromium.launch()
+        cls.browser = cls._playwright.chromium.launch(args=LOCAL_ONLY)
 
     @classmethod
     def tearDownClass(cls):
