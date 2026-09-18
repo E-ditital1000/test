@@ -21,6 +21,7 @@ box without them still runs the rest of the suite:
     pip install playwright && python -m playwright install chromium
 """
 import os
+import threading
 import time
 import unittest
 from datetime import timedelta
@@ -28,7 +29,9 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.management import call_command
+from django.core.servers.basehttp import ThreadedWSGIServer
 from django.test import tag
+from django.test.testcases import LiveServerThread
 from django.utils import timezone
 
 from accounts.models import Role, UserRole
@@ -57,10 +60,44 @@ def browser_available():
         return False
 
 
+class _OneRequestAtATime(ThreadedWSGIServer):
+    """
+    Django's test server answers each request on its own thread. Against the
+    test database -- in-memory SQLite, shared between those threads -- two
+    requests writing at once collide on SQLite's table lock, and one of them
+    500s. The clock screen does exactly that when it replays a queue, so the
+    browser tests failed now and then for a reason that is not in the app
+    (production runs Postgres, which has no such lock).
+
+    So only one request at a time runs the application. Connections stay
+    threaded: Chrome opens spare connections it may never send a request
+    on, and a server that served connections one at a time would wait on
+    one of those forever. The lock is taken only once a request has
+    arrived, around the part that touches the database.
+    """
+
+    _lock = threading.Lock()
+
+    def set_app(self, application):
+        lock = self._lock
+
+        def one_at_a_time(environ, start_response):
+            with lock:
+                return application(environ, start_response)
+
+        super().set_app(one_at_a_time)
+
+
+class _SerialLiveServerThread(LiveServerThread):
+    server_class = _OneRequestAtATime
+
+
 @unittest.skipUnless(PLAYWRIGHT and browser_available(), "playwright/chromium not installed")
 @tag("browser")
 class ShellBehaviourTests(StaticLiveServerTestCase):
     """The interactions the shell promises."""
+
+    server_thread_class = _SerialLiveServerThread
 
     @classmethod
     def setUpClass(cls):
