@@ -1,0 +1,4 @@
+name,phone,email,address,notes,contact_name,contact_job_title,contact_phone,contact_email,site_name,site_address,site_latitude,site_longitude
+Liberty Gold Ltd,+231 770 111 222,office@libertygold.example,"12 Broad Street, Monrovia",Pays on 30 days,Amos Kollie,Site Manager,+231 880 123 456,amos@libertygold.example,Main yard,"Bushrod Island, Monrovia",6.338000,-10.806000
+Liberty Gold Ltd,,,,,Mary Doe,Accounts,+231 770 999 000,,Ganta depot,"Ganta, Nimba County",,
+New Hope Clinic,+231 777 555 010,,"Tubman Boulevard, Sinkor",,,,,,Clinic,"Tubman Boulevard, Sinkor",,
