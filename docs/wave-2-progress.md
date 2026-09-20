@@ -103,5 +103,6 @@ python manage.py seed_demo_data
 python manage.py test
 ```
 
-Sign in at `/login/` — the demo panel lists one account per role
-(development only, gated on `SHOW_DEMO_ACCOUNTS`).
+Sign in at `/login/` with a seeded account; `seed_demo_data` prints the
+password it set. The sign-in page lists no accounts: it is unauthenticated,
+so anything on it is public.

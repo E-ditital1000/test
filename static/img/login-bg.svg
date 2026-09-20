@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1600" width="1200" height="1600" role="img" aria-label="Engineering blueprint">
+  <title>Engineering blueprint</title>
+  <desc>A transmission tower, gear and circuit run drawn as a blueprint. The
+  left third is kept clear so the sign-in headline sits on quiet ground.</desc>
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B0A5C"/>
+      <stop offset="0.55" stop-color="#11043A"/>
+      <stop offset="1" stop-color="#0B0227"/>
+    </linearGradient>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#FFCB00" stroke-opacity="0.13" stroke-width="1"/>
+    </pattern>
+    <pattern id="fineGrid" width="12" height="12" patternUnits="userSpaceOnUse">
+      <path d="M12 0H0V12" fill="none" stroke="#FFFFFF" stroke-opacity="0.05" stroke-width="0.6"/>
+    </pattern>
+    <g id="gearTeeth">
+      <rect x="-9" y="-104" width="18" height="26" rx="3"/>
+    </g>
+    <!-- Keeps the headline column quiet: the drawing fades out to the left. -->
+    <linearGradient id="clearLeft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.34" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="1"/>
+    </linearGradient>
+    <mask id="rightWeighted">
+      <rect width="1200" height="1600" fill="url(#clearLeft)"/>
+    </mask>
+  </defs>
+
+  <rect width="1200" height="1600" fill="url(#ground)"/>
+  <rect width="1200" height="1600" fill="url(#fineGrid)"/>
+  <rect width="1200" height="1600" fill="url(#grid)"/>
+
+  <g mask="url(#rightWeighted)">
+    <!-- Survey arcs: the setting out behind every install -->
+    <g fill="none" stroke="#FFCB00" stroke-opacity="0.26">
+      <circle cx="1010" cy="230" r="300" stroke-width="1.5"/>
+      <circle cx="1010" cy="230" r="220" stroke-width="1" stroke-dasharray="6 10"/>
+      <circle cx="1010" cy="230" r="140" stroke-width="1"/>
+      <path d="M650 230h720M1010 -170v800" stroke-width="0.8" stroke-opacity="0.18"/>
+    </g>
+
+    <!-- Transmission tower, standing in the right half -->
+    <g transform="translate(340,0)">
+      <g stroke="#FFFFFF" stroke-opacity="0.55" fill="none" stroke-width="3" stroke-linecap="round">
+        <path d="M300 1380 L380 620 M620 1380 L540 620"/>
+        <path d="M380 620 L540 620"/>
+        <path d="M300 1380 L620 1380" stroke-opacity="0.3"/>
+        <path d="M330 1100 L590 1100 M345 960 L575 960 M360 820 L560 820 M372 700 L548 700"/>
+        <path d="M330 1100 L590 960 M590 1100 L330 960 M345 960 L575 820 M575 960 L345 820
+                 M360 820 L560 700 M560 820 L360 700 M300 1380 L590 1100 M620 1380 L330 1100"
+              stroke-opacity="0.3" stroke-width="2"/>
+        <path d="M250 690 L670 690 M280 600 L640 600" stroke-opacity="0.5"/>
+        <path d="M380 620 L280 600 M540 620 L640 600" stroke-opacity="0.38" stroke-width="2"/>
+        <path d="M420 560 L460 600 L500 560" stroke-opacity="0.44" stroke-width="2"/>
+      </g>
+      <g fill="#FFCB00" fill-opacity="0.75">
+        <circle cx="250" cy="690" r="7"/><circle cx="670" cy="690" r="7"/>
+        <circle cx="280" cy="600" r="6"/><circle cx="640" cy="600" r="6"/>
+        <circle cx="460" cy="548" r="7"/>
+      </g>
+      <!-- Dimension line, the way a drawing is marked up -->
+      <g stroke="#FFFFFF" stroke-opacity="0.32" fill="none" stroke-width="1.5">
+        <path d="M300 1250 H620"/>
+        <path d="M300 1236 V1264 M620 1236 V1264"/>
+      </g>
+    </g>
+
+    <!-- The lines it carries, running off both edges -->
+    <g fill="none" stroke="#FFCB00" stroke-opacity="0.4" stroke-width="3">
+      <path d="M180 780 Q 400 800 590 690"/>
+      <path d="M1010 690 Q 1140 700 1260 640"/>
+      <path d="M200 700 Q 420 715 620 600"/>
+      <path d="M980 600 Q 1130 620 1260 560"/>
+    </g>
+
+    <!-- Gear: the mechanical half of the work, low and out of the way -->
+    <g transform="translate(250,1330) scale(0.62)">
+      <g fill="#FFFFFF" fill-opacity="0.26">
+        <use href="#gearTeeth"/>
+        <use href="#gearTeeth" transform="rotate(45)"/>
+        <use href="#gearTeeth" transform="rotate(90)"/>
+        <use href="#gearTeeth" transform="rotate(135)"/>
+        <use href="#gearTeeth" transform="rotate(180)"/>
+        <use href="#gearTeeth" transform="rotate(225)"/>
+        <use href="#gearTeeth" transform="rotate(270)"/>
+        <use href="#gearTeeth" transform="rotate(315)"/>
+        <path d="M0 -86 A86 86 0 1 1 0 86 A86 86 0 1 1 0 -86 Z M0 -42 A42 42 0 1 0 0 42 A42 42 0 1 0 0 -42 Z"
+              fill-rule="evenodd"/>
+      </g>
+      <circle r="124" fill="none" stroke="#FFCB00" stroke-opacity="0.32"
+              stroke-width="2" stroke-dasharray="4 12"/>
+    </g>
+
+    <!-- Circuit run along the foot: the electrical half -->
+    <g fill="none" stroke="#FFCB00" stroke-opacity="0.5" stroke-width="3" stroke-linecap="square">
+      <path d="M420 1520 H620 L680 1460 H900 L960 1520 H1200"/>
+      <path d="M760 1460 V1380 H900" stroke-opacity="0.26"/>
+      <path d="M1040 1520 V1430 H1200" stroke-opacity="0.26"/>
+    </g>
+    <g fill="#FFCB00" fill-opacity="0.8">
+      <circle cx="620" cy="1520" r="8"/>
+      <circle cx="960" cy="1520" r="8"/>
+      <circle cx="900" cy="1380" r="6" fill-opacity="0.35"/>
+    </g>
+  </g>
+</svg>

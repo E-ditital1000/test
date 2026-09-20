@@ -41,41 +41,6 @@ User = get_user_model()
 # Auth
 # --------------------------------------------------------------------------
 
-def _demo_accounts():
-    """
-    One working account per role, read from the database rather than
-    hardcoded, so the list can never drift from what actually exists.
-
-    Guarded by SHOW_DEMO_ACCOUNTS, which defaults to DEBUG: this is a list of
-    live credentials on an unauthenticated page.
-    """
-    if not django_settings.SHOW_DEMO_ACCOUNTS:
-        return []
-
-    from .navigation import visible_items
-
-    rows = []
-    for role in Role.objects.order_by("-is_system", "name"):
-        account = (
-            User.objects.filter(user_roles__role=role, is_active=True)
-            # Prefer one that signs straight in over one still facing the
-            # forced password reset.
-            .order_by("must_reset_password", "email")
-            .first()
-        )
-        if account is None:
-            continue
-        rows.append(
-            {
-                "role": role.name,
-                "email": account.email,
-                "modules": len(visible_items(account)),
-                "must_reset": account.must_reset_password,
-            }
-        )
-    return rows
-
-
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard-index")
@@ -120,8 +85,6 @@ def login_view(request):
             "locked": locked,
             "lock_message": lock_message,
             "lockout_threshold": django_settings.LOGIN_LOCKOUT_THRESHOLD,
-            "demo_accounts": _demo_accounts(),
-            "demo_password": django_settings.DEMO_ACCOUNT_PASSWORD,
         },
     )
 

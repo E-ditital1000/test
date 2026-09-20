@@ -230,12 +230,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# The sign-in screen can list the seeded demo accounts so roles can be
-# compared quickly while building. This is a list of working credentials on a
-# public page, so it defaults to DEBUG only and needs a deliberate, named
-# opt-in anywhere else. Turning it on against real data would be a breach.
-SHOW_DEMO_ACCOUNTS = env.bool("SHOW_DEMO_ACCOUNTS", default=DEBUG)
-DEMO_ACCOUNT_PASSWORD = env("DEMO_ACCOUNT_PASSWORD", default="Demo!Pass123")
 
 # Auth hardening (Phase One scope: email+password, forced reset on first
 # login, lockout after repeated failures — enforced in accounts.views).

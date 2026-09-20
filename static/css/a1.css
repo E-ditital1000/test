@@ -435,10 +435,10 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
    one voice. Deliberately not here: the sidebar and bottom tabs. They load a
    new page, and the page arriving is the feedback.
    -------------------------------------------------------------------------- */
-.chip, .opt, .demo-row, .a1-burger, .a1-bell, .a1-user, .toast-close {
+.chip, .opt, .a1-burger, .a1-bell, .a1-user, .toast-close {
   transition: transform var(--dur-press) var(--ease-out);
 }
-.chip:active, .opt:active, .demo-row:active,
+.chip:active, .opt:active,
 .a1-burger:active, .a1-bell:active, .a1-user:active, .toast-close:active {
   transform: scale(0.97);
 }
@@ -452,7 +452,7 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
 
 /* Reduced motion keeps the colour response and drops the size change. */
 @media (prefers-reduced-motion: reduce) {
-  .btn:active, .act:active, .chip:active, .opt:active, .demo-row:active,
+  .btn:active, .act:active, .chip:active, .opt:active,
   .a1-burger:active, .a1-bell:active, .a1-user:active, .toast-close:active {
     transform: none;
   }
@@ -955,15 +955,56 @@ input[type=checkbox], input[type=radio] {
    Sign in — split panel
    -------------------------------------------------------------------------- */
 .login { display: flex; min-height: 100vh; background: var(--card); }
+
+/* The left panel is a photograph of the work, with navy laid over it. The
+   overlay is deliberately not opaque: the picture has to read through it,
+   and the type on top has to stay legible at AA. It is a gradient rather
+   than a flat wash so the corner holding the headline is the darkest part.
+
+   To use a real photograph instead of the drawing shipped here, drop it in
+   at static/img/login-bg.jpg and change the one url() below. Anything
+   landscape and 1600px or wider works; the panel crops to fill. */
 .login .lft {
-  width: 600px; flex: none; background: var(--navy); padding: 72px 64px;
+  position: relative; isolation: isolate;
+  width: 600px; flex: none; padding: 72px 64px;
   display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
+  background: var(--navy) url("../img/login-bg.svg") center / cover no-repeat;
 }
+.login .lft::before {
+  content: ""; position: absolute; inset: 0; z-index: 0;
+  background:
+    linear-gradient(155deg, rgba(17, 4, 58, .88) 0%, rgba(17, 4, 58, .5) 45%, rgba(11, 2, 39, .9) 100%);
+}
+.login .lft > * { position: relative; z-index: 1; }
 .login .lft h5 {
   font-size: 32px; font-weight: 700; line-height: 1.22;
   letter-spacing: -.02em; color: #fff; margin-bottom: 16px;
+  text-wrap: balance;
 }
-.login .lft p { font-size: 14px; line-height: 1.6; color: var(--navy300); }
+/* Lighter than the sidebar's navy300: this sits over a picture, not a flat
+   ground, and has to hold its contrast over the lightest part of it. */
+.login .lft p { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
+.login .lft-say { max-width: 40ch; }
+
+/* What the system does, in three lines. Gold ticks, because gold is what
+   this product uses for the thing that has been done. */
+.lft-points { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.lft-points li {
+  position: relative; padding-left: 30px;
+  font-size: 14px; line-height: 1.5; color: #fff;
+}
+.lft-points li::before {
+  content: ""; position: absolute; left: 0; top: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: rgba(255, 203, 0, .16);
+  border: 1px solid rgba(255, 203, 0, .5);
+}
+.lft-points li::after {
+  content: ""; position: absolute; left: 6px; top: 7px; width: 7px; height: 4px;
+  border-left: 2px solid var(--gold); border-bottom: 2px solid var(--gold);
+  transform: rotate(-45deg);
+}
+.lft-foot { font-size: 12px; color: rgba(255, 255, 255, .62); }
+
 .login .rgt {
   flex: 1; background: var(--page); display: flex; align-items: center;
   justify-content: center; padding: 32px 24px;
@@ -971,38 +1012,34 @@ input[type=checkbox], input[type=radio] {
 .fbox {
   width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--border);
   border-radius: var(--r-card); padding: 32px; display: flex; flex-direction: column; gap: 18px;
+  box-shadow: 0 24px 60px -32px rgba(17, 4, 58, .3);
+}
+.fbox-head { display: flex; flex-direction: column; gap: 4px; }
+.fbox-head h1 { margin: 0; }
+.fbox-help { line-height: 1.55; }
+.kicker-red {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--red);
 }
 .fbox.is-locked { border-color: var(--red); }
+
+/* On a phone the panel becomes a header: the picture and the name, no
+   sales lines above a form somebody is trying to reach. */
+@media (max-width: 900px) {
+  .login { flex-direction: column; min-height: 100dvh; }
+  .login .lft {
+    width: auto; padding: 28px 20px; gap: 16px;
+    background-position: center 35%;
+  }
+  .login .lft-say p, .lft-points, .lft-foot { display: none; }
+  .login .lft h5 { font-size: 22px; line-height: 1.3; margin-bottom: 0; }
+  .login .rgt { padding: 24px 16px 40px; }
+  .fbox { padding: 24px 20px; box-shadow: none; }
+}
 /* The reference on the server-error page: read out over the phone. */
 .err-ref { border-radius: 10px; }
 .err-ref b { display: block; margin-top: 4px; font-size: 18px; letter-spacing: .12em; }
 
-/* Demo account switcher — development only, and it should look like scaffolding
-   rather than part of the product: dashed edge, gold-tinted ground, never the
-   solid card treatment a real feature gets. */
-.signin-col {
-  width: 100%; max-width: 400px;
-  display: flex; flex-direction: column; gap: 16px;
-}
-.demo-panel {
-  background: var(--gold100); border: 1px dashed var(--gold700);
-  border-radius: var(--r-card); padding: 14px 16px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.demo-head { display: flex; flex-direction: column; gap: 2px; }
-.demo-list { display: flex; flex-direction: column; gap: 6px; }
-.demo-row {
-  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
-  min-height: 48px; padding: 8px 12px; border-radius: var(--r-ctl);
-  background: var(--card); border: 1px solid var(--border); cursor: pointer;
-}
-@media (hover: hover) and (pointer: fine) {
-  .demo-row:hover { border-color: var(--gold700); }
-}
-.demo-role { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.demo-role b { font-size: 14px; font-weight: 600; }
-.demo-role span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.demo-meta { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* --------------------------------------------------------------------------
    Mobile — field surfaces. Connectivity is assumed absent, not present.
