@@ -989,28 +989,9 @@ input[type=checkbox], input[type=radio] {
 .login .lft p { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
 .login .lft-say { max-width: 40ch; }
 
-/* The words sit at the foot of the panel, where the gradient is darkest,
-   so the technician above them is not read through a wall of type. */
-.lft-bottom { display: flex; flex-direction: column; gap: 28px; }
-
-/* What the system does, in three lines. Gold ticks, because gold is what
-   this product uses for the thing that has been done. */
-.lft-points { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.lft-points li {
-  position: relative; padding-left: 30px;
-  font-size: 14px; line-height: 1.5; color: #fff;
-}
-.lft-points li::before {
-  content: ""; position: absolute; left: 0; top: 2px; width: 18px; height: 18px;
-  border-radius: 50%; background: rgba(255, 203, 0, .16);
-  border: 1px solid rgba(255, 203, 0, .5);
-}
-.lft-points li::after {
-  content: ""; position: absolute; left: 6px; top: 7px; width: 7px; height: 4px;
-  border-left: 2px solid var(--gold); border-bottom: 2px solid var(--gold);
-  transform: rotate(-45deg);
-}
-.lft-foot { font-size: 12px; color: rgba(255, 255, 255, .62); }
+/* The words sit at the foot of the panel, under the darkest part of the
+   gradient, so the technician above them is not read through type. */
+.login .lft-say { max-width: 40ch; }
 
 .login .rgt {
   flex: 1; background: var(--page); display: flex; align-items: center;
@@ -1038,8 +1019,7 @@ input[type=checkbox], input[type=radio] {
     width: auto; padding: 28px 20px; gap: 16px;
     background-position: 58% 40%;
   }
-  .login .lft-say p, .lft-points, .lft-foot { display: none; }
-  .lft-bottom { gap: 0; }
+  .login .lft-say p { display: none; }
   .login .lft h5 { font-size: 22px; line-height: 1.3; margin-bottom: 0; }
   .login .rgt { padding: 24px 16px 40px; }
   .fbox { padding: 24px 20px; box-shadow: none; }
