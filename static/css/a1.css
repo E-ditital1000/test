@@ -956,24 +956,27 @@ input[type=checkbox], input[type=radio] {
    -------------------------------------------------------------------------- */
 .login { display: flex; min-height: 100vh; background: var(--card); }
 
-/* The left panel is a photograph of the work, with navy laid over it. The
-   overlay is deliberately not opaque: the picture has to read through it,
-   and the type on top has to stay legible at AA. It is a gradient rather
-   than a flat wash so the corner holding the headline is the darkest part.
+/* The left panel is a photograph of A-1's own work, with navy laid over it.
+   The overlay is deliberately not opaque: the picture has to read through
+   it, and the white type on top has to stay legible over the brightest
+   part of it — sky and water. It is a gradient rather than a flat wash, so
+   the side holding the headline is the darkest and the technician stays in
+   the clear.
 
-   To use a real photograph instead of the drawing shipped here, drop it in
-   at static/img/login-bg.jpg and change the one url() below. Anything
-   landscape and 1600px or wider works; the panel crops to fill. */
+   To change the picture, replace static/img/login-bg.jpg (landscape, 1400px
+   or wider). Check the headline against it afterwards: a brighter photo
+   needs the alpha values below raised. */
 .login .lft {
   position: relative; isolation: isolate;
   width: 600px; flex: none; padding: 72px 64px;
   display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
-  background: var(--navy) url("../img/login-bg.svg") center / cover no-repeat;
+  background: var(--navy) url("../img/login-bg.jpg") 46% 18% / cover no-repeat;
 }
 .login .lft::before {
   content: ""; position: absolute; inset: 0; z-index: 0;
   background:
-    linear-gradient(155deg, rgba(17, 4, 58, .88) 0%, rgba(17, 4, 58, .5) 45%, rgba(11, 2, 39, .9) 100%);
+    linear-gradient(180deg, rgba(11, 2, 39, .5) 0%, rgba(11, 2, 39, .16) 24%, rgba(11, 2, 39, .8) 56%, rgba(11, 2, 39, .96) 100%),
+    linear-gradient(90deg, rgba(11, 2, 39, .42) 0%, rgba(11, 2, 39, .08) 62%, rgba(27, 10, 92, .3) 100%);
 }
 .login .lft > * { position: relative; z-index: 1; }
 .login .lft h5 {
@@ -985,6 +988,10 @@ input[type=checkbox], input[type=radio] {
    ground, and has to hold its contrast over the lightest part of it. */
 .login .lft p { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
 .login .lft-say { max-width: 40ch; }
+
+/* The words sit at the foot of the panel, where the gradient is darkest,
+   so the technician above them is not read through a wall of type. */
+.lft-bottom { display: flex; flex-direction: column; gap: 28px; }
 
 /* What the system does, in three lines. Gold ticks, because gold is what
    this product uses for the thing that has been done. */
@@ -1029,9 +1036,10 @@ input[type=checkbox], input[type=radio] {
   .login { flex-direction: column; min-height: 100dvh; }
   .login .lft {
     width: auto; padding: 28px 20px; gap: 16px;
-    background-position: center 35%;
+    background-position: 58% 40%;
   }
   .login .lft-say p, .lft-points, .lft-foot { display: none; }
+  .lft-bottom { gap: 0; }
   .login .lft h5 { font-size: 22px; line-height: 1.3; margin-bottom: 0; }
   .login .rgt { padding: 24px 16px 40px; }
   .fbox { padding: 24px 20px; box-shadow: none; }
