@@ -19,14 +19,24 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from config.pagination import paginate
+from accounts import audit
 from accounts.decorators import require_permission, user_has_permission
 from approvals.models import Approval, latest_decisions
-from config.models import PolicySetting
+from config.models import CompanyDetail, PolicySetting
 from config.references import next_reference
 from projects.models import Requisition
 
-from .forms import ExpenseForm, InvoiceForm, InvoiceLineForm, PaymentForm
-from .models import Expense, Invoice, InvoiceLine, Payment
+from .forms import (
+    ExpenseForm,
+    InvoiceForm,
+    InvoiceLineForm,
+    PaymentForm,
+    QuotationDecisionForm,
+    QuotationForm,
+    QuotationLineForm,
+    QuotationToInvoiceForm,
+)
+from .models import Expense, Invoice, InvoiceLine, Payment, Quotation, QuotationLine
 
 
 # --------------------------------------------------------------------------
@@ -330,3 +340,292 @@ def requisition_decide(request, pk):
         f"{requisition.reference} {'approved' if decision == Approval.APPROVED else 'returned'}.",
     )
     return redirect("finance-requisitions")
+
+
+# --------------------------------------------------------------------------
+# Quotations
+#
+# What was offered, before anything is billed. A quotation is editable while
+# it is a draft and fixed once it has been sent: the customer holds a copy,
+# and a document that can be changed afterwards is evidence of nothing.
+# --------------------------------------------------------------------------
+
+@require_permission("view_quotations")
+def quotations(request):
+    query = request.GET.get("q", "").strip()
+    state = request.GET.get("state", "").strip()
+
+    rows = Quotation.objects.select_related("customer", "project").prefetch_related(
+        "lines", "invoices__lines"
+    )
+    if query:
+        rows = rows.filter(
+            Q(number__icontains=query)
+            | Q(title__icontains=query)
+            | Q(customer__name__icontains=query)
+        )
+    rows = list(rows)
+    # Expiry is derived, so it is filtered here rather than in the query: a
+    # price that has lapsed must never be listed as though it still stands.
+    if state == Quotation.EXPIRED:
+        rows = [q for q in rows if q.is_expired()]
+    elif state:
+        rows = [q for q in rows if q.state == state and not q.is_expired()]
+
+    open_rows = [q for q in rows if q.state in Quotation.OPEN_STATES and not q.is_expired()]
+    accepted = [q for q in rows if q.state == Quotation.ACCEPTED]
+    awaiting = [q for q in accepted if not q.invoices.exists()]
+
+    return render(
+        request,
+        "finance/quotations.html",
+        {
+            "quotations": paginate(request, rows),
+            "query": query,
+            "state": state,
+            "states": Quotation.STATES,
+            "open_value": sum((q.total for q in open_rows), Decimal("0")),
+            "open_count": len(open_rows),
+            "accepted_value": sum((q.total for q in accepted), Decimal("0")),
+            "awaiting_invoice": len(awaiting),
+            "total_quotations": Quotation.objects.count(),
+            "can_manage": user_has_permission(request.user, "manage_quotations"),
+        },
+    )
+
+
+@require_permission("view_quotations")
+def quotation_detail(request, pk):
+    quotation = get_object_or_404(
+        Quotation.objects.select_related("customer", "project", "ticket", "prepared_by")
+        .prefetch_related("lines", "invoices__lines"),
+        pk=pk,
+    )
+    return render(
+        request,
+        "finance/quotation_detail.html",
+        {
+            "quotation": quotation,
+            "line_form": QuotationLineForm(),
+            "decision_form": QuotationDecisionForm(),
+            "can_manage": user_has_permission(request.user, "manage_quotations"),
+            "can_invoice": user_has_permission(request.user, "issue_invoice"),
+            "invoices": quotation.invoices.all(),
+        },
+    )
+
+
+@require_permission("manage_quotations")
+@transaction.atomic
+def quotation_create(request):
+    form = QuotationForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        quotation = form.save(commit=False)
+        quotation.number = next_reference(Quotation, "QUO", field="number")
+        quotation.prepared_by = request.user
+        # The lineage carries from wherever this came from, so the quote, the
+        # project it becomes and the invoice raised from it are one job.
+        source = quotation.project or quotation.ticket
+        if source is not None:
+            quotation.job_ref = source.job_ref
+        quotation.save()
+        audit.record_change(
+            actor=request.user,
+            action="quotation.created",
+            target=quotation,
+            after={"customer": quotation.customer.name, "title": quotation.title},
+        )
+        messages.success(request, f"{quotation.number} started as a draft. Add its items next.")
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+    return render(request, "finance/quotation_form.html", {"form": form})
+
+
+@require_permission("manage_quotations")
+def quotation_edit(request, pk):
+    quotation = get_object_or_404(Quotation, pk=pk)
+    if not quotation.is_editable:
+        messages.error(request, "Only a draft can be changed. The customer holds this one.")
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+    form = QuotationForm(request.POST or None, instance=quotation)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        messages.success(request, "Quotation updated.")
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+    return render(request, "finance/quotation_form.html", {"form": form, "quotation": quotation})
+
+
+@require_permission("manage_quotations")
+def quotation_line_add(request, pk):
+    quotation = get_object_or_404(Quotation, pk=pk)
+    if request.method == "POST":
+        if not quotation.is_editable:
+            messages.error(request, "Only a draft can have its items changed.")
+            return redirect("finance-quotation-detail", pk=quotation.pk)
+        form = QuotationLineForm(request.POST)
+        if form.is_valid():
+            line = form.save(commit=False)
+            line.quotation = quotation
+            line.order = quotation.lines.count()
+            line.save()
+            messages.success(request, "Item added.")
+        else:
+            for errors in form.errors.values():
+                messages.error(request, errors[0])
+    return redirect("finance-quotation-detail", pk=quotation.pk)
+
+
+@require_permission("manage_quotations")
+def quotation_line_remove(request, pk):
+    line = get_object_or_404(QuotationLine.objects.select_related("quotation"), pk=pk)
+    quotation = line.quotation
+    if request.method == "POST":
+        if quotation.is_editable:
+            line.delete()
+            messages.success(request, "Item removed.")
+        else:
+            messages.error(request, "Only a draft can have its items changed.")
+    return redirect("finance-quotation-detail", pk=quotation.pk)
+
+
+@require_permission("manage_quotations")
+@transaction.atomic
+def quotation_send(request, pk):
+    """draft -> sent. After this the items and prices are fixed."""
+    quotation = get_object_or_404(Quotation, pk=pk)
+    if request.method != "POST":
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+
+    if quotation.state != Quotation.DRAFT:
+        messages.info(request, f"{quotation.number} has already been sent.")
+    elif not quotation.lines.exists():
+        messages.error(request, "A quotation needs at least one item before it can go out.")
+    else:
+        quotation.state = Quotation.SENT
+        quotation.sent_on = timezone.localdate()
+        quotation.save(update_fields=["state", "sent_on"])
+        audit.record_change(
+            actor=request.user,
+            action="quotation.sent",
+            target=quotation,
+            before={"state": Quotation.DRAFT},
+            after={"state": Quotation.SENT, "total": str(quotation.total)},
+        )
+        messages.success(request, f"{quotation.number} marked as sent. Its prices are now fixed.")
+    return redirect("finance-quotation-detail", pk=quotation.pk)
+
+
+@require_permission("manage_quotations")
+@transaction.atomic
+def quotation_decide(request, pk):
+    """What the customer said, recorded against the quotation with its date."""
+    quotation = get_object_or_404(Quotation, pk=pk)
+    if request.method != "POST":
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+
+    if quotation.state != Quotation.SENT:
+        messages.error(request, "Only a quotation that has been sent can be accepted or declined.")
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+
+    form = QuotationDecisionForm(request.POST)
+    if not form.is_valid():
+        for errors in form.errors.values():
+            messages.error(request, errors[0])
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+
+    decision = form.cleaned_data["decision"]
+    quotation.state = (
+        Quotation.ACCEPTED if decision == QuotationDecisionForm.ACCEPTED else Quotation.DECLINED
+    )
+    quotation.decided_on = form.cleaned_data["decided_on"]
+    quotation.decision_reference = form.cleaned_data["decision_reference"]
+    quotation.save(update_fields=["state", "decided_on", "decision_reference"])
+    audit.record_change(
+        actor=request.user,
+        action=f"quotation.{quotation.state}",
+        target=quotation,
+        before={"state": Quotation.SENT},
+        after={
+            "state": quotation.state,
+            "decided_on": str(quotation.decided_on),
+            "reference": quotation.decision_reference,
+        },
+    )
+    messages.success(
+        request, f"{quotation.number} recorded as {quotation.get_state_display().lower()}."
+    )
+    return redirect("finance-quotation-detail", pk=quotation.pk)
+
+
+@require_permission("issue_invoice")
+@transaction.atomic
+def quotation_to_invoice(request, pk):
+    """
+    An accepted quotation becomes a draft invoice with its items copied
+    across. This is the point of the document: the invoice is then worked
+    out from what the customer agreed to, not from somebody's memory.
+    """
+    quotation = get_object_or_404(
+        Quotation.objects.select_related("customer", "project").prefetch_related("lines"), pk=pk
+    )
+    if quotation.state != Quotation.ACCEPTED:
+        messages.error(request, "Only an accepted quotation can be turned into an invoice.")
+        return redirect("finance-quotation-detail", pk=quotation.pk)
+
+    form = QuotationToInvoiceForm(request.POST or None, quotation=quotation)
+    if request.method == "POST" and form.is_valid():
+        project = form.cleaned_data["project"]
+        invoice = Invoice.objects.create(
+            number=next_reference(Invoice, "INV", field="number"),
+            project=project,
+            customer=quotation.customer,
+            quotation=quotation,
+            due_on=form.cleaned_data["due_on"],
+            job_ref=project.job_ref,
+            issued_by=request.user,
+            notes=quotation.notes,
+        )
+        InvoiceLine.objects.bulk_create(
+            [
+                InvoiceLine(
+                    invoice=invoice,
+                    description=line.description,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                )
+                for line in quotation.lines.all()
+            ]
+        )
+        # A quotation written before the project existed now belongs to it.
+        if quotation.project_id is None:
+            quotation.project = project
+            quotation.save(update_fields=["project"])
+        audit.record_change(
+            actor=request.user,
+            action="quotation.invoiced",
+            target=quotation,
+            after={"invoice": invoice.number, "total": str(invoice.total)},
+        )
+        count = invoice.lines.count()
+        messages.success(
+            request,
+            f"{invoice.number} drafted from {quotation.number} with {count} "
+            f"line{'' if count == 1 else 's'}.",
+        )
+        return redirect("finance-invoice-detail", pk=invoice.pk)
+
+    return render(
+        request, "finance/quotation_to_invoice.html", {"quotation": quotation, "form": form}
+    )
+
+
+@require_permission("view_quotations")
+def quotation_print(request, pk):
+    """The customer's copy. A-1's costs and margin are not on it."""
+    quotation = get_object_or_404(
+        Quotation.objects.select_related("customer", "project").prefetch_related("lines"), pk=pk
+    )
+    return render(
+        request,
+        "finance/quotation_print.html",
+        {"quotation": quotation, "company": CompanyDetail.get()},
+    )

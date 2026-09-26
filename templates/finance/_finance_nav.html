@@ -1,0 +1,18 @@
+{% comment %}
+Each tab appears only if the viewer holds the permission that gates it —
+absent, not disabled, as everywhere else in the system.
+{% endcomment %}
+<nav class="filters" aria-label="Finance sections">
+  {% if perms_held.view_quotations %}
+    <a class="chip {% if active == 'quotations' %}on{% endif %}" href="{% url 'finance-quotations' %}">Quotations</a>
+  {% endif %}
+  {% if perms_held.view_invoices %}
+    <a class="chip {% if active == 'invoices' %}on{% endif %}" href="{% url 'finance-invoices' %}">Invoices</a>
+  {% endif %}
+  {% if perms_held.log_expense %}
+    <a class="chip {% if active == 'expenses' %}on{% endif %}" href="{% url 'finance-expenses' %}">Expenses</a>
+  {% endif %}
+  {% if perms_held.approve_requisition %}
+    <a class="chip {% if active == 'requisitions' %}on{% endif %}" href="{% url 'finance-requisitions' %}">Requisitions</a>
+  {% endif %}
+</nav>

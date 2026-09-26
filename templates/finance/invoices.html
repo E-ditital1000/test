@@ -17,6 +17,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "finance/_finance_nav.html" with active="invoices" %}
+
   <div class="mrow">
     <div class="metric"><span>Outstanding</span><b>{{ outstanding|a1money }}</b><em>across every unpaid invoice</em></div>
     <div class="metric {% if overdue_count %}alert{% endif %}">

@@ -9,6 +9,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "finance/_finance_nav.html" with active="requisitions" %}
+
   {% if rows %}
     <div class="card">
       <div class="hd"><b>Pending</b><span class="meta">Oldest first</span></div>

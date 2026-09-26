@@ -64,6 +64,8 @@ ENDPOINTS = {
     "finance-expenses": "log_expense",
     "finance-expense-create": "log_expense",
     "finance-invoice-create": "issue_invoice",
+    "finance-quotations": "view_quotations",
+    "finance-quotation-create": "manage_quotations",
     "finance-requisitions": "approve_requisition",
     # Wave 3 / shell
     "global-search": "view_dashboard",

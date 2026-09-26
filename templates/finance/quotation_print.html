@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ quotation.number }} for {{ quotation.customer.name }} — A1 360{% endblock %}
+
+{% block page_title %}Customer copy{% endblock %}
+{% block page_sub %}{{ quotation.number }} · print it, or save it as a PDF from the print dialogue{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'finance-quotation-detail' quotation.pk %}">Back to the quotation</a>
+  <button class="btn btn-pri" type="button" onclick="window.print()">Print</button>
+{% endblock %}
+
+{% comment %}
+What the customer receives. A-1's own costs and the margin are deliberately
+absent: this document leaves the building.
+{% endcomment %}
+
+{% block content %}
+  <article class="card quote-sheet">
+    <header class="quote-head">
+      <div>
+        {% if company.logo %}
+          <img src="{{ company.logo.url }}" alt="" class="quote-logo">
+        {% else %}
+          <p class="t-h20">{{ company.name }}</p>
+        {% endif %}
+        <p class="t-small dim2 quote-from">
+          {% if company.address %}{{ company.address|linebreaksbr }}<br>{% endif %}
+          {% if company.phone %}{{ company.phone }}{% endif %}
+          {% if company.email %} · {{ company.email }}{% endif %}
+          {% if company.tax_number %}<br>Tax number {{ company.tax_number }}{% endif %}
+        </p>
+      </div>
+      <div class="quote-meta">
+        <p class="t-display">Quotation</p>
+        <dl>
+          <div><dt>Number</dt><dd class="mono">{{ quotation.number }}</dd></div>
+          {# Dated the day it went out; a draft carries the day it was written. #}
+          <div><dt>Date</dt><dd>{% if quotation.sent_on %}{{ quotation.sent_on|a1date }}{% else %}{{ quotation.created_at|a1date }}{% endif %}</dd></div>
+          {% if quotation.valid_until %}
+            <div><dt>Valid until</dt><dd>{{ quotation.valid_until|a1date }}</dd></div>
+          {% endif %}
+        </dl>
+      </div>
+    </header>
+
+    <section class="quote-to">
+      <div>
+        <p class="t-label">Quotation for</p>
+        <p class="t-body-b">{{ quotation.customer.name }}</p>
+        <p class="t-small dim2">
+          {% if quotation.customer.address %}{{ quotation.customer.address|linebreaksbr }}<br>{% endif %}
+          {% if quotation.customer.phone %}{{ quotation.customer.phone }}{% endif %}
+          {% if quotation.customer.email %} · {{ quotation.customer.email }}{% endif %}
+        </p>
+      </div>
+      <div>
+        <p class="t-label">Work</p>
+        <p class="t-body">{{ quotation.title }}</p>
+        {% if quotation.project %}
+          <p class="t-small dim2 mono">{{ quotation.project.reference }}</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <table class="quote-lines">
+      <thead>
+        <tr>
+          <th scope="col">Item</th>
+          <th scope="col" class="num">Qty</th>
+          <th scope="col" class="num">Unit price</th>
+          <th scope="col" class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in quotation.lines.all %}
+          <tr>
+            <td>{{ line.description }}</td>
+            <td class="num">{{ line.quantity }}</td>
+            <td class="num">{{ line.unit_price|a1money:True }}</td>
+            <td class="num">{{ line.line_total|a1money:True }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="dim">No items on this quotation yet.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3"><b>Total</b></td>
+          <td class="num"><b>{{ quotation.total|a1money:True }}</b></td>
+        </tr>
+      </tfoot>
+    </table>
+    <p class="t-small dim2 quote-currency">All amounts in USD.</p>
+
+    {% if quotation.notes %}
+      <section class="quote-block">
+        <p class="t-label">Notes</p>
+        <p class="t-body">{{ quotation.notes|linebreaksbr }}</p>
+      </section>
+    {% endif %}
+    {% if quotation.terms %}
+      <section class="quote-block">
+        <p class="t-label">Terms</p>
+        <p class="t-small">{{ quotation.terms|linebreaksbr }}</p>
+      </section>
+    {% endif %}
+
+    <footer class="quote-foot">
+      <div>
+        <p class="t-label">Prepared by</p>
+        <p class="t-body">{% if quotation.prepared_by %}{{ quotation.prepared_by.get_full_name|default:quotation.prepared_by.email }}{% else %}{{ company.name }}{% endif %}</p>
+      </div>
+      <div>
+        <p class="t-label">Accepted by</p>
+        <p class="quote-sign">Name, signature and date</p>
+      </div>
+    </footer>
+  </article>
+
+  <div class="card no-print quote-aside">
+    <div class="note">
+      {% if quotation.state == "draft" %}
+        This quotation is still a draft. Mark it as sent once it has gone to
+        the customer — after that its prices are fixed, which is what makes it
+        worth anything when the invoice is raised.
+      {% else %}
+        Send this copy to the customer. When they answer, record it on the
+        quotation so the invoice can be drawn from the price they agreed.
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block head_extra %}
+<style>
+  .quote-sheet { max-width: 820px; margin: 0 auto; padding: 36px 40px; display: flex; flex-direction: column; gap: 28px; }
+  .quote-head { display: flex; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+  .quote-logo { max-width: 200px; max-height: 72px; display: block; }
+  .quote-from { margin-top: 10px; line-height: 1.6; }
+  .quote-meta { text-align: right; min-width: 220px; }
+  .quote-meta dl { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .quote-meta dl > div { display: flex; justify-content: flex-end; gap: 12px; }
+  .quote-meta dt { font-size: 12px; color: var(--muted); }
+  .quote-meta dd { margin: 0; font-size: 13px; font-weight: 600; }
+  .quote-to { display: flex; gap: 40px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 20px; }
+  .quote-to > div { flex: 1 1 240px; display: flex; flex-direction: column; gap: 4px; }
+  .quote-lines { width: 100%; border-collapse: collapse; }
+  .quote-lines th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .08em;
+                    text-transform: uppercase; color: var(--muted); padding: 10px 12px;
+                    border-bottom: 1px solid var(--line); }
+  .quote-lines td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; vertical-align: top; }
+  .quote-lines tfoot td { border-bottom: none; border-top: 2px solid var(--line); font-size: 16px; }
+  .quote-currency { margin-top: -18px; }
+  .quote-block { display: flex; flex-direction: column; gap: 6px; }
+  .quote-foot { display: flex; gap: 40px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 24px; }
+  .quote-foot > div { flex: 1 1 240px; }
+  .quote-sign { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 6px; font-size: 12px; color: var(--muted); }
+  .quote-aside { max-width: 820px; margin: 20px auto 0; }
+
+  @media print {
+    /* The page that leaves the building: the document, and nothing else. */
+    .a1-side, .a1-top, .a1-bar, .a1-tabs, .no-print, .toasts, .msg { display: none !important; }
+    .a1-content { padding: 0; }
+    .quote-sheet { border: none; box-shadow: none; max-width: none; padding: 0; }
+    .quote-lines { page-break-inside: auto; }
+    .quote-lines tr { page-break-inside: avoid; }
+    @page { margin: 16mm; }
+  }
+</style>
+{% endblock %}

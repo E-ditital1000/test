@@ -128,6 +128,15 @@
             <span>{{ invoice.project.name }}</span>
           </div>
         </div>
+        {% if invoice.quotation and perms_held.view_quotations %}
+          {# What the customer agreed to pay, which is what these lines came from. #}
+          <div class="row-i">
+            <div class="two g">
+              <b><a href="{% url 'finance-quotation-detail' invoice.quotation.pk %}">{{ invoice.quotation.number }}</a></b>
+              <span>quoted {{ invoice.quotation.total|a1money }}, accepted {{ invoice.quotation.decided_on|a1date }}</span>
+            </div>
+          </div>
+        {% endif %}
         {% if invoice.project.ticket %}
           <div class="row-i">
             <div class="two g">

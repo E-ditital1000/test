@@ -18,6 +18,7 @@ ROLE_GRANTS = {
     # command view.
     "Executive": [
         ("view_dashboard", SCOPE_ALL),
+        ("view_quotations", SCOPE_ALL),
         ("view_executive_dashboard", SCOPE_ALL),
         ("view_customers", SCOPE_ALL),
         ("view_ticket_status", SCOPE_ALL),
@@ -41,6 +42,8 @@ ROLE_GRANTS = {
         ("view_dashboard", SCOPE_ALL),
         ("view_projects", SCOPE_ALL),
         ("view_project_cost", SCOPE_ALL),
+        ("view_quotations", SCOPE_ALL),
+        ("manage_quotations", SCOPE_ALL),
         ("view_invoices", SCOPE_ALL),
         ("issue_invoice", SCOPE_ALL),
         ("record_payment", SCOPE_ALL),

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{% if quotation %}Edit {{ quotation.number }}{% else %}New quotation{% endif %} — A1 360{% endblock %}
+
+{% block page_title %}{% if quotation %}Edit {{ quotation.number }}{% else %}New quotation{% endif %}{% endblock %}
+{% block page_sub %}Starts as a draft · items are priced next, then it goes to the customer{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        A quotation is usually written before there is a project, so the
+        project and the ticket are optional. Whichever is set carries the job
+        through, so the quote, the project and the invoice read as one job.
+      </div>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-sec"
+         href="{% if quotation %}{% url 'finance-quotation-detail' quotation.pk %}{% else %}{% url 'finance-quotations' %}{% endif %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">{% if quotation %}Save{% else %}Create draft{% endif %}</button>
+    </div>
+  </form>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Invoice {{ quotation.number }} — A1 360{% endblock %}
+
+{% block page_title %}Invoice {{ quotation.number }}{% endblock %}
+{% block page_sub %}{{ quotation.customer.name }} · {{ quotation.total|a1money }} accepted on {{ quotation.decided_on|a1date }}{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:680px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="hd">
+        <b>What will be billed</b>
+        <span class="meta">{{ quotation.lines.count }} item{{ quotation.lines.count|pluralize }} copied across</span>
+      </div>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Item</th>
+              <th scope="col" class="num">Qty</th>
+              <th scope="col" class="num">Unit price</th>
+              <th scope="col" class="num">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in quotation.lines.all %}
+              <tr>
+                <td>{{ line.description }}</td>
+                <td class="num">{{ line.quantity }}</td>
+                <td class="num">{{ line.unit_price|a1money }}</td>
+                <td class="num"><b>{{ line.line_total|a1money }}</b></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3"><b>Total</b></td><td class="num"><b>{{ quotation.total|a1money }}</b></td></tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        An invoice attaches to a project, which is what keeps project
+        profitability computable. The draft can still be changed before it is
+        sent.
+      </div>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'finance-quotation-detail' quotation.pk %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Draft the invoice</button>
+    </div>
+  </form>
+{% endblock %}

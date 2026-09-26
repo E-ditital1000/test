@@ -10,6 +10,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "finance/_finance_nav.html" with active="expenses" %}
+
   <div class="mrow">
     <div class="metric"><span>This month</span><b>{{ this_month|a1money }}</b><em>all charged to a project</em></div>
     <div class="metric"><span>Shown here</span><b>{{ total|a1money }}</b><em>{{ expenses.paginator.count }} entries</em></div>

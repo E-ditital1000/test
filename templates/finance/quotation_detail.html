@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ quotation.number }} — A1 360{% endblock %}
+
+{% block page_title %}{{ quotation.number }} — {{ quotation.customer.name }}{% endblock %}
+{% block page_sub %}
+  {{ quotation.title }}
+  {% if quotation.sent_on %} · sent {{ quotation.sent_on|a1date }}{% endif %}
+  {% if quotation.valid_until %} · holds until {{ quotation.valid_until|a1date }}{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'finance-quotations' %}">All quotations</a>
+  <a class="btn btn-sec" href="{% url 'finance-quotation-print' quotation.pk %}">Customer copy</a>
+  {% if can_manage and quotation.is_editable %}
+    <a class="btn btn-sec" href="{% url 'finance-quotation-edit' quotation.pk %}">Edit</a>
+    <form method="post" action="{% url 'finance-quotation-send' quotation.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn btn-pri" type="submit">Mark as sent</button>
+    </form>
+  {% endif %}
+  {% if can_invoice and quotation.state == "accepted" %}
+    <a class="btn btn-pri" href="{% url 'finance-quotation-invoice' quotation.pk %}">Turn into an invoice</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="mrow">
+    <div class="metric">
+      <span>Quoted</span><b>{{ quotation.total|a1money }}</b>
+      <em>{{ quotation.lines.count }} item{{ quotation.lines.count|pluralize }}</em>
+    </div>
+    {% if quotation.has_costs %}
+      <div class="metric {% if quotation.margin <= 0 %}alert{% else %}ok{% endif %}">
+        <span>Margin</span><b>{{ quotation.margin|a1money }}</b>
+        <em>
+          {% if quotation.margin_percent %}{{ quotation.margin_percent|floatformat:0 }}% of the price{% else %}no price yet{% endif %}
+          · cost {{ quotation.cost_total|a1money }}
+        </em>
+      </div>
+    {% endif %}
+    {% with shown=quotation.derived_state %}
+      <div class="metric {% if shown == 'accepted' %}ok{% elif shown == 'declined' or shown == 'expired' %}alert{% endif %}">
+        <span>State</span>
+        <b>{% if shown == 'expired' %}Expired{% else %}{{ quotation.get_state_display }}{% endif %}</b>
+        <em>
+          {% if shown == 'draft' %}not yet with the customer
+          {% elif shown == 'sent' %}with the customer, awaiting an answer
+          {% elif shown == 'accepted' %}agreed {{ quotation.decided_on|a1date }}
+          {% elif shown == 'declined' %}declined {{ quotation.decided_on|a1date }}
+          {% else %}the price no longer stands{% endif %}
+        </em>
+      </div>
+    {% endwith %}
+  </div>
+
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+      <div class="card">
+        <div class="hd">
+          <b>Items</b>
+          <span class="meta">
+            {% if quotation.is_editable %}Editable while draft{% else %}Fixed — the customer has this{% endif %}
+          </span>
+        </div>
+        <div class="scroll-x">
+          <table style="min-width:620px">
+            <thead>
+              <tr>
+                <th scope="col">Item</th>
+                <th scope="col" class="num">Qty</th>
+                <th scope="col" class="num">Unit price</th>
+                <th scope="col" class="num">Cost</th>
+                <th scope="col" class="num">Total</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for line in quotation.lines.all %}
+                <tr>
+                  <td>{{ line.description }}</td>
+                  <td class="num">{{ line.quantity }}</td>
+                  <td class="num">{{ line.unit_price|a1money }}</td>
+                  <td class="num dim2">{% if line.unit_cost != None %}{{ line.cost_total|a1money }}{% else %}—{% endif %}</td>
+                  <td class="num"><b>{{ line.line_total|a1money }}</b></td>
+                  <td class="acts">
+                    {% if can_manage and quotation.is_editable %}
+                      <form method="post" action="{% url 'finance-quotation-line-remove' line.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-gho btn-sm" style="color:var(--red)" type="submit">Remove</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6" class="dim">No items yet — a quotation cannot go out empty.</td></tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="4"><b>Total</b></td>
+                <td class="num"><b>{{ quotation.total|a1money }}</b></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="note">
+          The cost column is A-1's own and never appears on the customer's
+          copy. It is asked for while the price is still being decided,
+          because afterwards nobody goes back to work out the margin.
+        </div>
+      </div>
+
+      {% if can_manage and quotation.is_editable %}
+        <div class="card">
+          <div class="hd"><b>Add an item</b></div>
+          <form method="post" action="{% url 'finance-quotation-line-add' quotation.pk %}">
+            {% csrf_token %}
+            <div class="stack">{% include "shell/_form_fields.html" with form=line_form %}</div>
+            <div class="stack" style="padding-top:0">
+              <div class="form-actions"><button class="btn btn-sec" type="submit">Add item</button></div>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if can_manage and quotation.state == "sent" %}
+        <div class="card">
+          <div class="hd">
+            <b>What did the customer say?</b>
+            <span class="meta">Recorded with the date</span>
+          </div>
+          <form method="post" action="{% url 'finance-quotation-decide' quotation.pk %}">
+            {% csrf_token %}
+            <div class="stack">{% include "shell/_form_fields.html" with form=decision_form %}</div>
+            <div class="stack" style="padding-top:0">
+              <div class="form-actions"><button class="btn btn-pri" type="submit">Record the answer</button></div>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <div style="flex:1;display:flex;flex-direction:column;gap:20px;min-width:0">
+      <div class="card">
+        <div class="hd"><b>This quotation</b></div>
+        <dl>
+          <div class="kv"><dt>Customer</dt><dd>{{ quotation.customer.name }}</dd></div>
+          <div class="kv">
+            <dt>Project</dt>
+            <dd>
+              {% if quotation.project %}
+                <a href="{% url 'projects-detail' quotation.project.pk %}">{{ quotation.project.reference }}</a>
+              {% else %}
+                <span class="dim">Not a project yet</span>
+              {% endif %}
+            </dd>
+          </div>
+          <div class="kv">
+            <dt>Ticket</dt>
+            <dd>
+              {% if quotation.ticket %}
+                <a href="{% url 'crm-ticket-detail' quotation.ticket.pk %}">{{ quotation.ticket.reference }}</a>
+              {% else %}<span class="dim">—</span>{% endif %}
+            </dd>
+          </div>
+          <div class="kv"><dt>Prepared by</dt><dd>{% if quotation.prepared_by %}{{ quotation.prepared_by|a1name }}{% else %}—{% endif %}</dd></div>
+          <div class="kv"><dt>Raised</dt><dd>{{ quotation.created_at|a1date }}</dd></div>
+          {% if quotation.decision_reference %}
+            <div class="kv"><dt>Answered by</dt><dd>{{ quotation.decision_reference }}</dd></div>
+          {% endif %}
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="hd">
+          <b>Billed against this</b>
+          <span class="meta">{{ quotation.invoiced_total|a1money }} of {{ quotation.total|a1money }}</span>
+        </div>
+        {% for invoice in invoices %}
+          <a class="row-i" href="{% url 'finance-invoice-detail' invoice.pk %}" style="text-decoration:none;color:inherit">
+            <div class="two g">
+              <b>{{ invoice.number }}</b>
+              <span>{{ invoice.get_state_display }} · {{ invoice.total|a1money }}</span>
+            </div>
+          </a>
+        {% empty %}
+          <div class="stack">
+            <p class="t-body dim2">
+              {% if quotation.state == "accepted" %}
+                Accepted and not yet billed. Turning it into an invoice copies
+                every item across at the price agreed.
+              {% else %}
+                Nothing has been billed against this quotation.
+              {% endif %}
+            </p>
+          </div>
+        {% endfor %}
+      </div>
+
+      {% if quotation.notes or quotation.terms %}
+        <div class="card">
+          <div class="hd"><b>Notes and terms</b></div>
+          <div class="stack">
+            {% if quotation.notes %}<p class="t-body">{{ quotation.notes|linebreaksbr }}</p>{% endif %}
+            {% if quotation.terms %}<p class="t-small dim2">{{ quotation.terms|linebreaksbr }}</p>{% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

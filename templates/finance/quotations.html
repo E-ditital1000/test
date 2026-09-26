@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Quotations — A1 360{% endblock %}
+
+{% block page_title %}Quotations{% endblock %}
+{% block page_sub %}What was offered, before anything is billed · amounts in USD{% endblock %}
+{% block page_actions %}
+  {% if can_manage %}
+    <a class="btn btn-pri" href="{% url 'finance-quotation-create' %}">New quotation</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  {% include "finance/_finance_nav.html" with active="quotations" %}
+
+  <div class="mrow">
+    <div class="metric">
+      <span>Out with customers</span><b>{{ open_value|a1money }}</b>
+      <em>{{ open_count }} quotation{{ open_count|pluralize }} still standing</em>
+    </div>
+    <div class="metric ok">
+      <span>Accepted</span><b>{{ accepted_value|a1money }}</b>
+      <em>work the customer has agreed to</em>
+    </div>
+    <div class="metric {% if awaiting_invoice %}alert{% endif %}">
+      <span>Accepted, not yet invoiced</span><b>{{ awaiting_invoice }}</b>
+      <em>money agreed but not yet billed</em>
+    </div>
+  </div>
+
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:320px"
+           placeholder="Search number, customer or what it is for" aria-label="Search quotations">
+    <select name="state" aria-label="State" style="max-width:190px">
+      <option value="">Any state</option>
+      {% for value, label in states %}
+        <option value="{{ value }}" {% if state == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query or state %}<a class="btn btn-gho" href="{% url 'finance-quotations' %}">Clear</a>{% endif %}
+  </form>
+
+  {% if quotations %}
+    <div class="card">
+      <div class="hd">
+        <b>Quotations</b>
+        <span class="meta">Newest first · a sent quotation lapses on its own date</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:880px">
+          <thead>
+            <tr>
+              <th scope="col">Number</th>
+              <th scope="col">Customer</th>
+              <th scope="col">For</th>
+              <th scope="col">State</th>
+              <th scope="col">Holds until</th>
+              <th scope="col" class="num">Total</th>
+              <th scope="col">Invoiced</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for quotation in quotations %}
+              {% with shown=quotation.derived_state %}
+                <tr>
+                  <td><a class="mono" href="{% url 'finance-quotation-detail' quotation.pk %}">{{ quotation.number }}</a></td>
+                  <td>{{ quotation.customer.name }}</td>
+                  <td class="t-small">{{ quotation.title }}</td>
+                  <td>
+                    <span class="pill
+                      {% if shown == 'accepted' %}p-appr{% elif shown == 'sent' %}p-wait
+                      {% elif shown == 'declined' or shown == 'expired' %}p-over{% else %}p-clos{% endif %}">
+                      <i></i>{% if shown == 'expired' %}Expired{% else %}{{ quotation.get_state_display }}{% endif %}
+                    </span>
+                  </td>
+                  <td class="t-small dim2">{{ quotation.valid_until|a1date|default:"—" }}</td>
+                  <td class="num"><b>{{ quotation.total|a1money }}</b></td>
+                  <td class="t-small">
+                    {% for invoice in quotation.invoices.all %}
+                      <a class="mono" href="{% url 'finance-invoice-detail' invoice.pk %}">{{ invoice.number }}</a>
+                    {% empty %}
+                      <span class="dim">—</span>
+                    {% endfor %}
+                  </td>
+                </tr>
+              {% endwith %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "shell/_pager.html" with page=quotations noun="quotation" plural="quotations" %}
+    </div>
+  {% elif query or state %}
+    {% url 'finance-quotations' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="finance" search_term=query total_count=total_quotations total_noun="quotation" clear_url=clear_url %}
+  {% else %}
+    {% url 'finance-quotation-create' as create_url %}
+    {% include "shell/_empty.html" with icon="finance" heading="Nothing has been quoted yet" body="A quotation is what the customer agreed to pay: itemised, priced, and the thing an invoice is worked out from. Raise one, send it, and record what they said." primary_label="New quotation" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

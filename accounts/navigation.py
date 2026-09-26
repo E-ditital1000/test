@@ -57,6 +57,7 @@ NAV_ITEMS = [
     )),
     NavItem("Finance", "finance", (
         ("view_invoices", "finance-invoices"),
+        ("view_quotations", "finance-quotations"),
         ("log_expense", "finance-invoices"),
         ("approve_requisition", "finance-invoices"),
     )),

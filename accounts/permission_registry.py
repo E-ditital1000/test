@@ -51,6 +51,8 @@ PERMISSIONS = [
     ("approve_assessment", "approvals", "Approve or return a submitted assessment"),
 
     # Finance
+    ("view_quotations", "finance", "View quotations and what was offered"),
+    ("manage_quotations", "finance", "Raise, send and decide quotations"),
     ("view_invoices", "finance", "View invoices and payment status"),
     ("issue_invoice", "finance", "Create and send an invoice"),
     ("record_payment", "finance", "Record a payment against an invoice"),
