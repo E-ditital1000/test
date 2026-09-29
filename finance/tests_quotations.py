@@ -214,6 +214,30 @@ class QuotationFormRuleTests(QuotationTestCase):
         self.post_new(project=self.project.pk)
         self.assertEqual(Quotation.objects.get().job_ref, self.project.job_ref)
 
+    def test_a_quotation_written_before_any_project_stands_on_its_own(self):
+        """Which is the usual way round: the quote is what brings the work
+        about. It mints a reference and waits to be joined to one."""
+        self.post_new()
+        quotation = Quotation.objects.get()
+        self.assertIsNone(quotation.project_id)
+        self.assertIsNone(quotation.ticket_id)
+        self.assertIsNotNone(quotation.job_ref)
+        self.assertNotEqual(quotation.job_ref, self.project.job_ref)
+
+    def test_naming_the_project_afterwards_joins_its_job(self):
+        self.post_new()
+        quotation = Quotation.objects.get()
+        self.assertNotEqual(quotation.job_ref, self.project.job_ref)
+
+        self.client.post(
+            reverse("finance-quotation-edit", args=[quotation.pk]),
+            {"customer": self.customer.pk, "project": self.project.pk, "ticket": "",
+             "title": quotation.title, "valid_until": "", "notes": "", "terms": ""},
+        )
+        quotation.refresh_from_db()
+        self.assertEqual(quotation.project, self.project)
+        self.assertEqual(quotation.job_ref, self.project.job_ref)
+
     def test_an_item_needs_a_real_quantity_and_price(self):
         quotation = self.quotation()
         self.client.post(
@@ -256,6 +280,41 @@ class QuotationToInvoiceTests(QuotationTestCase):
         )
         self.assertEqual(invoice.total, self.quote.total)
         self.assertEqual(invoice.state, Invoice.DRAFT)
+
+    @tag("acceptance")
+    def test_a_quote_written_first_reads_as_one_job_with_the_project_and_invoice(self):
+        """
+        The usual way round, and the one that used to break: a quotation
+        written before there was a project kept the reference it minted for
+        itself, while the project and the invoice shared another. Three
+        records, three jobs, for one piece of work.
+        """
+        standalone = self.quotation(
+            number="QUO-0002", state=Quotation.ACCEPTED, decided_on=timezone.localdate()
+        )
+        self.line(standalone, description="Panels", price="1000.00", quantity="2")
+        self.assertNotEqual(standalone.job_ref, self.project.job_ref)
+
+        self.client.post(
+            reverse("finance-quotation-invoice", args=[standalone.pk]),
+            {"project": self.project.pk, "due_on": ""},
+        )
+
+        standalone.refresh_from_db()
+        invoice = Invoice.objects.get(quotation=standalone)
+        self.assertEqual(standalone.project, self.project, "the quote belongs to it now")
+        self.assertEqual(
+            {standalone.job_ref, self.project.job_ref, invoice.job_ref},
+            {self.project.job_ref},
+            "the quote, the project and the invoice must read as one job",
+        )
+
+    def test_a_quote_already_on_a_job_is_not_moved_off_it(self):
+        """The project's reference already runs through its ticket and its
+        field jobs. A second invoice must not rewrite that."""
+        self.convert()
+        self.quote.refresh_from_db()
+        self.assertEqual(self.quote.job_ref, self.project.job_ref)
 
     def test_a_quotation_written_before_the_project_adopts_it(self):
         self.assertIsNone(self.quote.project)

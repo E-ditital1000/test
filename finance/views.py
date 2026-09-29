@@ -267,6 +267,10 @@ def _pending_requisitions():
     """
     rows = list(
         Requisition.objects.select_related("project__customer", "raised_by")
+        # The items come with the queue: whoever approves it is approving a
+        # list of things, and reading them back one row at a time would be
+        # the same round trip this function exists to avoid.
+        .prefetch_related("items")
         .order_by("created_at")
     )
     decisions = latest_decisions(Requisition, [r.pk for r in rows])
@@ -425,9 +429,7 @@ def quotation_create(request):
         quotation.prepared_by = request.user
         # The lineage carries from wherever this came from, so the quote, the
         # project it becomes and the invoice raised from it are one job.
-        source = quotation.project or quotation.ticket
-        if source is not None:
-            quotation.job_ref = source.job_ref
+        quotation.carry_lineage()
         quotation.save()
         audit.record_change(
             actor=request.user,
@@ -448,8 +450,16 @@ def quotation_edit(request, pk):
         return redirect("finance-quotation-detail", pk=quotation.pk)
     form = QuotationForm(request.POST or None, instance=quotation)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Quotation updated.")
+        quotation = form.save(commit=False)
+        # A draft that has just been pointed at a project or a ticket joins
+        # that job here, rather than waiting until it is invoiced.
+        joined = quotation.carry_lineage()
+        quotation.save()
+        messages.success(
+            request,
+            "Quotation updated."
+            + (" It now reads as part of the same job." if joined else ""),
+        )
         return redirect("finance-quotation-detail", pk=quotation.pk)
     return render(request, "finance/quotation_form.html", {"form": form, "quotation": quotation})
 
@@ -595,10 +605,15 @@ def quotation_to_invoice(request, pk):
                 for line in quotation.lines.all()
             ]
         )
-        # A quotation written before the project existed now belongs to it.
+        # A quotation written before the project existed now belongs to it,
+        # and joins its job — otherwise the usual case, a quote written
+        # first, leaves the quote on a reference of its own while the
+        # project and the invoice share another, and the one job the
+        # lineage exists to show is three.
         if quotation.project_id is None:
             quotation.project = project
-            quotation.save(update_fields=["project"])
+            quotation.carry_lineage()
+            quotation.save(update_fields=["project", "job_ref"])
         audit.record_change(
             actor=request.user,
             action="quotation.invoiced",

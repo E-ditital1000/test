@@ -141,10 +141,26 @@ class FinanceTests(TestCase):
     # -- requisitions and the threshold -----------------------------------
 
     def _requisition(self, amount):
+        """
+        Raised the way the screens raise one: a list of items. The amount is
+        their total, never typed, so the threshold is applied to a figure
+        that cannot disagree with the list under it.
+        """
         self.client.force_login(self.manager)
         self.client.post(
             reverse("projects-requisition-create", args=[self.project.pk]),
-            {"description": "Breakers", "amount": str(amount), "needed_by": ""},
+            {
+                "description": "Breakers",
+                "needed_by": "",
+                "form-TOTAL_FORMS": "1",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "40",
+                "form-0-description": "32A breaker",
+                "form-0-quantity": "1",
+                "form-0-unit": "",
+                "form-0-estimated_unit_cost": str(amount),
+            },
         )
         return Requisition.objects.latest("id")
 

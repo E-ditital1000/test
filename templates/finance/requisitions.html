@@ -24,6 +24,12 @@
               · {{ row.requisition.created_at|a1date }}
               {% if row.requisition.needed_by %} · needed by {{ row.requisition.needed_by|a1date }}{% endif %}
             </span>
+            {% if row.requisition.items.all %}
+              {# What is actually being bought, not just the total of it. #}
+              <span class="t-small">
+                {% for item in row.requisition.items.all %}{{ item.quantity_label }} {{ item.description }}{% if item.estimated_unit_cost != None %} ({{ item.estimated_total|a1money }}){% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}
+              </span>
+            {% endif %}
           </div>
           <b class="mono" style="width:100px">{{ row.requisition.amount|a1money }}</b>
           <span class="{% if row.needs_executive %}warn{% else %}dim{% endif %} t-small" style="width:150px">

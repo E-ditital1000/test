@@ -272,6 +272,26 @@ class Quotation(JobLineageModel, TimeStampedModel):
     def is_editable(self):
         return self.state == self.DRAFT
 
+    def carry_lineage(self):
+        """
+        Take the job reference of whatever this quotation belongs to.
+
+        A quotation is usually written before there is a project, so it
+        mints its own reference and stands alone. The moment it is attached
+        to a project or a ticket, that job's reference is the one that
+        counts: the project's already runs through the ticket it came from,
+        the field jobs worked under it and any invoice raised on it, and
+        moving those to match a quote would rewrite the history of work
+        already done. So the quote joins the job, never the other way round.
+
+        Returns whether it moved, so a caller can say so.
+        """
+        source = self.project or self.ticket
+        if source is None or self.job_ref == source.job_ref:
+            return False
+        self.job_ref = source.job_ref
+        return True
+
     @property
     def invoiced_total(self):
         return sum((invoice.total for invoice in self.invoices.all()), Decimal("0"))
