@@ -23,11 +23,13 @@ from accounts.scoping import apply_scope
 from .forms import (
     ProjectCrewForm,
     ProjectDocumentForm,
-    RequisitionForm,
+    RequisitionItemFormSet,
+    RequisitionRequestForm,
     TaskCompletionForm,
     TaskForm,
 )
 from .models import Project, ProjectCrew, Requisition, Task
+from .services import approval_note, raise_requisition
 
 
 def _visible_projects(user):
@@ -101,7 +103,7 @@ def project_detail(request, pk):
             "overdue_task_count": project.tasks.overdue().count(),
             "crew": project.crew.select_related("employee__user"),
             "documents": project.documents.select_related("uploaded_by"),
-            "requisitions": project.requisitions.select_related("raised_by"),
+            "requisitions": project.requisitions.select_related("raised_by").prefetch_related("items"),
             "field_jobs": project.field_jobs.select_related("assigned_to", "site").order_by("scheduled_for"),
             "stage_events": project.stage_events.select_related("actor"),
             # Cost is a separate permission from seeing the project at all.
@@ -111,7 +113,7 @@ def project_detail(request, pk):
             "task_form": TaskForm(project=project),
             "crew_form": ProjectCrewForm(project=project),
             "document_form": ProjectDocumentForm(),
-            "requisition_form": RequisitionForm() if user_has_permission(request.user, "raise_requisition") else None,
+            "can_requisition": user_has_permission(request.user, "raise_requisition"),
             "next_stage": _next_stage(project),
         },
     )
@@ -203,11 +205,16 @@ def task_toggle(request, pk):
     Whoever the task belongs to can finish it. Requiring manage_project would
     mean a technician cannot tick off their own work, which is the surest way
     to have a task list nobody keeps up to date.
+
+    The lead of a visit can finish that visit's work too. They are the one
+    person accountable for what happened on site, and a checklist item done
+    by the crew in front of them is not worth a phone call to the office.
     """
-    task = get_object_or_404(Task.objects.select_related("project"), pk=pk)
+    task = get_object_or_404(Task.objects.select_related("project", "field_job"), pk=pk)
 
     is_mine = task.assignee_id == request.user.pk
-    if not is_mine:
+    leads_the_visit = task.field_job is not None and task.field_job.is_led_by(request.user)
+    if not (is_mine or leads_the_visit):
         if not user_has_permission(request.user, "manage_project"):
             raise PermissionDenied("missing permission: manage_project")
         get_object_or_404(_visible_projects(request.user), pk=task.project_id)
@@ -230,7 +237,12 @@ def task_toggle(request, pk):
             update_fields=["completed_at", "completed_by", "completion_note"]
         )
 
-    return redirect(request.POST.get("next") or reverse("projects-detail", args=[task.project_id]))
+    if request.POST.get("next"):
+        return redirect(request.POST["next"])
+    # A task on a visit with no project of its own belongs to the visit.
+    if task.project_id:
+        return redirect("projects-detail", pk=task.project_id)
+    return redirect("fieldjobs-job-detail", pk=task.field_job_id)
 
 
 @require_permission("manage_project")
@@ -276,30 +288,29 @@ def document_upload(request, pk):
 
 
 @require_permission("raise_requisition")
-@transaction.atomic
 def requisition_create(request, pk):
-    """Raised against the project, then approved through the shared mechanism."""
-    from config.references import next_reference
-
+    """
+    What the project needs, itemised. This goes through the same service as
+    the technician's screen on the job, so both produce one kind of record:
+    a list of items, totalled from them, submitted into the approvals trail.
+    """
     project = get_object_or_404(_visible_projects(request.user), pk=pk)
-    if request.method == "POST":
-        form = RequisitionForm(request.POST)
-        if form.is_valid():
-            requisition = form.save(commit=False)
-            requisition.project = project
-            requisition.reference = next_reference(Requisition, "RQ")
-            requisition.raised_by = request.user
-            requisition.save()
-            requisition.record_decision(decision="submitted", actor=request.user)
-            messages.success(
-                request,
-                f"{requisition.reference} raised. "
-                + (
-                    "It is above the threshold, so it needs an Executive."
-                    if requisition.requires_executive_approval()
-                    else "Finance can approve it."
-                ),
-            )
-        else:
-            messages.error(request, "That requisition could not be raised.")
-    return redirect("projects-detail", pk=project.pk)
+    form = RequisitionRequestForm(request.POST or None)
+    formset = RequisitionItemFormSet(request.POST or None)
+
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        requisition = raise_requisition(
+            project=project,
+            actor=request.user,
+            description=form.cleaned_data["description"],
+            items=formset.filled,
+            needed_by=form.cleaned_data.get("needed_by"),
+        )
+        messages.success(request, f"{requisition.reference} raised. " + approval_note(requisition))
+        return redirect("projects-detail", pk=project.pk)
+
+    return render(
+        request,
+        "projects/requisition_form.html",
+        {"project": project, "form": form, "formset": formset},
+    )

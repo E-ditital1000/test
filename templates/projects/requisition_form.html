@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Requisition for {{ project.reference }} — A1 360{% endblock %}
+
+{% block page_title %}Raise a requisition{% endblock %}
+{% block page_sub %}{{ project.reference }} · {{ project.name }} · {{ project.customer.name }}{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'projects-detail' project.pk %}">Back to the project</a>
+{% endblock %}
+
+{% block content %}
+  <form method="post" data-req-form style="display:flex;flex-direction:column;gap:20px;max-width:820px">
+    {% csrf_token %}
+
+    <div class="card">
+      <div class="hd"><b>What this is for</b></div>
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+    </div>
+
+    <div class="card">
+      <div class="hd">
+        <b>What is needed</b>
+        <span class="meta">Blank rows are ignored</span>
+      </div>
+      {{ formset.management_form }}
+      <div class="stack" data-req-rows>
+        {% for error in formset.non_form_errors %}
+          <div class="msg msg-error">{{ error }}</div>
+        {% endfor %}
+        {% for item in formset %}
+          <div class="form-rows req-line" data-req-row>
+            <div class="fld wide {% if item.description.errors %}has-error{% endif %}">
+              <label for="{{ item.description.id_for_label }}">Item {{ forloop.counter }}</label>
+              {{ item.description }}
+              {% for error in item.description.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="fld narrow {% if item.quantity.errors %}has-error{% endif %}">
+              <label for="{{ item.quantity.id_for_label }}">How many</label>
+              {{ item.quantity }}
+              {% for error in item.quantity.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="fld narrow">
+              <label for="{{ item.unit.id_for_label }}">Counted in</label>
+              {{ item.unit }}
+            </div>
+            <div class="fld narrow {% if item.estimated_unit_cost.errors %}has-error{% endif %}">
+              <label for="{{ item.estimated_unit_cost.id_for_label }}">Cost each</label>
+              {{ item.estimated_unit_cost }}
+              {% for error in item.estimated_unit_cost.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+        <div><button class="btn btn-sec" type="button" data-req-add hidden>Add another item</button></div>
+      </div>
+      <div class="note">
+        The amount is the total of the items, never typed on its own — a
+        figure that could disagree with the list under it is what the
+        approval threshold gets applied to. Leave a cost blank rather than
+        guess it; Finance prices those before approving.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'projects-detail' project.pk %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Send for approval</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block body_extra %}
+  {% include "projects/_requisition_rows_script.html" %}
+{% endblock %}

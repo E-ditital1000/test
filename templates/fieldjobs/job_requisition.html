@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}What {{ job.reference }} needs — A1 360{% endblock %}
+
+{% comment %}
+The technician's list of what the job needs, written on the site. Four rows
+to start with and a button for more, because most requests are two or three
+lines and a longer form on a phone is a longer scroll before the button.
+
+The rows work with no JavaScript: the extra ones are already in the page,
+and blank rows are dropped on save.
+{% endcomment %}
+
+{% block page_title %}What this job needs{% endblock %}
+{% block page_sub %}{{ job.reference }} · {{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
+
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'fieldjobs-job-detail' job.pk %}">Back to the job</a>
+{% endblock %}
+
+{% block content %}
+  <form method="post" class="fgrid" data-req-form>
+    {% csrf_token %}
+    <div class="fmain">
+      <div class="mc">
+        <p class="t-label">Why</p>
+        {% include "shell/_form_fields.html" %}
+      </div>
+
+      <p class="t-label">What is needed</p>
+      {{ formset.management_form }}
+      {% for error in formset.non_form_errors %}
+        <div class="msg msg-error">{{ error }}</div>
+      {% endfor %}
+
+      <div data-req-rows>
+        {% for item in formset %}
+          <div class="mc req-row" data-req-row>
+            <div class="fld {% if item.description.errors %}has-error{% endif %}">
+              <label for="{{ item.description.id_for_label }}">Item {{ forloop.counter }}</label>
+              {{ item.description }}
+              {% for error in item.description.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+            <div class="req-two">
+              <div class="fld {% if item.quantity.errors %}has-error{% endif %}">
+                <label for="{{ item.quantity.id_for_label }}">How many</label>
+                {{ item.quantity }}
+                {% for error in item.quantity.errors %}<span class="err">{{ error }}</span>{% endfor %}
+              </div>
+              <div class="fld">
+                <label for="{{ item.unit.id_for_label }}">Counted in</label>
+                {{ item.unit }}
+              </div>
+            </div>
+            <div class="fld {% if item.estimated_unit_cost.errors %}has-error{% endif %}">
+              <label for="{{ item.estimated_unit_cost.id_for_label }}">Rough cost each, if you know it</label>
+              {{ item.estimated_unit_cost }}
+              {% if forloop.first %}<span class="help">Leave it blank if you do not. Nobody should guess.</span>{% endif %}
+              {% for error in item.estimated_unit_cost.errors %}<span class="err">{{ error }}</span>{% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <button class="btn btn-sec btn-wide" type="button" data-req-add hidden>Add another item</button>
+
+      <button class="act act-gold" type="submit">Send for approval</button>
+      <p class="t-m-meta dim2">
+        Finance approves it, or an Executive if it is a large one. You will
+        see it on this job once it has been decided.
+      </p>
+    </div>
+
+    <div class="frail">
+      {% if raised %}
+        <p class="t-label">Already asked for</p>
+        {% for requisition in raised %}
+          <div class="mc tight">
+            <div class="kvr">
+              <span class="mono">{{ requisition.reference }}</span>
+              {% if requisition.is_approved %}
+                <span class="pill p-appr"><i></i>Approved</span>
+              {% elif requisition.approval_state == "returned" %}
+                <span class="pill p-over"><i></i>Returned</span>
+              {% else %}
+                <span class="pill p-wait"><i></i>Waiting</span>
+              {% endif %}
+            </div>
+            <p class="t-m-meta dim2">
+              {% for item in requisition.items.all %}{{ item.quantity_label }} {{ item.description }}{% if not forloop.last %} · {% endif %}{% empty %}{{ requisition.description }}{% endfor %}
+            </p>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </form>
+{% endblock %}
+
+{% block body_extra %}
+  {% include "projects/_requisition_rows_script.html" %}
+{% endblock %}

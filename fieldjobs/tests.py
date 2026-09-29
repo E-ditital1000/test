@@ -458,6 +458,108 @@ class FieldWorkTests(TestCase):
         self.assertEqual(invoice.outstanding, 0)
 
 
+class SchedulingSiteTests(TestCase):
+    """
+    Where the crew is sent.
+
+    The picker offered every site in the company, so a job could be scheduled
+    at another customer's address — a crew driving to the wrong town, with
+    the job record agreeing with them. It now only ever offers the sites of
+    the customer the job is for, and refuses the rest on save.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+        cls.service_type = ServiceType.objects.create(code="solar", name="Solar Installation")
+        cls.status = StatusOption.objects.create(
+            kind=StatusOption.PROJECT, code="active", label="Active", is_default=True, order=1
+        )
+        cls.supervisor = make_user("sup@test.local", ["Supervisor"])
+        cls.technician = make_user("tech@test.local", ["Technician"])
+        Employee.objects.create(user=cls.technician, staff_id="A1-002")
+
+        cls.customer = Customer.objects.create(name="Duport Road Clinic")
+        cls.site = Site.objects.create(customer=cls.customer, name="Duport Road")
+        cls.stranger = Customer.objects.create(name="Somewhere Else Ltd")
+        cls.elsewhere = Site.objects.create(customer=cls.stranger, name="Their depot")
+
+    def _schedule(self, **overrides):
+        payload = {
+            "customer": self.customer.pk,
+            "site": self.site.pk,
+            "service_type": self.service_type.pk,
+            "assigned_to": self.technician.pk,
+            "scheduled_for": timezone.localtime().strftime("%Y-%m-%dT%H:%M"),
+            "instructions": "",
+        }
+        payload.update(overrides)
+        self.client.force_login(self.supervisor)
+        return self.client.post(reverse("fieldjobs-schedule"), payload)
+
+    def test_a_job_can_be_scheduled_at_its_customers_own_site(self):
+        self.assertEqual(self._schedule().status_code, 302)
+        self.assertEqual(FieldJob.objects.get().site, self.site)
+
+    def test_another_customers_site_is_refused(self):
+        response = self._schedule(site=self.elsewhere.pk)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors.get("site"))
+        self.assertFalse(FieldJob.objects.exists())
+
+    def test_the_page_offers_each_customers_own_sites_before_submit(self):
+        self.client.force_login(self.supervisor)
+        response = self.client.get(reverse("fieldjobs-schedule"))
+        self.assertContains(response, 'id="site-picker"')
+
+        picker = response.context["form"].site_picker()["sites"]
+        self.assertEqual(picker[self.customer.pk], [{"id": self.site.pk, "label": "Duport Road"}])
+        self.assertEqual(picker[self.stranger.pk], [{"id": self.elsewhere.pk, "label": "Their depot"}])
+
+    def test_nothing_is_offered_until_a_customer_is_chosen(self):
+        """A list of every site in the company is an invitation to pick the
+        wrong one."""
+        from .forms import FieldJobForm
+
+        field = FieldJobForm().fields["site"]
+        self.assertEqual(list(field.queryset), [])
+        self.assertEqual(field.empty_label, "Choose a customer first")
+
+    def test_scheduling_against_a_project_stays_on_its_customer(self):
+        from .forms import FieldJobForm
+
+        project = Project.objects.create(
+            reference="PRJ-0001", name="Array", customer=self.customer, site=self.site,
+            service_type=self.service_type, status=self.status,
+        )
+        field = FieldJobForm(project=project).fields["site"]
+        self.assertEqual(list(field.queryset), [self.site])
+        self.assertEqual(field.initial, self.site.pk)
+
+    def test_a_project_with_no_site_still_falls_back_to_its_customers_only_one(self):
+        """Choosing from a list of one only makes a job with no site likelier."""
+        from .forms import FieldJobForm
+
+        project = Project.objects.create(
+            reference="PRJ-0002", name="No site on it", customer=self.customer,
+            service_type=self.service_type, status=self.status,
+        )
+        self.assertIsNone(project.site_id)
+        self.assertEqual(FieldJobForm(project=project).fields["site"].initial, self.site.pk)
+
+    def test_a_customer_with_no_site_says_so_rather_than_showing_an_empty_list(self):
+        from .forms import FieldJobForm
+
+        siteless = Customer.objects.create(name="Walk-in")
+        project = Project.objects.create(
+            reference="PRJ-0003", name="Nowhere named", customer=siteless,
+            service_type=self.service_type, status=self.status,
+        )
+        field = FieldJobForm(project=project).fields["site"]
+        self.assertEqual(field.empty_label, "No site on this customer yet")
+        self.assertIn("put the location in the instructions", field.help_text)
+
+
 class CrewArrivalTests(TestCase):
     """
     Who is on the visit and who has actually turned up used to be two

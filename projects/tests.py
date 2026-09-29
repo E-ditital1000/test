@@ -261,6 +261,59 @@ class TaskAssignmentTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("assignee", form.errors)
 
+    def test_a_task_runs_from_a_start_date_to_a_due_date(self):
+        from datetime import date
+
+        from .forms import TaskForm
+        from .models import Task
+
+        form = TaskForm(
+            {
+                "title": "Run cabling", "assignee": self.on_crew.user.pk,
+                "start_date": "2026-10-05", "due_date": "2026-10-12",
+                "description": "",
+            },
+            project=self.project,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        task = form.save(commit=False)
+        task.project = self.project
+        task.save()
+
+        saved = Task.objects.get(pk=task.pk)
+        self.assertEqual(saved.start_date, date(2026, 10, 5))
+        self.assertEqual(saved.due_date, date(2026, 10, 12))
+
+    def test_a_range_that_ends_before_it_starts_is_refused(self):
+        """Saved, it would read "12–5 Oct" and count overdue from a day the
+        work could not have begun."""
+        from .forms import TaskForm
+
+        form = TaskForm(
+            {
+                "title": "Run cabling", "assignee": self.on_crew.user.pk,
+                "start_date": "2026-10-12", "due_date": "2026-10-05",
+                "description": "",
+            },
+            project=self.project,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("due_date", form.errors)
+
+    def test_either_end_of_the_range_may_be_left_empty(self):
+        """Plenty of work is "whenever you get to it"."""
+        from .forms import TaskForm
+
+        for dates in ({"start_date": "2026-10-05", "due_date": ""},
+                      {"start_date": "", "due_date": "2026-10-12"},
+                      {"start_date": "", "due_date": ""}):
+            with self.subTest(**dates):
+                form = TaskForm(
+                    {"title": "Run cabling", "assignee": "", "description": "", **dates},
+                    project=self.project,
+                )
+                self.assertTrue(form.is_valid(), form.errors)
+
     def test_before_a_crew_exists_everyone_is_offered(self):
         """
         A form that cannot be used is worse than a long list, so an empty
@@ -347,6 +400,11 @@ class TaskVisibilityTests(TestCase):
             project=cls.project, title="Not yours", assignee=cls.other,
             due_date=today - timedelta(days=1),
         )
+        cls.booked = Task.objects.create(
+            project=cls.project, title="Pull the mains in", assignee=cls.tech,
+            start_date=today + timedelta(days=7), due_date=today + timedelta(days=9),
+            assigned_by=cls.manager,
+        )
 
     def test_open_work_sorts_above_finished_work(self):
         """
@@ -385,6 +443,25 @@ class TaskVisibilityTests(TestCase):
         self.assertIn("Run cabling", body)
         self.assertNotIn("Not yours", body)
 
+    def test_the_screens_show_a_task_as_a_range_not_a_single_date(self):
+        """
+        The project page, the assignee's list and their phone each read the
+        same pair of dates, so a task does not run to one date in the office
+        and another on site.
+        """
+        from accounts.templatetags.a1 import a1daterange
+
+        expected = a1daterange(self.booked.start_date, self.booked.due_date)
+        self.assertIn("–", expected, "the fixture must span more than one day")
+
+        self.client.force_login(self.manager)
+        self.assertContains(self.client.get(reverse("projects-detail", args=[self.project.pk])), expected)
+
+        self.client.force_login(self.tech)
+        for screen in ("dashboard-my-tasks", "fieldjobs-my-jobs"):
+            with self.subTest(screen=screen):
+                self.assertContains(self.client.get(reverse(screen)), expected)
+
     def test_the_attention_queue_carries_overdue_tasks_only(self):
         from dashboard.services import attention_queue
 
@@ -392,6 +469,15 @@ class TaskVisibilityTests(TestCase):
         self.assertIn("Run cabling", labels)
         self.assertNotIn("Commission inverter", labels, "a task not yet due is not blocked work")
         self.assertNotIn("Not yours", labels)
+        self.assertNotIn("Pull the mains in", labels, "work that has not started is not blocked")
+
+    def test_the_attention_queue_writes_its_date_the_way_every_screen_does(self):
+        """`%d %b` gave "03 Sep" — padded, and a spelling used nowhere else."""
+        from accounts.templatetags.a1 import a1date
+        from dashboard.services import attention_queue
+
+        item = next(i for i in attention_queue(self.tech) if i.label == "Run cabling")
+        self.assertIn(f"due {a1date(self.overdue.due_date)}", item.detail)
 
     def test_the_assignee_can_finish_their_own_task(self):
         """

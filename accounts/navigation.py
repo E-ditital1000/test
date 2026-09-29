@@ -52,6 +52,13 @@ NAV_ITEMS = [
         ("view_projects", "projects-list"),
     )),
     NavItem("Field Jobs", "field", (
+        # The office's board first. Somebody holding both this and a job
+        # list of their own is an Admin or a Supervisor who also carries
+        # work: the schedule is the screen they open Field Jobs to reach,
+        # and it links to their own day. The other way round, an Admin was
+        # shown an empty personal list and told nothing was assigned today,
+        # however much work was out there.
+        ("view_field_jobs", "fieldjobs-board"),
         ("view_own_job_list", "fieldjobs-my-jobs"),
         ("review_assessment", "approvals-queue"),
     )),

@@ -19,6 +19,10 @@ from django.utils import timezone
 
 from accounts.decorators import user_has_permission
 from accounts.scoping import apply_scope
+# A queue entry is read on screen, so it obeys the same content rules as a
+# template does. The filters are plain functions; this is the one place they
+# are called from Python rather than from a template.
+from accounts.templatetags.a1 import a1date
 
 
 @dataclass
@@ -159,17 +163,28 @@ def attention_queue(user, limit=12):
     # own job list needs no permission beyond having one.
     from projects.models import Task
 
-    for task in Task.objects.for_person(user).overdue().select_related("project"):
+    for task in Task.objects.for_person(user).overdue().select_related("project", "field_job"):
+        # Where it is read: its project, or the visit it is part of when the
+        # visit has no project behind it.
+        if task.project_id:
+            where = task.project.reference
+            url = reverse("projects-detail", args=[task.project_id]) + "#tasks"
+        else:
+            where = task.field_job.reference
+            url = reverse("fieldjobs-job-detail", args=[task.field_job_id])
         items.append(
             Item(
                 kind="Task",
                 label=task.title,
-                detail=f"{task.project.reference} · due {task.due_date:%d %b}",
+                # `%d %b` wrote "03 Sep" — zero-padded, and a month spelling
+                # the system uses nowhere else. Dates have one form here, and
+                # a1.py is where it is decided.
+                detail=f"{where} · due {a1date(task.due_date)}",
                 # Ranked from when it fell due, so the longest-overdue leads.
                 waiting_since=timezone.make_aware(
                     datetime.combine(task.due_date, datetime.min.time())
                 ),
-                url=reverse("projects-detail", args=[task.project_id]) + "#tasks",
+                url=url,
                 tone="over",
             )
         )

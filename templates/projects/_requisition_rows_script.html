@@ -1,0 +1,61 @@
+{% comment %}
+"Add another item", shared by the office form and the technician's screen.
+
+Both render every row they start with in the page, so the form works with no
+JavaScript at all: this only adds more rows to a form that already saves.
+{% endcomment %}
+<script>
+(function () {
+  "use strict";
+  var form = document.querySelector("[data-req-form]");
+  if (!form) return;
+  var rows = form.querySelector("[data-req-rows]");
+  var add = form.querySelector("[data-req-add]");
+  var total = form.querySelector("[name$='-TOTAL_FORMS']");
+  var max = form.querySelector("[name$='-MAX_NUM_FORMS']");
+  if (!rows || !add || !total) return;
+
+  // Shown only where it can work.
+  add.hidden = false;
+
+  add.addEventListener("click", function () {
+    var count = parseInt(total.value, 10);
+    var limit = max ? parseInt(max.value, 10) : 40;
+    var template = form.querySelector("[data-req-row]:last-of-type");
+    if (!template || count >= limit) {
+      add.hidden = true;
+      return;
+    }
+
+    var row = template.cloneNode(true);
+    // Renumber the copy so Django reads it as the next row, and empty it.
+    Array.prototype.forEach.call(row.querySelectorAll("input, textarea, select"), function (field) {
+      ["name", "id"].forEach(function (attribute) {
+        var value = field.getAttribute(attribute);
+        if (value) field.setAttribute(attribute, value.replace(/-\d+-/, "-" + count + "-"));
+      });
+      field.value = "";
+      field.classList.remove("is-error");
+    });
+    Array.prototype.forEach.call(row.querySelectorAll("label"), function (label) {
+      var target = label.getAttribute("for");
+      if (target) label.setAttribute("for", target.replace(/-\d+-/, "-" + count + "-"));
+    });
+    Array.prototype.forEach.call(row.querySelectorAll(".err"), function (error) {
+      error.parentNode.removeChild(error);
+    });
+    Array.prototype.forEach.call(row.querySelectorAll(".has-error"), function (field) {
+      field.classList.remove("has-error");
+    });
+    var first = row.querySelector("label");
+    if (first && first.textContent.indexOf("Item ") === 0) {
+      first.textContent = "Item " + (count + 1);
+    }
+
+    template.parentNode.insertBefore(row, template.nextSibling);
+    total.value = count + 1;
+    var focusable = row.querySelector("input");
+    if (focusable) focusable.focus();
+  });
+})();
+</script>

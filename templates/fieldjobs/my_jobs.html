@@ -19,7 +19,17 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
 {% endcomment %}
 
 {% block page_title %}Today · {{ today|a1date }}{% endblock %}
-{% block page_sub %}{{ user.get_full_name|default:user.email }} · Technician{% endblock %}
+{% comment %}
+"Your own jobs", not "Technician": this screen is whoever is looking at it,
+and an Admin or a Supervisor who also carries work was being told their job
+title was something it is not.
+{% endcomment %}
+{% block page_sub %}{{ user.get_full_name|default:user.email }} · your own jobs{% endblock %}
+{% block page_actions %}
+  {% if can_see_schedule %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-board' %}">Everyone&rsquo;s schedule</a>
+  {% endif %}
+{% endblock %}
 
 {% block content %}
   {% comment %} With nothing in the rail the grid would leave an empty column
@@ -35,6 +45,7 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
               {{ next_job.customer.name }}{% if next_job.site %}, {{ next_job.site.name }}{% endif %}
               · {{ next_job.scheduled_for|date:"H:i" }}
               {% if next_job.crew_size > 1 %} · {{ next_job.crew_size }} on site{% endif %}
+              {% if next_job.to_do %} · {{ next_job.to_do }} to do{% endif %}
             </p>
             {% if next_job.assigned_to != user %}
               <p class="t-m-meta" style="color:var(--gold300)">
@@ -51,7 +62,10 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
             {% for job in later_today %}
               <a class="mc tight fcard" href="{% url 'fieldjobs-job-detail' job.pk %}">
                 <p class="t-body-b">{{ job.reference }} · {{ job.service_type.name }}</p>
-                <p class="t-m-meta dim">{{ job.customer.name }} · {{ job.scheduled_for|date:"H:i" }}</p>
+                <p class="t-m-meta dim">
+                  {{ job.customer.name }} · {{ job.scheduled_for|date:"H:i" }}
+                  {% if job.to_do %} · {{ job.to_do }} to do{% endif %}
+                </p>
                 <span class="pill p-open"><i></i>Scheduled</span>
               </a>
             {% endfor %}
@@ -94,11 +108,26 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
               <svg width="34" height="34" aria-hidden="true"><use href="#i-field"></use></svg>
             </div>
             <p class="t-m-action">No jobs assigned today</p>
-            <p class="t-m-meta dim2">
-              Your supervisor assigns jobs from the office. If you were expecting
-              one, check with them — nothing is hidden from you here.
-            </p>
-            <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px">Refresh</a>
+            {% comment %}
+            "Nothing today" and "nothing at all" are different answers, and
+            telling somebody with a job on Thursday to go and ask their
+            supervisor sends them on an errand the screen could have saved.
+            {% endcomment %}
+            {% if next_up %}
+              <p class="t-m-meta dim2">
+                Your next is {{ next_up.reference }} · {{ next_up.service_type.name }}
+                for {{ next_up.customer.name }}, {{ next_up.scheduled_for|a1datetime }}.
+                Open it to read what it is about and what to bring.
+              </p>
+              <a class="btn btn-sec" style="min-height:48px"
+                 href="{% url 'fieldjobs-job-detail' next_up.pk %}">Open {{ next_up.reference }}</a>
+            {% else %}
+              <p class="t-m-meta dim2">
+                Your supervisor assigns jobs from the office. If you were expecting
+                one, check with them — nothing is hidden from you here.
+              </p>
+              <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}" style="min-height:48px">Refresh</a>
+            {% endif %}
           </div>
         </div>
       {% endif %}
@@ -106,16 +135,21 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
 
     {% if tasks or upcoming %}
       <div class="frail">
+        {% comment %}
+        Work not pinned to any visit. What belongs to a visit is read on the
+        visit, counted on its card above — saying it twice in two places
+        would read as two different jobs.
+        {% endcomment %}
         {% if tasks %}
           <p class="t-label">
-            Your tasks{% if overdue_tasks %} · {{ overdue_tasks }} overdue{% endif %}
+            Not on a visit{% if overdue_tasks %} · {{ overdue_tasks }} overdue{% endif %}
           </p>
           {% for task in tasks %}
             <div class="mc tight">
               <p class="t-body-b">{{ task.title }}</p>
               <p class="t-m-meta dim">
-                {{ task.project.reference }}
-                {% if task.due_date %} · due {{ task.due_date|a1date }}{% endif %}
+                {% if task.project %}{{ task.project.reference }}{% else %}No project{% endif %}
+                {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
               </p>
               {% if task.description %}
                 <p class="t-m-meta dim2">{{ task.description|truncatechars:120 }}</p>
@@ -129,13 +163,30 @@ The .fgrid / .fmain / .frail / .fcards wrappers are `display: contents` below
           {% endfor %}
         {% endif %}
 
+        {% comment %}
+        A link, and enough to plan from. These were flat cards saying only a
+        reference and a time, so a technician could see that something was
+        coming and nothing about what it was — no service, no site, no way
+        to open it and read the instructions before the morning of.
+        {% endcomment %}
         {% if upcoming %}
           <p class="t-label">Coming up</p>
           {% for job in upcoming %}
-            <div class="mc tight">
-              <p class="t-body-b">{{ job.reference }} · {{ job.customer.name }}</p>
-              <p class="t-m-meta dim">{{ job.scheduled_for|a1datetime }}</p>
-            </div>
+            <a class="mc tight" href="{% url 'fieldjobs-job-detail' job.pk %}"
+               style="text-decoration:none;color:inherit">
+              <p class="t-body-b">{{ job.reference }} · {{ job.service_type.name }}</p>
+              <p class="t-m-meta dim">
+                {{ job.customer.name }}{% if job.site %}, {{ job.site.name }}{% endif %}
+              </p>
+              <p class="t-m-meta dim">
+                {{ job.scheduled_for|a1datetime }}
+                {% if job.crew_size > 1 %} · {{ job.crew_size }} on site{% endif %}
+                {% if job.to_do %} · {{ job.to_do }} to do{% endif %}
+              </p>
+              {% if job.instructions %}
+                <p class="t-m-meta dim2">{{ job.instructions|truncatechars:90 }}</p>
+              {% endif %}
+            </a>
           {% endfor %}
         {% endif %}
       </div>

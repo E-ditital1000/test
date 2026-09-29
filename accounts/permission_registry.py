@@ -42,6 +42,10 @@ PERMISSIONS = [
     # phone. Section 5 gives Supervisors "assign jobs" but Wave 1 shipped no
     # code for it, so the screens had nothing to gate on.
     ("schedule_field_job", "fieldjobs", "Schedule a field job and assign it to a technician"),
+    # The office's view of the same work. `view_own_job_list` is a
+    # technician's own day; this is everybody's, and it is the screen that
+    # answers "who is where today, and who sent them".
+    ("view_field_jobs", "fieldjobs", "View the field job schedule across the company"),
     ("view_own_job_list", "fieldjobs", "View own assigned field job list"),
     ("gps_check_in", "fieldjobs", "GPS check in on arrival at a field job"),
     ("submit_assessment", "fieldjobs", "Submit a structured site assessment"),

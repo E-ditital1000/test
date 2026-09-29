@@ -22,25 +22,29 @@ it, not work anyone will do.
         <span class="meta">Soonest due first · overdue at the top</span>
       </div>
       {% for task in open_tasks %}
-        <a class="row-i" href="{% url 'projects-detail' task.project_id %}#tasks"
-           style="text-decoration:none;color:inherit">
+        {% comment %} A task on a visit that has no project of its own is read on
+           the visit — there is no project page to send it to. {% endcomment %}
+        <a class="row-i" style="text-decoration:none;color:inherit"
+           href="{% if task.project_id %}{% url 'projects-detail' task.project_id %}#tasks{% else %}{% url 'fieldjobs-job-detail' task.field_job_id %}{% endif %}">
           <div class="two g">
             <b>{{ task.title }}</b>
             <span>
-              {{ task.project.reference }} · {{ task.project.customer.name }}
+              {% if task.project %}{{ task.project.reference }} · {{ task.project.customer.name }}
+              {% else %}{{ task.field_job.customer.name }}{% endif %}
+              {% if task.field_job %} · on visit {{ task.field_job.reference }}{% endif %}
               {% if task.assigned_by %} · set by {{ task.assigned_by|a1name }}{% endif %}
             </span>
             {% if task.description %}
               <span class="dim2">{{ task.description|truncatechars:110 }}</span>
             {% endif %}
           </div>
-          {% if task.due_date %}
+          {% if task.start_date or task.due_date %}
             <span class="{% if task.is_overdue %}bad{% else %}dim{% endif %} t-small mono"
-                  style="width:120px">
-              due {{ task.due_date|a1date }}
+                  style="width:150px">
+              {{ task.start_date|a1daterange:task.due_date }}
             </span>
           {% else %}
-            <span class="dim t-small" style="width:120px">no date</span>
+            <span class="dim t-small" style="width:150px">no date</span>
           {% endif %}
           {% if task.is_overdue %}
             <span class="pill p-over"><i></i>Overdue</span>

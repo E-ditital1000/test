@@ -7,6 +7,7 @@ spec is a contract; this module is where it is enforced.
 
     {{ ticket.created_at|a1datetime }}   3 Sept 11:42
     {{ project.start_date|a1date }}      3 Sept   (3 Sept 2025 across years)
+    {{ t.start_date|a1daterange:t.due_date }}  3–12 Sept
     {{ user|a1name }}                    M. Toe
     {{ employee|a1register_name }}       Toe, Moses
     {{ invoice.total|a1money }}          $18,400
@@ -45,6 +46,37 @@ def a1date(value):
     if value.year != timezone.localdate().year:
         text += f" {value.year}"
     return text
+
+
+@register.filter
+def a1daterange(start, end):
+    """
+    A stretch of days, in the least ink that stays exact:
+
+        {{ task.start_date|a1daterange:task.due_date }}
+
+        3–12 Sept        within one month
+        28 Sept – 3 Oct  across two
+        3 Sept           a single day
+        from 3 Sept      no end given
+        due 12 Sept      no start given
+
+    One filter rather than a date at each end, so the project page, the
+    dashboard and the phone cannot drift into writing a range three ways.
+    """
+    if start is None and end is None:
+        return ""
+    if start is None:
+        return f"due {a1date(end)}"
+    if end is None:
+        return f"from {a1date(start)}"
+    if start == end:
+        return a1date(start)
+    # Within one month the month is said once. The year, where a1date adds
+    # it, comes from the end date and so covers both.
+    if (start.year, start.month) == (end.year, end.month):
+        return f"{start.day}–{a1date(end)}"
+    return f"{a1date(start)} – {a1date(end)}"
 
 
 @register.filter

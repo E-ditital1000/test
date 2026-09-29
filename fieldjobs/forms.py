@@ -2,13 +2,22 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from config.models import ServiceType
-from crm.models import Customer, Site
+from crm.forms import limit_sites_to_customer, site_picker_data
+from crm.models import Customer
 
 from hr.models import Employee
 
 from .models import FieldJob
 
 User = get_user_model()
+
+# A job with no site is worse here than on a ticket: it is a crew driving to
+# an address nobody wrote down. Where the customer has no site on record the
+# form says so, and says what to do instead.
+NO_SITES_HELP_HERE = (
+    "This customer has no site yet. Add one on the customer record, or leave "
+    "it empty and put the location in the instructions."
+)
 
 
 class FieldJobForm(forms.ModelForm):
@@ -54,6 +63,33 @@ class FieldJobForm(forms.ModelForm):
             is_active=True
         ).select_related("user").order_by("staff_id")
         self.fields["customer"].queryset = Customer.objects.filter(is_active=True)
+
+        # Where the visit is. Only ever this customer's sites: scheduled
+        # against a project the customer comes with it, and on a job of its
+        # own the customer is chosen on this form and the page follows it.
+        # Offering every site in the company let a job be booked at another
+        # customer's address, which is a crew sent to the wrong town.
+        if project is not None:
+            self.customer_id = project.customer_id
+        else:
+            self.customer_id = (
+                self.data.get("customer") or getattr(self.instance, "customer_id", None)
+            )
+        sites = limit_sites_to_customer(
+            self.fields["site"], self.customer_id, prompt="Where is this visit?"
+        )
+        # Said on the page as well as by the empty option, because a job
+        # scheduled from a project never picks a customer and so never gets
+        # the version the page swaps in.
+        self.fields["site"].help_text = (
+            NO_SITES_HELP_HERE if self.customer_id and not sites.exists()
+            else "Where the visit is. Sites come from the customer's record."
+        )
+        # Most customers have exactly one place work happens. Choosing it
+        # from a list of one is a step that only makes it likelier a job
+        # goes out with no location on it.
+        if not self.is_bound and sites.count() == 1:
+            self.fields["site"].initial = sites[0].pk
         self.fields["service_type"].queryset = ServiceType.objects.filter(is_active=True)
         # Who can be sent to a job is a permission, not a job title.
         self.fields["assigned_to"].queryset = (
@@ -93,10 +129,21 @@ class FieldJobForm(forms.ModelForm):
             for name in ("customer", "service_type"):
                 self.fields[name].initial = getattr(project, f"{name}_id")
                 self.fields[name].disabled = True
-            self.fields["site"].queryset = Site.objects.filter(
-                customer=project.customer, is_active=True
-            )
-            self.fields["site"].initial = project.site_id
-        else:
-            self.fields["site"].queryset = Site.objects.filter(is_active=True)
-        self.fields["site"].required = False
+            # Where the project says the work is, if it says. Where it does
+            # not, the single site picked above still stands.
+            if project.site_id:
+                self.fields["site"].initial = project.site_id
+
+    def site_picker(self):
+        """
+        The sites the page may offer. Against a project that is one
+        customer's; on a job of its own it is every customer's, because the
+        customer is still being chosen.
+        """
+        customers = (
+            [self.project.customer] if self.project is not None
+            else self.fields["customer"].queryset
+        )
+        return site_picker_data(
+            customers, prompt="Where is this visit?", none_yet_help=NO_SITES_HELP_HERE
+        )

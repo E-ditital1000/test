@@ -54,6 +54,19 @@ class FieldJob(JobLineageModel, TimeStampedModel):
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="field_jobs"
     )
+    # Who put this on somebody's phone. There is more than one person in the
+    # office who can, so "the office scheduled it" is not an answer when a
+    # technician asks why they are driving to Ganta on a Friday.
+    #
+    # Nullable: jobs recorded before this was asked for have no answer, and
+    # inventing one would be worse than an honest blank.
+    scheduled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="field_jobs_scheduled",
+    )
     scheduled_for = models.DateTimeField()
     state = models.CharField(max_length=20, choices=STATES, default=SCHEDULED)
     instructions = models.TextField(blank=True)

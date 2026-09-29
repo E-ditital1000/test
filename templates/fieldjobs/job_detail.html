@@ -16,13 +16,33 @@ on the crew and who has turned up is one question asked twice.
 {% block page_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
 
 {% block page_actions %}
-  <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+  {% comment %} Back where you came from: the office came from the board. {% endcomment %}
+  {% if on_the_job %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+  {% else %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-board' %}">Back to the schedule</a>
+  {% endif %}
+  {% comment %} Raising a requisition is done by whoever is standing on the site;
+     the route refuses anyone else, so it is not offered to them either. {% endcomment %}
+  {% if on_the_job and job.project and perms_held.raise_requisition %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-job-requisition' job.pk %}">What this job needs</a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
   <div class="fgrid">
     <div class="fmain">
-      {% if not is_lead %}
+      {% if not on_the_job %}
+        {% comment %} The office reading a job it is not on. {% endcomment %}
+        <div class="mc">
+          <p class="t-label">From the office</p>
+          <p class="t-m-meta dim2">
+            You are not on this visit. {{ job.assigned_to|a1name }} leads it and
+            submits its assessment — checking in and reporting belong to the
+            people who are there.
+          </p>
+        </div>
+      {% elif not is_lead %}
         <div class="mc warnbox">
           <p class="t-label" style="color:var(--gold700)">You are on the crew</p>
           <p class="t-m-meta" style="color:var(--text2)">
@@ -37,6 +57,11 @@ on the crew and who has turned up is one question asked twice.
         <div class="fdl">
           <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
           <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
+          {% if job.scheduled_by %}
+            {% comment %} More than one person in the office can send you somewhere.
+               This says which of them did. {% endcomment %}
+            <div class="kvr"><span>Sent by</span><b>{{ job.scheduled_by|a1name }}</b></div>
+          {% endif %}
           {% if job.site.address %}
             <div class="kvr"><span>Address</span><b class="ar">{{ job.site.address }}</b></div>
           {% endif %}
@@ -45,6 +70,45 @@ on the crew and who has turned up is one question asked twice.
           <p class="t-m-meta dim2">{{ job.instructions|linebreaksbr }}</p>
         {% endif %}
       </div>
+
+      {% comment %}
+      What to do on this visit. Work pinned to the job itself, rather than
+      sitting on a project page in the office where the person standing on
+      the site will never read it.
+
+      Everyone on the crew sees the list. Ticking one off is for whoever it
+      belongs to and for the lead, who is accountable for the day anyway.
+      {% endcomment %}
+      {% if tasks %}
+        <div class="mc" style="gap:10px">
+          <p class="t-label">
+            On this visit{% if open_task_count %} · {{ open_task_count }} to do{% else %} · all done{% endif %}
+          </p>
+          {% for task in tasks %}
+            <div class="fdl">
+              <div class="two g">
+                <b {% if task.is_complete %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{{ task.title }}</b>
+                <span class="t-m-meta dim">
+                  {% if task.assignee %}{{ task.assignee|a1name }}{% else %}Anyone on site{% endif %}
+                  {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
+                </span>
+                {% if task.description %}
+                  <span class="t-m-meta dim2">{{ task.description }}</span>
+                {% endif %}
+              </div>
+              {% if task.assignee == user or is_lead %}
+                <form method="post" action="{% url 'projects-task-toggle' task.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'fieldjobs-job-detail' job.pk %}">
+                  <button class="btn btn-gho btn-sm" type="submit" style="min-height:44px">
+                    {% if task.is_complete %}Reopen{% else %}Mark done{% endif %}
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
 
       {% if check_in %}
         <div class="mc ok">
@@ -56,6 +120,24 @@ on the crew and who has turned up is one question asked twice.
             {% else %}
               {{ check_in.accuracy_m|a1metres }}
             {% endif %}
+          </p>
+        </div>
+      {% elif not on_the_job %}
+        {% comment %} Nobody checks in for somebody else. {% endcomment %}
+        <div class="mc">
+          <p class="t-label">Not checked in</p>
+          <p class="t-m-meta dim2">
+            Nobody on this visit has recorded arriving yet.
+          </p>
+        </div>
+      {% elif before_the_day %}
+        {% comment %} Open early to plan; check in on the day. {% endcomment %}
+        <div class="mc">
+          <p class="t-label">Not today</p>
+          <p class="t-m-action">{{ job.scheduled_for|a1datetime }}</p>
+          <p class="t-m-meta dim2">
+            Everything about the visit is here to read now. Checking in
+            appears on the day itself.
           </p>
         </div>
       {% else %}
@@ -102,6 +184,14 @@ on the crew and who has turned up is one question asked twice.
           The questions come from the service type. You can fill this in with no
           signal — it saves on the device and uploads by itself.
         </p>
+      {% elif not on_the_job %}
+        <div class="mc" style="gap:6px">
+          <p class="t-label">Assessment</p>
+          <p class="t-m-meta dim2">
+            Not submitted yet. {{ job.assigned_to|a1name }} fills it in on site,
+            and it reaches the review queue from there.
+          </p>
+        </div>
       {% elif not is_lead %}
         <div class="mc" style="gap:6px">
           <p class="t-label">Assessment</p>
@@ -133,7 +223,11 @@ on the crew and who has turned up is one question asked twice.
         </p>
       </div>
 
-      <a class="btn btn-sec fback" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+      {% if on_the_job %}
+        <a class="btn btn-sec fback" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>
+      {% else %}
+        <a class="btn btn-sec fback" href="{% url 'fieldjobs-board' %}">Back to the schedule</a>
+      {% endif %}
     </div>
   </div>
 {% endblock %}

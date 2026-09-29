@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Field job schedule — A1 360{% endblock %}
+
+{% block page_title %}Field jobs{% endblock %}
+{% block page_sub %}
+  {{ today_count }} today · {{ unfinished_count }} not finished ·
+  {{ completed_count }} completed · who is where, and who sent them
+{% endblock %}
+{% block page_actions %}
+  {% if has_own_list %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">My own jobs</a>
+  {% endif %}
+  {% if can_schedule %}
+    <a class="btn btn-pri" href="{% url 'fieldjobs-schedule' %}">Schedule a field job</a>
+  {% endif %}
+{% endblock %}
+
+{% comment %}
+The office's view of the same work the phone shows.
+
+`my_jobs` is one technician's day and is scoped to them by construction. This
+is everybody's, and it exists because an Admin opening Field Jobs used to be
+shown their own empty day — "No jobs assigned today" — however much work was
+out there.
+
+Who scheduled each visit is a column, not a detail: there is more than one
+person in the office who can, and "the office sent you" is not an answer.
+{% endcomment %}
+
+{% block content %}
+  <form method="get" class="filters">
+    <input type="search" name="q" value="{{ query }}" style="max-width:300px"
+           placeholder="Search reference, customer, site or technician"
+           aria-label="Search field jobs">
+    <input type="hidden" name="filter" value="{{ filter }}">
+    <button class="btn btn-sec" type="submit">Search</button>
+    {% if query or filter != "today" %}
+      <a class="btn btn-gho" href="{% url 'fieldjobs-board' %}">Clear</a>
+    {% endif %}
+  </form>
+
+  {% comment %} One press per view, the way the ticket list filters. {% endcomment %}
+  <nav class="filters" aria-label="Field job filters">
+    {% for key, label in filters.items %}
+      <a class="chip {% if key == filter %}on{% endif %}"
+         href="?filter={{ key }}{% if query %}&q={{ query }}{% endif %}"
+         {% if key == filter %}aria-current="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if jobs %}
+    <div class="card">
+      <div class="scroll-x">
+        <table style="min-width:960px">
+          <thead>
+            <tr>
+              <th scope="col">Job</th>
+              <th scope="col">Customer &amp; site</th>
+              <th scope="col">When</th>
+              <th scope="col">Who is going</th>
+              <th scope="col">Scheduled by</th>
+              <th scope="col">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in jobs %}
+              <tr>
+                <td>
+                  <a href="{% url 'fieldjobs-job-detail' job.pk %}" class="two" style="text-decoration:none">
+                    <b class="mono">{{ job.reference }}</b>
+                    <span>{{ job.service_type.name }}</span>
+                  </a>
+                </td>
+                <td>
+                  <div class="two">
+                    <b>{{ job.customer.name }}</b>
+                    <span>{{ job.site.name|default:"No site" }}</span>
+                  </div>
+                </td>
+                <td class="mono t-small">{{ job.scheduled_for|a1datetime }}</td>
+                <td>
+                  <div class="two">
+                    <b>{{ job.assigned_to|a1name }}</b>
+                    <span>
+                      {% if job.crew_size > 1 %}+{{ job.crew.count }} on site{% else %}on their own{% endif %}
+                    </span>
+                  </div>
+                </td>
+                <td class="t-small">
+                  {% if job.scheduled_by %}
+                    {{ job.scheduled_by|a1name }}
+                  {% else %}
+                    {% comment %} Jobs recorded before the system asked. {% endcomment %}
+                    <span class="dim" title="Recorded before this was asked for">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if job.state == "completed" %}
+                    <span class="pill p-appr"><i></i>Completed</span>
+                  {% elif job.state == "in_progress" %}
+                    <span class="pill p-prog"><i></i>In progress</span>
+                  {% else %}
+                    <span class="pill p-open"><i></i>Scheduled</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% include "shell/_pager.html" with page=jobs noun="field job" plural="field jobs" %}
+  {% elif query or filter != "today" %}
+    {% url 'fieldjobs-board' as clear_url %}
+    {% include "shell/_empty_filtered.html" with icon="field" search_term=query filter_summary=filters|dictkey:filter total_count=total_count total_noun="field job" clear_url=clear_url %}
+  {% else %}
+    {% url 'fieldjobs-schedule' as create_url %}
+    {% include "shell/_empty.html" with icon="field" heading="Nothing scheduled today" body="No visit is booked for today. Anything still to come is under “Still to come”, and a job put on a technician’s phone appears here the moment it is scheduled." primary_label="Schedule a field job" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

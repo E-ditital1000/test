@@ -7,10 +7,12 @@ urlpatterns = [
     path("field-jobs/", views.my_jobs, name="fieldjobs-my-jobs"),
     path("field-jobs/<int:pk>/", views.job_detail, name="fieldjobs-job-detail"),
     path("field-jobs/<int:pk>/check-in/", views.check_in, name="fieldjobs-check-in"),
+    path("field-jobs/<int:pk>/requisition/", views.job_requisition, name="fieldjobs-job-requisition"),
     path("field-jobs/<int:pk>/assessment/", views.assessment_form, name="fieldjobs-assessment"),
     path("field-jobs/<int:pk>/assessment/submit/", views.assessment_submit, name="fieldjobs-assessment-submit"),
 
     # The office side.
+    path("field-jobs/board/", views.schedule_board, name="fieldjobs-board"),
     path("field-jobs/schedule/", views.schedule, name="fieldjobs-schedule"),
     path("projects/<int:project_pk>/field-jobs/new/", views.schedule, name="fieldjobs-schedule-for-project"),
 ]

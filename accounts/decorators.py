@@ -48,6 +48,42 @@ def require_permission(code):
     return decorator
 
 
+def require_any_permission(*codes):
+    """
+    Route-gate for a screen that two different rights can reach.
+
+    A field job is the case this exists for: a technician opens it because
+    they are on it, and the office opens it because it can read the whole
+    schedule. Holding either is enough to see the page; what the page then
+    offers is decided inside it, because reading a job and acting on one are
+    not the same right.
+
+    The stamp names the first code. The acceptance walker only covers
+    argument-free views, so a screen gated this way is not silently listed
+    against half its gate — and if one ever is, the role matrix fails loudly
+    for the role holding only the second code, which is the right outcome.
+    """
+    for code in codes:
+        assert code in PERMISSION_CODES, (
+            f"'{code}' is not in accounts.permission_registry.PERMISSIONS — "
+            "add it there first; the permission list is the frozen contract."
+        )
+
+    def decorator(view_func):
+        @wraps(view_func)
+        @login_required
+        def wrapper(request, *args, **kwargs):
+            if not any(user_has_permission(request.user, code) for code in codes):
+                raise PermissionDenied("missing permission: " + " or ".join(codes))
+            return view_func(request, *args, **kwargs)
+
+        wrapper._a1_permission = codes[0]
+        wrapper._a1_any_permissions = codes
+        return wrapper
+
+    return decorator
+
+
 class PermissionRequiredMixin:
     """Class-based-view equivalent of require_permission."""
 

@@ -64,7 +64,10 @@
               <b {% if task.is_complete %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{{ task.title }}</b>
               <span>
                 {% if task.assignee %}{{ task.assignee|a1name }}{% else %}<span class="warn">Unassigned</span>{% endif %}
-                {% if task.due_date %} · due {{ task.due_date|a1date }}{% endif %}
+                {% if task.field_job %}
+                  · on <a href="{% url 'fieldjobs-job-detail' task.field_job.pk %}">{{ task.field_job.reference }}</a>
+                {% endif %}
+                {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
                 {% if task.assigned_by %} · set by {{ task.assigned_by|a1name }}{% endif %}
                 {% if task.is_complete %} · done {{ task.completed_at|a1date }}{% if task.completed_by %} by {{ task.completed_by|a1name }}{% endif %}{% endif %}
               </span>
@@ -158,6 +161,9 @@
           <div class="row-i">
             <div class="two g">
               <b class="mono">{{ requisition.reference }}</b>
+              <span>
+                {% for item in requisition.items.all %}{{ item.quantity_label }} {{ item.description }}{% if not forloop.last %} · {% endif %}{% empty %}{{ requisition.description|truncatechars:60 }}{% endfor %}
+              </span>
               <span>{{ requisition.amount|a1money }} · {{ requisition.raised_by|a1name }}</span>
             </div>
             {% if requisition.is_approved %}
@@ -205,19 +211,18 @@
         {% endif %}
       </div>
 
-      {% if requisition_form %}
+      {% if can_requisition %}
         <div class="card">
-          <div class="hd"><b>Raise a requisition</b></div>
-          <form method="post" action="{% url 'projects-requisition-create' project.pk %}">
-            {% csrf_token %}
-            <div class="stack">
-              {% include "shell/_form_fields.html" with form=requisition_form %}
-              <div><button class="btn btn-sec btn-wide" type="submit">Raise it</button></div>
+          <div class="hd"><b>Materials</b></div>
+          <div class="stack">
+            <p class="t-body dim2">
+              A requisition lists what the job needs, item by item. Its amount
+              is the total of that list, and above the Settings-owned
+              threshold it routes to an Executive; below it, Finance decides.
+            </p>
+            <div>
+              <a class="btn btn-sec btn-wide" href="{% url 'projects-requisition-create' project.pk %}">Raise a requisition</a>
             </div>
-          </form>
-          <div class="note">
-            Above the Settings-owned threshold it routes to an Executive;
-            below it, Finance can approve.
           </div>
         </div>
       {% endif %}

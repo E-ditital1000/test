@@ -19,15 +19,22 @@ import uuid
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from accounts.decorators import require_permission, user_has_permission
+from accounts.decorators import (
+    require_any_permission,
+    require_permission,
+    user_has_permission,
+)
+from config.pagination import paginate
 from config.references import next_reference
+from projects.forms import RequisitionItemFormSet, RequisitionRequestForm
 from projects.models import Project
+from projects.services import approval_note, raise_requisition
 
 from .forms import FieldJobForm
 from .models import (
@@ -43,6 +50,82 @@ from .models import (
 # sign something has gone wrong rather than a genuine site photo.
 MAX_PHOTO_BYTES = 4 * 1024 * 1024
 MAX_PHOTOS = 12
+
+
+# --------------------------------------------------------------------------
+# The office's view of everybody's work
+# --------------------------------------------------------------------------
+
+SCHEDULE_FILTERS = {
+    "today": "Today",
+    "upcoming": "Still to come",
+    "unfinished": "Not finished",
+    "completed": "Completed",
+    "all": "Every job",
+}
+
+
+@require_permission("view_field_jobs")
+def schedule_board(request):
+    """
+    Who is where, and who sent them.
+
+    `my_jobs` answers "what am I doing today" and is scoped to one person by
+    construction. This answers the office's question instead, which no screen
+    asked before: an Admin opening Field Jobs was shown their own empty day
+    and told nothing was assigned, however much work was out there.
+    """
+    query = request.GET.get("q", "").strip()
+    active_filter = request.GET.get("filter", "today")
+    if active_filter not in SCHEDULE_FILTERS:
+        active_filter = "today"
+
+    today = timezone.localdate()
+    rows = FieldJob.objects.select_related(
+        "customer", "site", "service_type", "assigned_to", "scheduled_by", "project"
+    ).prefetch_related("crew__employee__user")
+
+    # Finished work is history and reads newest first; everything else is
+    # what is coming, and reads soonest first.
+    order = ("scheduled_for", "reference")
+    if active_filter == "today":
+        rows = rows.filter(scheduled_for__date=today)
+    elif active_filter == "upcoming":
+        rows = rows.filter(scheduled_for__date__gt=today)
+    elif active_filter == "unfinished":
+        rows = rows.exclude(state=FieldJob.COMPLETED)
+    elif active_filter == "completed":
+        rows = rows.filter(state=FieldJob.COMPLETED)
+        order = ("-scheduled_for", "reference")
+
+    if query:
+        rows = rows.filter(
+            Q(reference__icontains=query)
+            | Q(customer__name__icontains=query)
+            | Q(site__name__icontains=query)
+            | Q(assigned_to__first_name__icontains=query)
+            | Q(assigned_to__last_name__icontains=query)
+        )
+
+    everything = FieldJob.objects.all()
+    return render(
+        request,
+        "fieldjobs/schedule_board.html",
+        {
+            "jobs": paginate(request, rows.order_by(*order)),
+            "query": query,
+            "filter": active_filter,
+            "filters": SCHEDULE_FILTERS,
+            "today_count": everything.filter(scheduled_for__date=today).count(),
+            "unfinished_count": everything.exclude(state=FieldJob.COMPLETED).count(),
+            "completed_count": everything.filter(state=FieldJob.COMPLETED).count(),
+            "total_count": everything.count(),
+            "can_schedule": user_has_permission(request.user, "schedule_field_job"),
+            # Somebody can hold both this screen and a job list of their own.
+            "has_own_list": user_has_permission(request.user, "view_own_job_list"),
+            "tab_active": "field",
+        },
+    )
 
 
 # --------------------------------------------------------------------------
@@ -67,6 +150,11 @@ def my_jobs(request):
         .distinct()
         .select_related("customer", "site", "service_type", "project")
         .prefetch_related("crew__employee__user")
+        # What is still to do on the visit, said on the card rather than
+        # found by opening it.
+        .annotate(
+            to_do=Count("tasks", filter=Q(tasks__completed_at__isnull=True), distinct=True)
+        )
     )
     todays = list(mine.filter(scheduled_for__date=today).order_by("scheduled_for"))
     upcoming = list(
@@ -77,10 +165,15 @@ def my_jobs(request):
 
     # A technician works from this screen. A task they are given that only
     # lives on a project page in the office is a task they will never do.
+    #
+    # Work pinned to a visit is read on that visit, where the person is
+    # standing — so it is counted on the job's card and left out of the list
+    # below, which would otherwise say the same thing twice in two places
+    # with no hint that they were the same thing.
     from projects.models import Task
 
     my_tasks = list(
-        Task.objects.for_person(request.user).open().select_related("project")[:6]
+        Task.objects.for_person(request.user).open().loose().select_related("project")[:6]
     )
 
     return render(
@@ -93,10 +186,34 @@ def my_jobs(request):
             "later_today": outstanding[1:],
             "done_today": [job for job in todays if job.state == FieldJob.COMPLETED],
             "upcoming": upcoming,
+            # Nothing today is a different answer from nothing at all.
+            "next_up": upcoming[0] if upcoming else None,
             "today": today,
+            # Somebody can carry work and run the schedule both.
+            "can_see_schedule": user_has_permission(request.user, "view_field_jobs"),
             "tab_active": "field",
         },
     )
+
+
+def _readable_job(request, pk):
+    """
+    A job somebody may read: one they are on, or — for the office — any of
+    them.
+
+    Deliberately wider than `_own_job`, which everything that *acts* on a
+    job still uses: checking in, raising a requisition, the assessment.
+    Reading that a crew is at Ganta today and standing on that site are
+    different rights, and only the first is granted here.
+    """
+    if user_has_permission(request.user, "view_field_jobs"):
+        return get_object_or_404(
+            FieldJob.objects.select_related(
+                "customer", "site", "service_type", "project", "scheduled_by"
+            ).prefetch_related("crew__employee__user"),
+            pk=pk,
+        )
+    return _own_job(request, pk)
 
 
 def _own_job(request, pk):
@@ -149,11 +266,14 @@ def _crew_rows(job, viewer):
     return rows
 
 
-@require_permission("view_own_job_list")
+@require_any_permission("view_own_job_list", "view_field_jobs")
 def job_detail(request, pk):
-    job = _own_job(request, pk)
+    job = _readable_job(request, pk)
     assessment = job.assessments.order_by("-device_timestamp").first()
     is_lead = job.is_led_by(request.user)
+    # Whether the person reading this is actually going. The office can open
+    # any job; it cannot check in for a crew or report on their behalf.
+    on_the_job = is_lead or job.crew.filter(employee__user=request.user).exists()
     crew_rows = _crew_rows(job, request.user)
     return render(
         request,
@@ -164,13 +284,77 @@ def job_detail(request, pk):
             "crew_rows": crew_rows,
             "arrived_count": sum(1 for row in crew_rows if row["arrival"]),
             "is_lead": is_lead,
+            "on_the_job": on_the_job,
             # My own check-in, not the lead's — each person on site checks in
             # for themselves.
             "check_in": job.check_ins.filter(technician=request.user)
             .order_by("-device_timestamp").first(),
             "assessment": assessment,
+            # Read before the day, to plan: what it is, where, what to bring.
+            # Checking in is the one thing that belongs to the day itself, so
+            # the button is kept back until then rather than sitting under a
+            # thumb a night early. It is not refused if it is posted — a
+            # mis-scheduled job should not strand a crew who are standing on
+            # the site, and nothing else here blocks a check-in either.
+            "before_the_day": timezone.localtime(job.scheduled_for).date() > timezone.localdate(),
+            # What to do on this visit, as opposed to somewhere on the
+            # project. Everyone on site sees the list; the lead and whoever
+            # a task belongs to can tick one off.
+            "tasks": job.tasks.select_related("assignee").all(),
+            "open_task_count": job.tasks.open().count(),
             # Crew can be on site and check in; the assessment is the lead's.
             "can_assess": is_lead and user_has_permission(request.user, "submit_assessment"),
+            "tab_active": "field",
+        },
+    )
+
+
+@require_permission("raise_requisition")
+def job_requisition(request, pk):
+    """
+    What this job needs, listed by the person standing on the site.
+
+    The technician is the only one who knows the items; by the time it
+    reaches the office that knowledge is a sentence and a number. They are
+    asked what is needed, not what it costs — the cost is optional, and
+    whoever buys it records the real figure as an expense afterwards.
+    """
+    job = _own_job(request, pk)
+    if job.project is None:
+        messages.error(
+            request,
+            "This job is not under a project yet, so there is nothing to charge "
+            "materials to. Ask the office to raise the project first.",
+        )
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    form = RequisitionRequestForm(request.POST or None)
+    formset = RequisitionItemFormSet(request.POST or None)
+
+    if request.method == "POST" and form.is_valid() and formset.is_valid():
+        requisition = raise_requisition(
+            project=job.project,
+            actor=request.user,
+            description=form.cleaned_data["description"],
+            items=formset.filled,
+            needed_by=form.cleaned_data.get("needed_by"),
+        )
+        messages.success(
+            request,
+            f"{requisition.reference} sent for approval with "
+            f"{requisition.items.count()} item{'' if requisition.items.count() == 1 else 's'}. "
+            + approval_note(requisition),
+        )
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    return render(
+        request,
+        "fieldjobs/job_requisition.html",
+        {
+            "job": job,
+            "form": form,
+            "formset": formset,
+            "raised": job.project.requisitions.filter(raised_by=request.user).prefetch_related("items")[:5],
             "tab_active": "field",
         },
     )
@@ -413,6 +597,9 @@ def schedule(request, project_pk=None):
             job.service_type = project.service_type
             job.job_ref = project.job_ref
         job.reference = next_reference(FieldJob, "FJ")
+        # More than one person in the office can schedule work, so the
+        # schedule says which of them did.
+        job.scheduled_by = request.user
         job.save()
 
         crew = form.cleaned_data.get("crew") or []

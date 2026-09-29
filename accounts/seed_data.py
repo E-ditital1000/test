@@ -24,6 +24,7 @@ ROLE_GRANTS = {
         ("view_ticket_status", SCOPE_ALL),
         ("view_projects", SCOPE_ALL),
         ("view_project_cost", SCOPE_ALL),
+        ("view_field_jobs", SCOPE_ALL),
         ("review_assessment", SCOPE_ALL),
         ("view_invoices", SCOPE_ALL),
         ("approve_requisition", SCOPE_ALL),
@@ -91,6 +92,7 @@ ROLE_GRANTS = {
         # Admin can move it like any other grant.
         ("close_ticket", SCOPE_ALL),
         ("schedule_field_job", SCOPE_ALL),
+        ("view_field_jobs", SCOPE_ALL),
         ("view_projects", SCOPE_ALL),
         # Own team, like attendance below it. A Supervisor signing off
         # another crew's site work is not what section 5 describes, and the
@@ -110,6 +112,7 @@ ROLE_GRANTS = {
         ("view_ticket_status", SCOPE_ALL),
         ("convert_ticket_to_project", SCOPE_ALL),
         ("schedule_field_job", SCOPE_ALL),
+        ("view_field_jobs", SCOPE_ALL),
         ("view_projects", SCOPE_OWN_PROJECTS),
         ("manage_project", SCOPE_OWN_PROJECTS),
         ("view_project_cost", SCOPE_OWN_PROJECTS),
@@ -124,6 +127,17 @@ ROLE_GRANTS = {
         ("view_own_job_list", SCOPE_ALL),
         ("gps_check_in", SCOPE_ALL),
         ("submit_assessment", SCOPE_ALL),
+        # The projects they are actually on, and no others — the same rule
+        # their job list follows. Without this a technician could raise a
+        # requisition against a project (below) but never open it, and the
+        # work they were sent to do had no context they could reach.
+        # Scope does the limiting: "own projects" is the ones they are crewed
+        # on or manage, so the list is theirs whoever else is on it.
+        ("view_projects", SCOPE_OWN_PROJECTS),
+        # What the job needs is known on the site and nowhere else. The
+        # screen only reaches jobs they are on, and it commits nothing:
+        # approval is still Finance's, above the threshold an Executive's.
+        ("raise_requisition", SCOPE_OWN_PROJECTS),
         ("clock_in_out", SCOPE_ALL),
     ],
 

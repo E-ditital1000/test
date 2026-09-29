@@ -21,17 +21,21 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `create_ticket` | crm | ✅ |  |  |  | ✅ |  |  |  |  |
 | `assign_ticket` | crm | ✅ |  |  |  |  | ✅ |  |  |  |
 | `view_ticket_status` | crm | ✅ | ✅ |  |  | ✅ | ✅ | ✅ |  |  |
-| `close_ticket` | crm | ✅ |  |  |  |  |  |  |  |  |
+| `close_ticket` | crm | ✅ |  |  |  |  | ✅ |  |  |  |
 | `convert_ticket_to_project` | crm | ✅ |  |  |  |  |  | ✅ |  |  |
-| `view_projects` | projects | ✅ | ✅ | ✅ |  |  | ✅ | 📁 |  |  |
+| `view_projects` | projects | ✅ | ✅ | ✅ |  |  | ✅ | 📁 | 📁 |  |
 | `manage_project` | projects | ✅ |  |  |  |  |  | 📁 |  |  |
 | `view_project_cost` | projects | ✅ | ✅ | ✅ |  |  |  | 📁 |  |  |
-| `raise_requisition` | projects | ✅ |  |  |  |  |  | 📁 |  |  |
+| `raise_requisition` | projects | ✅ |  |  |  |  |  | 📁 | 📁 |  |
+| `schedule_field_job` | fieldjobs | ✅ |  |  |  |  | ✅ | ✅ |  |  |
+| `view_field_jobs` | fieldjobs | ✅ | ✅ |  |  |  | ✅ | ✅ |  |  |
 | `view_own_job_list` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
 | `gps_check_in` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
 | `submit_assessment` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
-| `review_assessment` | approvals | ✅ | ✅ |  |  |  | ✅ |  |  |  |
-| `approve_assessment` | approvals | ✅ |  |  |  |  | ✅ |  |  |  |
+| `review_assessment` | approvals | ✅ | ✅ |  |  |  | 👥 |  |  |  |
+| `approve_assessment` | approvals | ✅ |  |  |  |  | 👥 |  |  |  |
+| `view_quotations` | finance | ✅ | ✅ | ✅ |  |  |  |  |  |  |
+| `manage_quotations` | finance | ✅ |  | ✅ |  |  |  |  |  |  |
 | `view_invoices` | finance | ✅ | ✅ | ✅ |  |  |  |  |  |  |
 | `issue_invoice` | finance | ✅ |  | ✅ |  |  |  |  |  |  |
 | `record_payment` | finance | ✅ |  | ✅ |  |  |  |  |  |  |
@@ -46,6 +50,7 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `correct_attendance` | hr | ✅ |  |  | ✅ |  | 👥 |  |  |  |
 | `view_attendance_reports` | hr | ✅ | ✅ |  | ✅ |  |  |  |  |  |
 | `clock_in_out` | hr | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `manage_attendance_codes` | hr | ✅ |  |  | ✅ |  |  |  |  |  |
 
 ## What each permission allows
 
@@ -78,6 +83,8 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 - `raise_requisition` — Raise a requisition against a project
 ### fieldjobs
 
+- `schedule_field_job` — Schedule a field job and assign it to a technician
+- `view_field_jobs` — View the field job schedule across the company
 - `view_own_job_list` — View own assigned field job list
 - `gps_check_in` — GPS check in on arrival at a field job
 - `submit_assessment` — Submit a structured site assessment
@@ -87,6 +94,8 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 - `approve_assessment` — Approve or return a submitted assessment
 ### finance
 
+- `view_quotations` — View quotations and what was offered
+- `manage_quotations` — Raise, send and decide quotations
 - `view_invoices` — View invoices and payment status
 - `issue_invoice` — Create and send an invoice
 - `record_payment` — Record a payment against an invoice
@@ -105,3 +114,4 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 - `correct_attendance` — Correct an attendance event, with a mandatory reason
 - `view_attendance_reports` — View the monthly attendance report
 - `clock_in_out` — Clock in and out, and view own attendance history
+- `manage_attendance_codes` — Create, print and revoke the attendance QR codes employees scan

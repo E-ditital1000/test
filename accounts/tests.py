@@ -59,6 +59,8 @@ ENDPOINTS = {
     "crm-customer-create": "create_customer",
     # Wave 2 — Field Jobs, HR attendance and Finance
     "fieldjobs-schedule": "schedule_field_job",
+    # The office's view of everybody's work, as against a technician's own.
+    "fieldjobs-board": "view_field_jobs",
     "hr-roll-call": "view_attendance_records",
     "hr-monthly-report": "view_attendance_reports",
     "finance-expenses": "log_expense",
