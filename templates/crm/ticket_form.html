@@ -34,7 +34,7 @@ the first thing said on the phone.
           <label for="{{ form.site.id_for_label }}">Site</label>
           {{ form.site }}
           {% for e in form.site.errors %}<span class="err">{{ e }}</span>{% endfor %}
-          <span class="help">Choose the customer and save to pick from their sites.</span>
+          <span class="help" data-site-help>Where the work is. Sites come from the customer's record.</span>
         </div>
       </div>
     </div>
@@ -85,4 +85,8 @@ the first thing said on the phone.
       <button class="btn btn-pri" type="submit">Create ticket</button>
     </div>
   </form>
+{% endblock %}
+
+{% block body_extra %}
+  {% include "crm/_site_picker_script.html" %}
 {% endblock %}

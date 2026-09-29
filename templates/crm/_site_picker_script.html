@@ -1,0 +1,64 @@
+{% comment %}
+The Site list follows the Customer list as it changes.
+
+Used by every form where both are chosen at once — raising a ticket and
+scheduling a field job. Without it the site list can only fill on submit,
+and on a create form submitting is what creates the record, so no site could
+ever be chosen for a new one.
+
+Shared rather than copied so the two screens cannot drift apart about what a
+customer's sites are called.
+
+The form still checks the chosen site belongs to the chosen customer, so
+this is a convenience and never the rule. Include it with the form in scope:
+
+    {% templatetag openblock %} include "crm/_site_picker_script.html" {% templatetag closeblock %}
+{% endcomment %}
+{{ form.site_picker|json_script:"site-picker" }}
+<script>
+(function () {
+  "use strict";
+  var data = document.getElementById("site-picker");
+  var customer = document.getElementById("{{ form.customer.id_for_label }}");
+  var site = document.getElementById("{{ form.site.id_for_label }}");
+  if (!data || !customer || !site) return;
+  var picker = JSON.parse(data.textContent);
+
+  // The page may mark its own help text; otherwise it is the one the form
+  // rendered under the field.
+  var help = document.querySelector("[data-site-help]")
+    || document.getElementById(site.id + "_helptext");
+  var usualHelp = help ? help.textContent : "";
+
+  function fill(pickOnly) {
+    var list = (customer.value && picker.sites[customer.value]) || [];
+    var kept = site.value;
+
+    while (site.options.length) site.remove(0);
+    site.add(new Option(
+      !customer.value ? picker.no_customer : list.length ? picker.prompt : picker.none_yet,
+      ""
+    ));
+    list.forEach(function (entry) {
+      site.add(new Option(entry.label, entry.id));
+    });
+
+    if (list.some(function (entry) { return String(entry.id) === kept; })) {
+      site.value = kept;
+    } else if (pickOnly && list.length === 1) {
+      // Most customers have one place work happens; choosing it from a list
+      // of one is a step that only makes a record without a site likelier.
+      site.value = String(list[0].id);
+    }
+
+    if (help) {
+      help.textContent = customer.value && !list.length ? picker.none_yet_help : usualHelp;
+    }
+  }
+
+  customer.addEventListener("change", function () { fill(true); });
+  // A customer can already be chosen when the page opens: after a failed
+  // submit, when scheduling against a project, or on Back.
+  fill(false);
+})();
+</script>

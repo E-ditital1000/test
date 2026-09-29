@@ -2,17 +2,89 @@
 {% block title %}{% if instance %}Edit customer{% else %}New customer{% endif %} — A1 360{% endblock %}
 
 {% block page_title %}{% if instance %}Edit {{ instance.name }}{% else %}New customer{% endif %}{% endblock %}
-{% block page_sub %}Sites and contacts are added once the customer is saved{% endblock %}
+{% block page_sub %}Sites are added once the customer is saved{% endblock %}
+
+{% comment %}
+Two customers in one register: a person, and an organisation reached through
+a person. The kind is asked first because it decides what the rest of the
+form is asking for.
+
+The contact block is rendered whatever the kind, and the page hides it for an
+individual. With no JavaScript it stays on screen and is simply ignored on
+save, so the form still works rather than silently dropping half of itself.
+{% endcomment %}
 
 {% block content %}
   <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:680px">
     {% csrf_token %}
+    {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+
     <div class="card">
-      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="stack">
+        <fieldset class="fld wide {% if form.kind.errors %}has-error{% endif %}">
+          <legend>{{ form.kind.label }}</legend>
+          <div class="chk-list">
+            {% for choice in form.kind %}
+              <label class="chk" for="{{ choice.id_for_label }}">
+                {{ choice.tag }}
+                <span>{{ choice.choice_label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+          {% for error in form.kind.errors %}<span class="err">{{ error }}</span>{% endfor %}
+        </fieldset>
+      </div>
     </div>
+
+    <div class="card">
+      <div class="stack">
+        {% include "shell/_form_fields.html" with form=form.detail_fields %}
+      </div>
+    </div>
+
+    {% if form.contact_fields %}
+      <div class="card" data-organisation-only {% if form.kind.value == "individual" %}hidden{% endif %}>
+        <div class="hd">
+          <b>Who to ask for</b>
+          <span class="meta">Optional · add more later</span>
+        </div>
+        <div class="stack">
+          {% include "shell/_form_fields.html" with form=form.contact_fields %}
+        </div>
+      </div>
+    {% endif %}
+
     <div class="form-actions">
       <a class="btn btn-sec" href="{% if instance %}{% url 'crm-customer-detail' instance.pk %}{% else %}{% url 'crm-customers' %}{% endif %}">Cancel</a>
       <button class="btn btn-pri" type="submit">Save customer</button>
     </div>
   </form>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+(function () {
+  "use strict";
+  // The form follows the kind as it is chosen. What the server saves does
+  // not depend on any of this: an individual's contact fields are dropped
+  // on save whether or not they were ever on screen.
+  var radios = document.querySelectorAll("input[name='kind']");
+  var block = document.querySelector("[data-organisation-only]");
+  var name = document.getElementById("{{ form.name.id_for_label }}");
+  var label = name ? document.querySelector("label[for='" + name.id + "']") : null;
+  if (!radios.length) return;
+
+  function apply() {
+    var chosen = document.querySelector("input[name='kind']:checked");
+    var individual = chosen && chosen.value === "individual";
+    if (block) block.hidden = !!individual;
+    if (label) label.textContent = individual ? "Full name" : "Organisation name";
+  }
+
+  Array.prototype.forEach.call(radios, function (radio) {
+    radio.addEventListener("change", apply);
+  });
+  apply();
+})();
+</script>
 {% endblock %}

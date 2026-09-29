@@ -51,6 +51,36 @@ class ImportRulesTests(TestCase):
         self.assertFalse(contacts[1].is_primary)
         self.assertEqual(AuditEntry.objects.filter(action="customer.imported").count(), 1)
 
+    def test_a_row_can_say_whether_it_is_a_person_or_an_organisation(self):
+        raw = (
+            "name,kind,phone\n"
+            "Liberty Gold,organisation,+231 770 111 222\n"
+            "Faith Jallah,individual,+231 886 400 100\n"
+            "New Hope Clinic,,+231 777 555 010\n"
+        ).encode("utf-8")
+        report = self.run_import(raw)
+
+        self.assertTrue(report.committed, report.errors)
+        kinds = dict(Customer.objects.values_list("name", "kind"))
+        self.assertEqual(kinds["Faith Jallah"], Customer.INDIVIDUAL)
+        self.assertEqual(kinds["Liberty Gold"], Customer.ORGANISATION)
+        # Said nothing: most of the register is organisations.
+        self.assertEqual(kinds["New Hope Clinic"], Customer.ORGANISATION)
+
+    def test_either_spelling_of_organisation_is_read(self):
+        """Operations will export whichever their spellchecker prefers."""
+        raw = b"name,kind\nLiberty Gold,Organization\nNew Hope Clinic,Company\n"
+        self.assertTrue(self.run_import(raw).committed)
+        self.assertEqual(
+            set(Customer.objects.values_list("kind", flat=True)), {Customer.ORGANISATION}
+        )
+
+    def test_a_kind_nobody_recognises_is_an_error_rather_than_a_guess(self):
+        report = self.run_import(b"name,kind\nLiberty Gold,charity\n")
+        self.assertFalse(report.committed)
+        self.assertTrue(any("charity" in message for _, message in report.errors))
+        self.assertFalse(Customer.objects.exists())
+
     def test_nothing_is_written_without_commit(self):
         report = self.run_import(csv("Liberty Gold,,,,,,,,,,,"), commit=False)
         self.assertFalse(report.committed)

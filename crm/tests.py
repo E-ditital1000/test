@@ -86,6 +86,45 @@ class TicketFlowTests(TestCase):
         self.assertNotEqual(first.reference, second.reference)
         self.assertEqual(second.reference, "TKT-0002")
 
+    # -- site -------------------------------------------------------------
+
+    def test_the_new_ticket_page_can_offer_a_customers_sites_before_submit(self):
+        # The list used to fill only on submit, and submitting created the
+        # ticket, so no site could ever be chosen for a new one.
+        self.client.force_login(self.receptionist)
+        response = self.client.get(reverse("crm-ticket-create"))
+        self.assertContains(response, 'id="site-picker"')
+        self.assertEqual(
+            response.context["form"].site_picker()["sites"][self.customer.pk],
+            [{"id": self.site.pk, "label": "Duport Road"}],
+        )
+
+    def test_a_ticket_keeps_the_site_chosen_for_it(self):
+        self.client.force_login(self.receptionist)
+        self.client.post(reverse("crm-ticket-create"), {
+            "customer": self.customer.pk,
+            "site": self.site.pk,
+            "service_type": self.service_type.pk,
+            "priority": "high",
+            "description": "Inverter fault light since Tuesday.",
+        })
+        self.assertEqual(Ticket.objects.get().site, self.site)
+
+    def test_a_site_of_another_customer_is_refused(self):
+        other = Customer.objects.create(name="Somewhere Else")
+        elsewhere = Site.objects.create(customer=other, name="Their depot")
+        self.client.force_login(self.receptionist)
+        response = self.client.post(reverse("crm-ticket-create"), {
+            "customer": self.customer.pk,
+            "site": elsewhere.pk,
+            "service_type": self.service_type.pk,
+            "priority": "high",
+            "description": "Inverter fault light since Tuesday.",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].errors.get("site"))
+        self.assertFalse(Ticket.objects.exists())
+
     # -- assignment -------------------------------------------------------
 
     def test_supervisor_assigns_in_one_action_from_the_list(self):

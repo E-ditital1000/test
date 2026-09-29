@@ -84,6 +84,7 @@
       <div class="card">
         <div class="hd"><b>Details</b></div>
         <dl style="margin:0">
+          <div class="kv"><dt>Kind</dt><dd>{{ customer.get_kind_display }}</dd></div>
           <div class="kv"><dt>Phone</dt><dd class="mono">{{ customer.phone|default:"—" }}</dd></div>
           <div class="kv"><dt>Email</dt><dd>{{ customer.email|default:"—" }}</dd></div>
           <div class="kv"><dt>Address</dt><dd>{{ customer.address|default:"—"|linebreaksbr }}</dd></div>

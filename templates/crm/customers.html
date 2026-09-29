@@ -42,7 +42,10 @@
                 <td>
                   <a href="{% url 'crm-customer-detail' customer.pk %}" class="two" style="text-decoration:none">
                     <b>{{ customer.name }}</b>
-                    <span>{{ customer.address|truncatechars:44|default:"No address" }}</span>
+                    <span>
+                      {{ customer.get_kind_display }}
+                      · {{ customer.address|truncatechars:34|default:"no address" }}
+                    </span>
                   </a>
                 </td>
                 <td class="mono dim2">{{ customer.phone|default:"—" }}</td>

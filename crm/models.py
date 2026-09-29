@@ -10,6 +10,15 @@ from config.mixins import JobLineageModel, SoftDeleteModel, TimeStampedModel
 
 
 class Customer(SoftDeleteModel, TimeStampedModel):
+    INDIVIDUAL = "individual"
+    ORGANISATION = "organisation"
+    KINDS = [(INDIVIDUAL, "Individual"), (ORGANISATION, "Organisation")]
+
+    # Who the customer is, which decides what the register is even asking
+    # for: a person's own name and number, or an organisation's name and the
+    # person who answers its phone. Most of A-1's work is for organisations,
+    # so that is the default a blank row falls to.
+    kind = models.CharField(max_length=20, choices=KINDS, default=ORGANISATION)
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=40, blank=True)
     email = models.EmailField(blank=True)
@@ -25,6 +34,10 @@ class Customer(SoftDeleteModel, TimeStampedModel):
 
     class Meta:
         ordering = ["name"]
+
+    @property
+    def is_organisation(self):
+        return self.kind == self.ORGANISATION
 
     def __str__(self):
         return self.name

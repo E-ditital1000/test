@@ -9,13 +9,122 @@ User = get_user_model()
 
 
 class CustomerForm(forms.ModelForm):
+    """
+    Two customers in one register: a person, and an organisation reached
+    through a person. Asking both the same five questions made the second
+    kind a two-step job — save the organisation, then go and add the human
+    being anyone would actually ring.
+
+    The kind is asked first because it decides what the rest of the form
+    means. The page follows the choice as it is made; the labels below are
+    set from it as well, so the form is right on a device running no
+    JavaScript and after a failed submit.
+    """
+
+    # The card around these says what they are for and that they are
+    # optional, so the fields themselves do not repeat it.
+    contact_name = forms.CharField(max_length=120, required=False, label="Contact person")
+    contact_job_title = forms.CharField(max_length=80, required=False, label="Their job title")
+    contact_phone = forms.CharField(max_length=40, required=False, label="Their phone")
+    contact_email = forms.EmailField(required=False, label="Their email")
+
+    CONTACT_FIELDS = ["contact_name", "contact_job_title", "contact_phone", "contact_email"]
+
     class Meta:
         model = Customer
-        fields = ["name", "phone", "email", "address", "notes"]
+        fields = ["kind", "name", "phone", "email", "address", "notes"]
         widgets = {
+            "kind": forms.RadioSelect,
             "address": forms.Textarea(attrs={"rows": 2}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+        labels = {"kind": "What kind of customer is this?"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Radios, not a dropdown: two choices that change the form are a
+        # decision to be seen, not a list to be opened.
+        self.fields["kind"].choices = Customer.KINDS
+        self.fields["kind"].required = True
+
+        if self.kind == Customer.INDIVIDUAL:
+            self.fields["name"].label = "Full name"
+            self.fields["phone"].help_text = "Their own number."
+            self.fields["email"].help_text = "Their own email."
+        else:
+            self.fields["name"].label = "Organisation name"
+            self.fields["phone"].help_text = "The number the office answers."
+            self.fields["email"].help_text = "A general address, not one person's."
+
+        # An organisation's contact can be filled in later, but asking here
+        # is the difference between a register with names in it and one with
+        # switchboard numbers.
+        if self.instance.pk and self.instance.contacts.exists():
+            for name in self.CONTACT_FIELDS:
+                del self.fields[name]
+
+    @property
+    def kind(self):
+        """
+        What the form is being filled in as, before it has validated: the
+        posted choice, then the record being edited, then the default.
+        """
+        posted = self.data.get("kind") if self.is_bound else None
+        return posted or getattr(self.instance, "kind", None) or Customer.ORGANISATION
+
+    def detail_fields(self):
+        """The customer's own details, rendered as one block."""
+        return [self[name] for name in ("name", "phone", "email", "address", "notes")]
+
+    def contact_fields(self):
+        """The person to ask for — an organisation's half of the form, and
+        absent once they have contacts of their own."""
+        return [self[name] for name in self.CONTACT_FIELDS if name in self.fields]
+
+    def clean(self):
+        cleaned = super().clean()
+        if "contact_name" not in self.fields:
+            # Editing a customer who already has contacts; they are managed
+            # on their own screen, not re-asked here.
+            return cleaned
+
+        if cleaned.get("kind") == Customer.INDIVIDUAL:
+            # A person is their own contact. Anything typed under the
+            # organisation half is dropped rather than saved out of sight.
+            for name in self.CONTACT_FIELDS:
+                cleaned[name] = ""
+            return cleaned
+
+        named = (cleaned.get("contact_name") or "").strip()
+        others = [name for name in self.CONTACT_FIELDS[1:] if cleaned.get(name)]
+        if others and not named:
+            self.add_error(
+                "contact_name",
+                "Give the contact's name, or clear their details — a job title "
+                "and a number with nobody attached cannot be rung.",
+            )
+        return cleaned
+
+    def save(self, commit=True):
+        customer = super().save(commit=commit)
+        if commit:
+            self.save_contact(customer)
+        return customer
+
+    def save_contact(self, customer):
+        """The person to ask for, where one was given. The first contact a
+        customer has is their main one."""
+        name = (self.cleaned_data.get("contact_name") or "").strip()
+        if not name:
+            return None
+        return Contact.objects.create(
+            customer=customer,
+            name=name,
+            job_title=self.cleaned_data.get("contact_job_title", ""),
+            phone=self.cleaned_data.get("contact_phone", ""),
+            email=self.cleaned_data.get("contact_email", ""),
+            is_primary=not customer.contacts.exists(),
+        )
 
 
 class SiteForm(forms.ModelForm):
@@ -62,16 +171,87 @@ class TicketForm(forms.ModelForm):
         self.fields["service_type"].queryset = ServiceType.objects.filter(is_active=True)
         # Sites belong to a customer. Until one is chosen there is nothing
         # sensible to offer, and offering every site in the company invites
-        # picking the wrong one.
+        # picking the wrong one. The page swaps the list in when a customer
+        # is picked (see site_picker); this queryset is what the posted site
+        # is checked against, so a site from another customer is refused.
         customer_id = self.data.get("customer") or getattr(self.instance, "customer_id", None)
-        if customer_id:
-            self.fields["site"].queryset = Site.objects.filter(
-                customer_id=customer_id, is_active=True
-            )
-        else:
-            self.fields["site"].queryset = Site.objects.none()
-        self.fields["site"].required = False
-        self.fields["site"].empty_label = "Choose a customer first"
+        limit_sites_to_customer(self.fields["site"], customer_id, prompt="Which site?")
+
+    def site_picker(self):
+        return site_picker_data(self.fields["customer"].queryset, prompt="Which site?")
+
+
+# --------------------------------------------------------------------------
+# Choosing a site
+#
+# A site belongs to a customer, and both are chosen on the same form — here
+# and when scheduling a field job. Shared so the two screens cannot come to
+# disagree about which sites a customer has or what to call them.
+# --------------------------------------------------------------------------
+
+NO_CUSTOMER_YET = "Choose a customer first"
+NO_SITES_YET = "No site on this customer yet"
+NO_SITES_HELP = (
+    "This customer has no site yet. Add one on the customer record, or leave "
+    "it empty and say where in the description."
+)
+
+
+def site_label(site):
+    """The customer is already chosen, so the site is named by where it is."""
+    address = " ".join(site.address.split())
+    return f"{site.name} — {address}" if address else site.name
+
+
+def limit_sites_to_customer(field, customer_id, *, prompt):
+    """
+    Point a site field at one customer's sites, and say so in the empty
+    option. With no customer there is nothing to offer, so it offers nothing
+    rather than every site in the company.
+
+    Optional throughout: a job with no site recorded is worse than one whose
+    location is in the notes, but a form that refuses to save without one
+    would be answered with any site at all.
+    """
+    field.queryset = (
+        Site.objects.filter(customer_id=customer_id, is_active=True).order_by("name")
+        if customer_id
+        else Site.objects.none()
+    )
+    field.required = False
+    field.label_from_instance = site_label
+    if not customer_id:
+        field.empty_label = NO_CUSTOMER_YET
+    elif field.queryset.exists():
+        field.empty_label = prompt
+    else:
+        field.empty_label = NO_SITES_YET
+    return field.queryset
+
+
+def site_picker_data(customers, *, prompt, none_yet_help=NO_SITES_HELP):
+    """
+    Every listed customer's sites, keyed by customer, and the words the
+    picker uses — so a page can fill its site list the moment a customer is
+    chosen. Without it the list can only fill on submit, and on a create
+    form submitting is what creates the record.
+
+    What the page does with this is a convenience. The field's own queryset
+    is what a posted site is checked against, so a site belonging to another
+    customer is refused however the list was filled.
+    """
+    sites = {}
+    for site in Site.objects.filter(is_active=True, customer__in=customers).order_by("name"):
+        sites.setdefault(site.customer_id, []).append(
+            {"id": site.pk, "label": site_label(site)}
+        )
+    return {
+        "sites": sites,
+        "prompt": prompt,
+        "no_customer": NO_CUSTOMER_YET,
+        "none_yet": NO_SITES_YET,
+        "none_yet_help": none_yet_help,
+    }
 
 
 class TicketAssignForm(forms.Form):

@@ -30,6 +30,7 @@ from .forms import (
     TicketStatusForm,
 )
 from .models import Contact, Customer, Site, Ticket
+from .services import ensure_main_site
 
 
 # --------------------------------------------------------------------------
@@ -103,7 +104,18 @@ def customer_edit(request, pk=None):
         if instance is None:
             customer.created_by = request.user
         customer.save()
-        messages.success(request, f"Customer “{customer.name}” saved.")
+        # The address just typed becomes somewhere work can be booked at,
+        # so a field job has a location instead of an empty picker.
+        site = ensure_main_site(customer)
+        # An organisation is reached through a person, and the person named
+        # on this form is saved with it rather than as a second errand.
+        contact = form.save_contact(customer)
+        messages.success(
+            request,
+            f"Customer “{customer.name}” saved."
+            + (f" {contact.name} is their main contact." if contact else "")
+            + (" Their address is now a site work can be booked at." if site else ""),
+        )
         return redirect("crm-customer-detail", pk=customer.pk)
     return render(
         request,

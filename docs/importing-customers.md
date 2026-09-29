@@ -31,6 +31,7 @@ underscores (`Contact Name` and `contact_name` are the same column).
 | Column | What goes in it |
 | --- | --- |
 | `name` | The customer. **Required on every row.** |
+| `kind` | `individual` for a person, `organisation` for a company or institution. Empty means organisation. Read from the customer's first row |
 | `phone`, `email`, `address`, `notes` | The customer's own details |
 | `contact_name`, `contact_job_title`, `contact_phone`, `contact_email` | A person at the customer |
 | `site_name`, `site_address` | A place work happens |

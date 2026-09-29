@@ -19,12 +19,27 @@ from django.db import transaction
 from config.csv_import import Report, read_rows
 
 from .models import Contact, Customer, Site
+from .services import ensure_main_site
 
 REQUIRED = ["name"]
 CUSTOMER_COLUMNS = ["name", "phone", "email", "address", "notes"]
 CONTACT_COLUMNS = ["contact_name", "contact_job_title", "contact_phone", "contact_email"]
 SITE_COLUMNS = ["site_name", "site_address", "site_latitude", "site_longitude"]
-KNOWN = CUSTOMER_COLUMNS + CONTACT_COLUMNS + SITE_COLUMNS
+KNOWN = CUSTOMER_COLUMNS + ["kind"] + CONTACT_COLUMNS + SITE_COLUMNS
+
+# What a cleaned list is likely to say, in either spelling. A list that says
+# nothing gets organisations, which is what most of the register is — and a
+# word nobody here recognises is an error rather than a quiet guess.
+KINDS = {
+    "individual": Customer.INDIVIDUAL,
+    "person": Customer.INDIVIDUAL,
+    "private": Customer.INDIVIDUAL,
+    "organisation": Customer.ORGANISATION,
+    "organization": Customer.ORGANISATION,
+    "company": Customer.ORGANISATION,
+    "business": Customer.ORGANISATION,
+    "institution": Customer.ORGANISATION,
+}
 
 
 def _limits():
@@ -63,6 +78,21 @@ def _email_ok(report, line, value, label):
     except ValidationError:
         report.error(line, f"{label} '{value}' is not an email address.")
         return False
+
+
+def _kind(report, line, value):
+    """Which kind of customer this row is. Blank is an organisation."""
+    if not value.strip():
+        return Customer.ORGANISATION
+    kind = KINDS.get(value.strip().lower())
+    if kind is None:
+        report.error(
+            line,
+            f"Kind '{value}' is not one this import reads. Write 'individual' "
+            f"for a person or 'organisation' for a company or institution, "
+            f"or leave it empty for an organisation.",
+        )
+    return kind
 
 
 def _coordinate(report, line, value, label, limit):
@@ -140,6 +170,9 @@ def plan(raw):
                 )
         _email_ok(report, line, v.get("email", ""), "Email")
         _email_ok(report, line, v.get("contact_email", ""), "Contact email")
+        # Checked on every row so a typo is reported wherever it is written,
+        # though only the customer's first row decides what they are.
+        kind = _kind(report, line, v.get("kind", ""))
         latitude = _coordinate(report, line, v.get("site_latitude", ""), "Latitude", 90)
         longitude = _coordinate(report, line, v.get("site_longitude", ""), "Longitude", 180)
         # On what was typed, not what parsed: a bad number is its own error.
@@ -163,7 +196,7 @@ def plan(raw):
                 )
             customer = {
                 "line": line,
-                "fields": {c: v.get(c, "") for c in CUSTOMER_COLUMNS},
+                "fields": {c: v.get(c, "") for c in CUSTOMER_COLUMNS} | {"kind": kind},
                 "sites": [],
                 "contacts": [],
             }
@@ -238,6 +271,9 @@ def import_customers(raw, *, actor, commit=False, source=""):
             customer = Customer.objects.create(created_by=actor, **planned["fields"])
             for site in planned["sites"]:
                 Site.objects.create(customer=customer, **site)
+            # A row with an address but no site column still leaves somewhere
+            # a field job can be booked at.
+            ensure_main_site(customer)
             for index, contact in enumerate(planned["contacts"]):
                 # The first contact given is the main one.
                 Contact.objects.create(customer=customer, is_primary=index == 0, **contact)
