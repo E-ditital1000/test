@@ -310,6 +310,55 @@ class OfflineClockTests(StaticLiveServerTestCase):
         page.wait_for_load_state("networkidle")
         return context, page
 
+    def _scanner_context(self, supported):
+        """
+        A context whose page either has BarcodeDetector or has not.
+
+        The camera itself cannot be driven here, but the decision that
+        depends on it can: whether a device is offered a scanner at all.
+        That is the part that breaks silently — a button that does nothing
+        on the phone a crew actually carries, or a scanner withheld from one
+        that could run it.
+        """
+        context = self.browser.new_context()
+        if supported:
+            context.add_init_script(
+                "window.BarcodeDetector = function () {"
+                "  this.detect = function () { return Promise.resolve([]); };"
+                "};"
+            )
+        else:
+            context.add_init_script("delete window.BarcodeDetector;")
+        page = context.new_page()
+        page.goto(f"{self.live_server_url}/login/")
+        page.fill("#id_email", self.worker.email)
+        page.fill("#id_password", self.password)
+        page.click("button[type=submit]")
+        page.wait_for_load_state("networkidle")
+        page.goto(f"{self.live_server_url}/hr/clock/")
+        page.wait_for_load_state("networkidle")
+        return context, page
+
+    def test_a_phone_that_can_scan_is_offered_the_scanner(self):
+        context, page = self._scanner_context(supported=True)
+        try:
+            self.assertTrue(page.locator("#scan-card").is_visible())
+            self.assertTrue(page.locator("#scan-start").is_visible())
+            # The camera is not running until it is asked for.
+            self.assertFalse(page.locator("#scan-view").is_visible())
+        finally:
+            context.close()
+
+    def test_a_phone_that_cannot_is_not_shown_a_button_that_does_nothing(self):
+        """The short code on the wall is the route that has always worked,
+        and it stays."""
+        context, page = self._scanner_context(supported=False)
+        try:
+            self.assertFalse(page.locator("#scan-card").is_visible())
+            self.assertTrue(page.locator("#code-input").is_visible())
+        finally:
+            context.close()
+
     def test_a_clock_event_taken_offline_syncs_once_when_the_network_returns(self):
         context, page = self._signed_in()
         try:

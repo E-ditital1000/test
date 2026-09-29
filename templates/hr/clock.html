@@ -63,6 +63,32 @@ row that already exists instead of creating a second one.
       </div>
       {% endif %}
 
+      {% comment %}
+      The scanner. Hidden until the script has decided the device can run
+      it, so a phone that cannot is never shown a button that does nothing —
+      and the typed short code below is always there either way.
+      {% endcomment %}
+      <div class="mc" style="gap:10px" id="scan-card" hidden>
+        <p class="t-label">Scan the code</p>
+        <div class="scan" id="scan-view" hidden>
+          <video id="scan-video" playsinline muted autoplay></video>
+          <div class="scan-eye" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <p class="scan-note" id="scan-note">Hold the code inside the corners</p>
+        </div>
+        <div class="scan-acts">
+          <button class="btn btn-pri" type="button" id="scan-start" style="min-height:52px">
+            Scan the QR code
+          </button>
+          <button class="btn btn-sec" type="button" id="scan-stop" hidden style="min-height:52px">
+            Stop the camera
+          </button>
+        </div>
+        <p class="t-m-meta dim" id="scan-help">
+          Point the camera at the code posted at your location. The camera
+          only runs while this is open.
+        </p>
+      </div>
+
       <div class="mc" style="gap:10px">
       <p class="t-label">Attendance code</p>
       <input type="text" id="code-input" inputmode="text" autocapitalize="characters"
@@ -265,6 +291,145 @@ row that already exists instead of creating a second one.
     paint(queue);
     if (queue.length) flush();
   });
+
+  // ---------------------------------------------------------------------
+  // The scanner
+  //
+  // Reads the QR in the page rather than sending somebody out to their
+  // phone's camera app and back. The QR encodes this screen's URL with the
+  // token on it, so a scan yields either that URL or a bare code, and both
+  // end up in the same field the person could have typed into.
+  //
+  // Uses the browser's own BarcodeDetector — no library, nothing extra to
+  // cache for a device that works offline. Chrome on Android has it, which
+  // is what the crews carry; anywhere it is missing this stays hidden and
+  // the wall's short code is still there, which is the route that has
+  // always worked.
+  //
+  // The camera runs only between Scan and Stop. It is released on stop, on
+  // a successful read, and when the screen is put away.
+  // ---------------------------------------------------------------------
+  (function () {
+    var card = document.getElementById("scan-card");
+    var view = document.getElementById("scan-view");
+    var video = document.getElementById("scan-video");
+    var startButton = document.getElementById("scan-start");
+    var stopButton = document.getElementById("scan-stop");
+    var note = document.getElementById("scan-note");
+    var help = document.getElementById("scan-help");
+    var field = document.getElementById("code-input");
+    if (!card || !video || !startButton || !field) return;
+
+    var canScan = "BarcodeDetector" in window
+      && navigator.mediaDevices
+      && navigator.mediaDevices.getUserMedia;
+    // A camera needs a secure origin. Saying nothing would look like a bug.
+    if (!canScan) return;
+
+    card.hidden = false;
+
+    var stream = null;
+    var detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+    var timer = null;
+
+    function release() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (stream) {
+        stream.getTracks().forEach(function (track) { track.stop(); });
+        stream = null;
+      }
+      video.srcObject = null;
+      view.hidden = true;
+      view.classList.remove("live", "got");
+      startButton.hidden = false;
+      stopButton.hidden = true;
+    }
+
+    function fail(message) {
+      release();
+      help.textContent = message + " Type the short code printed under the QR instead.";
+    }
+
+    // The QR holds this screen's URL with ?code= on it. A code typed on a
+    // wall poster holds just the code. Both are the same secret.
+    function codeFrom(raw) {
+      var value = (raw || "").trim();
+      if (!value) return "";
+      try {
+        var parsed = new URL(value, window.location.origin);
+        return (parsed.searchParams.get("code") || "").trim() || value;
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function found(raw) {
+      var code = codeFrom(raw);
+      if (!code) return;
+
+      view.classList.add("got");
+      note.textContent = "Code read";
+      field.value = code;
+      release();
+
+      // Online, let the server say which location this is before anybody
+      // clocks against it. Offline, keep it here — the code rides with the
+      // queued event and is judged when it uploads, and a round trip now
+      // would land on the offline page instead.
+      if (navigator.onLine) {
+        window.location.href = "?code=" + encodeURIComponent(code);
+      } else {
+        help.textContent = "Code read. It is checked when this device "
+          + "next has signal — clock now and it uploads with the event.";
+      }
+    }
+
+    function scan() {
+      if (!stream) return;
+      detector.detect(video).then(function (codes) {
+        if (codes && codes.length) found(codes[0].rawValue);
+      }).catch(function () {
+        // One unreadable frame is not a failure; the next is along shortly.
+      });
+    }
+
+    startButton.addEventListener("click", function () {
+      startButton.hidden = true;
+      help.textContent = "Starting the camera…";
+      navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } }
+      }).then(function (opened) {
+        stream = opened;
+        video.srcObject = stream;
+        view.hidden = false;
+        view.classList.add("live");
+        stopButton.hidden = false;
+        note.textContent = "Hold the code inside the corners";
+        help.textContent = "The camera only runs while this is open.";
+        timer = setInterval(scan, 320);
+      }).catch(function (error) {
+        if (error && error.name === "NotAllowedError") {
+          fail("The camera was not allowed for this site.");
+        } else {
+          fail("The camera would not start.");
+        }
+      });
+    });
+
+    stopButton.addEventListener("click", function () {
+      release();
+      help.textContent = "Camera off. Scan again, or type the short code.";
+    });
+
+    // A phone put in a pocket mid-scan should not keep the camera on.
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && stream) {
+        release();
+        help.textContent = "Camera stopped. Tap Scan to start it again.";
+      }
+    });
+    window.addEventListener("pagehide", release);
+  })();
 
   var elapsed = document.getElementById("elapsed");
   if (elapsed && elapsed.dataset.since) {

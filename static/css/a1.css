@@ -1175,6 +1175,11 @@ input[type=checkbox], input[type=radio] {
 .a-form { display: flex; flex-direction: column; gap: 16px; }
 .a-step { display: flex; flex-direction: column; gap: 12px; }
 .mrow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* A requisition row: what it is, then how many of it, on one line even
+   on the narrowest phone -- a quantity field does not need the width. */
+.req-row { gap: 12px; }
+.req-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
 .ph { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
 .ph > div { display: flex; flex-direction: column; gap: 6px; }
 
@@ -1332,4 +1337,68 @@ input[type=checkbox], input[type=radio] {
   .a1-side, .a1-tabs, .a1-bar .acts, .skip { display: none !important; }
   body { background: #fff; }
   .card { border-color: #999; break-inside: avoid; }
+}
+
+/* --------------------------------------------------------------------------
+   The attendance scanner
+   --------------------------------------------------------------------------
+   A camera viewport on the clock screen. It sits in the flow rather than over
+   it: a full-screen overlay on a phone in sunlight hides the thing you are
+   trying to line up with, and leaves nowhere to put the reason it failed.
+
+   Every state here is a real one on the devices the crews carry — a camera
+   that will not start in the rain is the normal case, not the exception — so
+   none of them is a dead end: the typed short code is always underneath.
+   -------------------------------------------------------------------------- */
+.scan {
+  position: relative; width: 100%; aspect-ratio: 1 / 1; max-height: 58vh;
+  background: var(--navy); border-radius: var(--r-card); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.scan video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  /* The back camera is not mirrored; a mirrored preview makes lining up
+     a code on a wall feel wrong-handed. */
+  transform: none;
+}
+
+/* The reticle. Four corners, not a full box: the code must sit inside it and
+   a solid frame competes with the code's own quiet zone. */
+.scan-eye {
+  position: absolute; inset: 50% auto auto 50%; transform: translate(-50%, -50%);
+  width: 62%; aspect-ratio: 1 / 1; pointer-events: none;
+}
+.scan-eye i {
+  position: absolute; width: 28px; height: 28px; border: 3px solid var(--gold);
+}
+.scan-eye i:nth-child(1) { top: 0; left: 0; border-right: 0; border-bottom: 0; border-radius: 6px 0 0 0; }
+.scan-eye i:nth-child(2) { top: 0; right: 0; border-left: 0; border-bottom: 0; border-radius: 0 6px 0 0; }
+.scan-eye i:nth-child(3) { bottom: 0; left: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 6px; }
+.scan-eye i:nth-child(4) { bottom: 0; right: 0; border-left: 0; border-top: 0; border-radius: 0 0 6px 0; }
+
+.scan-note {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px;
+  background: linear-gradient(to top, rgba(17, 4, 58, .92), rgba(17, 4, 58, 0));
+  color: #fff; font-size: 14px; line-height: 1.4; text-align: center;
+}
+.scan-msg {
+  padding: 24px 20px; text-align: center; color: #fff; display: flex;
+  flex-direction: column; gap: 10px; align-items: center;
+}
+.scan-msg b { font-size: 17px; font-weight: 600; }
+.scan-msg span { font-size: 14px; line-height: 1.5; color: var(--navy300); }
+
+.scan-acts { display: flex; gap: 10px; }
+.scan-acts .btn { flex: 1; min-height: 48px; }
+
+/* Found it. A held green frame rather than a flash — the person is looking at
+   a phone in daylight and a 200ms blink is missed. */
+.scan.got { outline: 3px solid var(--green); outline-offset: -3px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .scan.live .scan-eye { animation: scan-breathe 2.4s var(--ease-out) infinite; }
+  @keyframes scan-breathe {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .55; }
+  }
 }
