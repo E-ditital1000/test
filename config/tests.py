@@ -122,3 +122,44 @@ class PolicyTests(TestCase):
         self.assertEqual(
             PolicySetting.get_value(PolicySetting.REQUISITION_THRESHOLD), "50000"
         )
+
+
+class MediaSafetyTests(TestCase):
+    """
+    The test suite must never write to the live media account.
+
+    Real Cloudinary credentials in a developer's .env are the normal way to
+    check that uploads work, and this suite submits assessments with
+    photographs attached. Without a guard every run would push fixture
+    images into the same library that holds real site evidence, where
+    nothing would distinguish them afterwards.
+    """
+
+    def test_the_suite_knows_it_is_the_suite(self):
+        from django.conf import settings
+
+        self.assertTrue(
+            settings.TESTING,
+            "settings.TESTING must be true under the test runner, or the "
+            "media guard is never applied",
+        )
+
+    def test_media_never_goes_to_the_live_account_while_testing(self):
+        from django.conf import settings
+
+        self.assertEqual(
+            settings.STORAGES["default"]["BACKEND"],
+            "django.core.files.storage.FileSystemStorage",
+            "configured Cloudinary credentials must not be used by the suite",
+        )
+
+    def test_a_file_written_in_a_test_stays_on_this_machine(self):
+        """Asserted on a real write, not only on the setting."""
+        from django.core.files.base import ContentFile
+        from django.core.files.storage import default_storage
+
+        name = default_storage.save("test-guard.txt", ContentFile(b"local only"))
+        try:
+            self.assertNotIn("cloudinary", default_storage.url(name).lower())
+        finally:
+            default_storage.delete(name)

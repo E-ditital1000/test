@@ -2,6 +2,7 @@
 Django settings for the A-1 Management System (Phase One).
 """
 import os
+import sys
 from pathlib import Path
 
 import environ
@@ -12,6 +13,16 @@ env = environ.Env(
     DEBUG=(bool, True),
 )
 environ.Env.read_env(BASE_DIR / ".env")
+
+# Whether this process is running the test suite.
+#
+# It exists for one reason: a developer with real media credentials in their
+# .env — which is the normal way to check uploads work — would otherwise have
+# every test run push its fixture photographs into the live media account.
+# The suite submits assessments with photographs attached, so that is not
+# hypothetical, and the images would be indistinguishable from real site
+# evidence once they were there.
+TESTING = "test" in sys.argv or "pytest" in sys.modules
 
 SECRET_KEY = env("SECRET_KEY", default="dev-only-insecure-secret-key-change-me")
 
@@ -161,7 +172,8 @@ MEDIA_ROOT = BASE_DIR / "media"
 # credentials are supplied via the environment; falls back to local
 # filesystem storage for day-to-day local development.
 CLOUDINARY_CLOUD_NAME = env("CLOUDINARY_CLOUD_NAME", default="")
-if CLOUDINARY_CLOUD_NAME:
+# Never under test, whatever is configured: see TESTING at the top.
+if CLOUDINARY_CLOUD_NAME and not TESTING:
     CLOUDINARY_STORAGE = {
         "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
         "API_KEY": env("CLOUDINARY_API_KEY", default=""),
