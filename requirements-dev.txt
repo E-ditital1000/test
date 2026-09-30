@@ -1,0 +1,19 @@
+# Everything production needs, plus what only the test suite does.
+#
+#   pip install -r requirements-dev.txt
+#
+# Kept out of requirements.txt so a deploy does not build a browser
+# automation stack it will never run.
+-r requirements.txt
+
+pytest==8.3.3
+pytest-django==4.9.0
+
+# Parses the JavaScript this system ships, so a syntax error cannot reach
+# production on a box with no Node toolchain.
+esprima==4.0.1
+
+# Drives a real browser for the offline and scanner tests. The browser suite
+# skips itself when this or its chromium download is absent.
+#   python -m playwright install chromium
+playwright==1.62.0

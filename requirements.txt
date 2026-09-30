@@ -16,13 +16,3 @@ Pillow==10.4.0
 # Renders the attendance QR codes HR prints and sticks on a wall. Pure
 # Python; Pillow above turns the matrix into the PNG that gets printed.
 qrcode==7.4.2
-pytest==8.3.3
-pytest-django==4.9.0
-
-# Test-only. esprima parses the JavaScript this system ships, so a syntax
-# error cannot reach production on a box with no Node toolchain.
-esprima==4.0.1
-# Optional: drives a real browser for the offline tests. The browser suite
-# skips itself when this or its chromium download is absent.
-#   pip install playwright && python -m playwright install chromium
-playwright==1.62.0
