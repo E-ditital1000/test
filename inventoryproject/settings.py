@@ -158,7 +158,14 @@ DATABASES = {
 #
 # Neither is a warning. A deployment that has missed either should refuse to
 # start, while there is still nothing depending on it.
-if not DEBUG and not TESTING:
+# collectstatic runs during the image build, touches no database, and on
+# some platforms runs before the service's variables are attached at all.
+# Refusing it over a missing DATABASE_URL would fail the build for a reason
+# that has nothing to do with what it is doing, and there would be no
+# deployment left to correct.
+BUILD_STEP = "collectstatic" in sys.argv
+
+if not DEBUG and not TESTING and not BUILD_STEP:
     from django.core.exceptions import ImproperlyConfigured
 
     if not _database_url():
