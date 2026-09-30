@@ -24,7 +24,8 @@ environ.Env.read_env(BASE_DIR / ".env")
 # evidence once they were there.
 TESTING = "test" in sys.argv or "pytest" in sys.modules
 
-SECRET_KEY = env("SECRET_KEY", default="dev-only-insecure-secret-key-change-me")
+DEV_SECRET_KEY = "dev-only-insecure-secret-key-change-me"
+SECRET_KEY = env("SECRET_KEY", default=DEV_SECRET_KEY)
 
 DEBUG = env.bool("DEBUG", default=True)
 
@@ -98,6 +99,38 @@ WSGI_APPLICATION = "inventoryproject.wsgi.application"
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
+
+# Two settings whose defaults are right for a laptop and dangerous on a
+# server, and which fail silently rather than loudly when they are missed.
+#
+# DATABASE_URL: unset in a container, the fallback above is a SQLite file on
+# the container's own disk. The app runs perfectly well against it and says
+# nothing, while starting empty on every deploy and taking the day's clock
+# events with it when the container is replaced.
+#
+# SECRET_KEY: unset, the fallback is a published string. It signs sessions
+# and password reset links, so anyone who has read this repository can mint
+# both.
+#
+# Neither is a warning. A deployment that has missed either should refuse to
+# start, while there is still nothing depending on it.
+if not DEBUG and not TESTING:
+    from django.core.exceptions import ImproperlyConfigured
+
+    if not env("DATABASE_URL", default=""):
+        raise ImproperlyConfigured(
+            "DATABASE_URL is not set and DEBUG is off. Refusing to start on "
+            "the SQLite fallback, which lives on the container's own disk "
+            "and is destroyed on the next deploy. On Railway set it to "
+            "${{Postgres.DATABASE_URL}}; see docs/deploy-railway.md."
+        )
+    if SECRET_KEY == DEV_SECRET_KEY:
+        raise ImproperlyConfigured(
+            "SECRET_KEY is still the development default, which is published "
+            "in this repository, and DEBUG is off. Generate one with: "
+            "python -c \"from django.core.management.utils import "
+            "get_random_secret_key as k; print(k())\""
+        )
 
 # SQLite serialises writers and, by default, blocks readers behind them and
 # gives up immediately. That is fine for one person on `runserver` and not
