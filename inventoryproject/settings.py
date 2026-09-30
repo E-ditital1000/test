@@ -27,9 +27,25 @@ TESTING = "test" in sys.argv or "pytest" in sys.modules
 DEV_SECRET_KEY = "dev-only-insecure-secret-key-change-me"
 SECRET_KEY = env("SECRET_KEY", default=DEV_SECRET_KEY)
 
-DEBUG = env.bool("DEBUG", default=True)
+# Railway sets these on every service it runs, so their presence is how this
+# process knows it is not on somebody's laptop. Nothing has to be configured
+# for the detection itself to work, which is the point: the settings that are
+# dangerous to get wrong should not depend on remembering to set them.
+ON_RAILWAY = bool(
+    env("RAILWAY_ENVIRONMENT_NAME", default="") or env("RAILWAY_PROJECT_ID", default="")
+)
+RAILWAY_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="")
+
+# On by default on a laptop, off by default on the platform. A deployment
+# that forgot this used to serve real tracebacks to the internet.
+DEBUG = env.bool("DEBUG", default=not ON_RAILWAY)
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+# The domain the platform itself gave this service. Without it a deployment
+# that has not set ALLOWED_HOSTS answers every request with 400 and no
+# explanation a non-developer could act on.
+if RAILWAY_DOMAIN and RAILWAY_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
 
 INSTALLED_APPS = [
     "jazzmin",
@@ -96,8 +112,36 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "inventoryproject.wsgi.application"
 
+def _database_url():
+    """
+    Where the data lives, however the platform chose to say it.
+
+    A managed Postgres is offered two ways: one DATABASE_URL, or the parts
+    as PGHOST/PGUSER/PGPASSWORD/PGPORT and a database name. Reading only the
+    first means a service wired up the second way falls through to the
+    SQLite default and runs, wrongly, on the container's own disk.
+    """
+    url = env("DATABASE_URL", default="")
+    if url:
+        return url
+
+    host = env("PGHOST", default="")
+    if not host:
+        return ""
+
+    from urllib.parse import quote
+
+    user = env("PGUSER", default="postgres")
+    password = quote(env("PGPASSWORD", default=""), safe="")
+    port = env("PGPORT", default="5432")
+    name = env("PGDATABASE", default="") or env("POSTGRES_DB", default="railway")
+    return f"postgres://{quote(user, safe='')}:{password}@{host}:{port}/{name}"
+
+
 DATABASES = {
-    "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+    "default": env.db_url_config(
+        _database_url() or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+    )
 }
 
 # Two settings whose defaults are right for a laptop and dangerous on a
@@ -117,12 +161,12 @@ DATABASES = {
 if not DEBUG and not TESTING:
     from django.core.exceptions import ImproperlyConfigured
 
-    if not env("DATABASE_URL", default=""):
+    if not _database_url():
         raise ImproperlyConfigured(
-            "DATABASE_URL is not set and DEBUG is off. Refusing to start on "
+            "No database is configured and DEBUG is off. Refusing to start on "
             "the SQLite fallback, which lives on the container's own disk "
-            "and is destroyed on the next deploy. On Railway set it to "
-            "${{Postgres.DATABASE_URL}}; see docs/deploy-railway.md."
+            "and is destroyed on the next deploy. On Railway set DATABASE_URL "
+            "to ${{Postgres.DATABASE_URL}}; see docs/deploy-railway.md."
         )
     if SECRET_KEY == DEV_SECRET_KEY:
         raise ImproperlyConfigured(
@@ -251,6 +295,13 @@ if not DEBUG:
     # Django's CSRF check needs the site's real origin behind a proxy.
     # e.g. CSRF_TRUSTED_ORIGINS=https://a1360.example.com
     CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+    # The platform's own domain, so signing in works on a deployment that has
+    # set nothing. Without it every POST is rejected and the sign-in page just
+    # reloads, which looks like a wrong password rather than a missing setting.
+    if RAILWAY_DOMAIN:
+        origin = f"https://{RAILWAY_DOMAIN}"
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
 
     # HSTS is deliberately OFF by default. It tells browsers to refuse plain
     # HTTP for this domain for the whole period, and that instruction cannot
