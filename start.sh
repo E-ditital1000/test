@@ -28,6 +28,35 @@ set -euo pipefail
 echo "--> collecting static files"
 python manage.py collectstatic --noinput
 
+# Wait for the database to be reachable before doing anything with it.
+#
+# A private network attaches a moment after the container starts, and a
+# managed database can still be coming up when its first client arrives.
+# Neither is an error worth crashing over — but a host that never resolves
+# is, so this gives up rather than retrying forever, and says which it was.
+echo "--> waiting for the database"
+for attempt in $(seq 1 20); do
+  if python -c "
+import django, os, sys
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inventoryproject.settings')
+django.setup()
+from django.db import connection
+connection.ensure_connection()
+" 2>/tmp/dbwait.log; then
+    echo "    reachable after ${attempt} attempt(s)"
+    break
+  fi
+  if [ "$attempt" -eq 20 ]; then
+    echo "    the database could not be reached after 20 attempts:"
+    tail -3 /tmp/dbwait.log
+    echo "    If the host name will not resolve, the private network is not"
+    echo "    attached to this service. Use the public proxy host instead;"
+    echo "    see docs/deploy-railway.md."
+    exit 1
+  fi
+  sleep 3
+done
+
 echo "--> migrating"
 python manage.py migrate --noinput
 
