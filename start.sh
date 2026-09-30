@@ -15,6 +15,19 @@
 #
 set -euo pipefail
 
+# Static files, here rather than trusting the build to have done it.
+#
+# Whether the builder runs collectstatic, and whether it runs with DEBUG on
+# or off, varies by platform and is invisible until it bites: with DEBUG off
+# the app serves static files from a hashed manifest that only collectstatic
+# writes, and without that manifest every single page raises rather than
+# falling back. Running it here costs a few seconds a boot and means the
+# manifest always matches the code being served.
+#
+# It opens no database, so it runs before the database is even checked.
+echo "--> collecting static files"
+python manage.py collectstatic --noinput
+
 echo "--> migrating"
 python manage.py migrate --noinput
 
