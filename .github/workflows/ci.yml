@@ -44,7 +44,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Migrations are in step with the models
         run: python manage.py makemigrations --check --dry-run
@@ -101,7 +101,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
           python -m playwright install --with-deps chromium
 
       - name: Offline and shell behaviour
@@ -130,7 +130,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Phase One release gate
         # Exits non-zero on any failure. Phase One does not ship on a partial
