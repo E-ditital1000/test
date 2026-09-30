@@ -169,11 +169,32 @@ if not DEBUG and not TESTING and not BUILD_STEP:
     from django.core.exceptions import ImproperlyConfigured
 
     if not _database_url():
+        # What this process can actually see, by name. A deployment that
+        # believes it set the variable and a deployment that did not look
+        # identical from here otherwise, and the difference is usually a
+        # reference to a variable the other service never had. Names only —
+        # a password must not end up in a deploy log.
+        watched = [
+            "DATABASE_URL", "PGHOST", "PGUSER", "PGPASSWORD", "PGPORT",
+            "PGDATABASE", "POSTGRES_DB", "RAILWAY_ENVIRONMENT_NAME",
+        ]
+        seen = []
+        for name in watched:
+            if name not in os.environ:
+                continue
+            seen.append(name if os.environ[name].strip() else f"{name} (empty)")
+
         raise ImproperlyConfigured(
             "No database is configured and DEBUG is off. Refusing to start on "
-            "the SQLite fallback, which lives on the container's own disk "
-            "and is destroyed on the next deploy. On Railway set DATABASE_URL "
-            "to ${{Postgres.DATABASE_URL}}; see docs/deploy-railway.md."
+            "the SQLite fallback, which lives on the container's own disk and "
+            "is destroyed on the next deploy.\n"
+            "  Database variables this process can see: "
+            + (", ".join(seen) if seen else "none of them")
+            + "\n"
+            "  Set DATABASE_URL on THIS service. A ${{Service.VAR}} reference "
+            "resolves to nothing when the named service has no such variable, "
+            "and an empty value looks exactly like an unset one from here.\n"
+            "  See docs/deploy-railway.md."
         )
     if SECRET_KEY == DEV_SECRET_KEY:
         raise ImproperlyConfigured(
