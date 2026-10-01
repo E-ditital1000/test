@@ -41,11 +41,17 @@ RAILWAY_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="")
 DEBUG = env.bool("DEBUG", default=not ON_RAILWAY)
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
-# The domain the platform itself gave this service. Without it a deployment
-# that has not set ALLOWED_HOSTS answers every request with 400 and no
-# explanation a non-developer could act on.
+# The domain the platform gave this service. Without it a deployment that
+# has not set ALLOWED_HOSTS answers every request with 400, and the only
+# explanation is in a log the person looking at the blank page cannot see.
 if RAILWAY_DOMAIN and RAILWAY_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RAILWAY_DOMAIN)
+# RAILWAY_PUBLIC_DOMAIN is not in the environment unless somebody thought to
+# reference it, so the line above cannot be relied on. The generated domain
+# is always under this suffix, and Railway controls who gets one, so trusting
+# it costs nothing a custom domain would not already have to be listed for.
+if ON_RAILWAY and ".up.railway.app" not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(".up.railway.app")
 
 INSTALLED_APPS = [
     "jazzmin",
@@ -330,6 +336,11 @@ if not DEBUG:
         origin = f"https://{RAILWAY_DOMAIN}"
         if origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(origin)
+    # And the same safety net as ALLOWED_HOSTS, for the same reason: without
+    # it the sign-in form is rejected as a CSRF failure, which reads to the
+    # person typing as a wrong password.
+    if ON_RAILWAY and "https://*.up.railway.app" not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append("https://*.up.railway.app")
 
     # HSTS is deliberately OFF by default. It tells browsers to refuse plain
     # HTTP for this domain for the whole period, and that instruction cannot
