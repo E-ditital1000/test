@@ -34,7 +34,7 @@ SECRET_KEY = env("SECRET_KEY", default=DEV_SECRET_KEY)
 ON_RAILWAY = bool(
     env("RAILWAY_ENVIRONMENT_NAME", default="") or env("RAILWAY_PROJECT_ID", default="")
 )
-RAILWAY_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="")
+RAILWAY_DOMAIN = env("RAILWAY_PUBLIC_DOMAIN", default="test-production-8c6f.up.railway.app")
 
 # On by default on a laptop, off by default on the platform. A deployment
 # that forgot this used to serve real tracebacks to the internet.
