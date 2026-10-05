@@ -36,7 +36,9 @@ class UserForm(forms.ModelForm):
 
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "email", "is_active"]
+        fields = ["first_name", "middle_name", "last_name", "email", "is_active"]
+        labels = {"middle_name": "Middle name"}
+        help_texts = {"middle_name": "Optional. Shown in full on the employee register."}
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()

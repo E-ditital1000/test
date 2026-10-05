@@ -1,0 +1,31 @@
+{% comment %}
+HR's sections, in the module rather than in the sidebar.
+
+The sidebar carries the eight modules of the design specification and no
+more, so "HR" is one entry and lands on whichever screen the viewer can
+reach first. That left attendance records real, working and effectively
+hidden: the client reported not being able to find them at all.
+
+Each tab appears only if the viewer holds the permission that gates it —
+absent, not disabled, because no condition would make it usable for them.
+{% endcomment %}
+<nav class="filters" aria-label="HR sections">
+  {% if perms_held.view_employees %}
+    <a class="chip {% if active == 'register' %}on{% endif %}" href="{% url 'hr-employees' %}">Employee register</a>
+  {% endif %}
+  {% if perms_held.manage_employees %}
+    <a class="chip {% if active == 'departments' %}on{% endif %}" href="{% url 'hr-departments' %}">Departments</a>
+  {% endif %}
+  {% if perms_held.view_attendance_records %}
+    <a class="chip {% if active == 'roll_call' %}on{% endif %}" href="{% url 'hr-roll-call' %}">Daily roll-call</a>
+  {% endif %}
+  {% if perms_held.view_attendance_reports %}
+    <a class="chip {% if active == 'report' %}on{% endif %}" href="{% url 'hr-monthly-report' %}">Monthly report</a>
+  {% endif %}
+  {% if perms_held.manage_attendance_codes %}
+    <a class="chip {% if active == 'codes' %}on{% endif %}" href="{% url 'hr-codes' %}">Attendance codes</a>
+  {% endif %}
+  {% if perms_held.clock_in_out %}
+    <a class="chip {% if active == 'clock' %}on{% endif %}" href="{% url 'hr-clock' %}">My clock</a>
+  {% endif %}
+</nav>

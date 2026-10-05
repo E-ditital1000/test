@@ -22,6 +22,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "shell/_hr_nav.html" with active="roll_call" %}
+
   <div class="mrow">
     <div class="metric ok"><span>In on time</span><b>{{ counts.present }}</b><em>clocked in within the grace period</em></div>
     <div class="metric {% if counts.late %}alert{% endif %}"><span>Late</span><b>{{ counts.late }}</b><em>after the grace period</em></div>

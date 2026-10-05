@@ -20,6 +20,25 @@ from config.mixins import (
 )
 
 
+class Department(SoftDeleteModel, TimeStampedModel):
+    """
+    The parts of the company somebody can belong to, owned by HR.
+
+    A list rather than a text box because it was a text box: "Operations",
+    "operations" and "Ops" were three departments as far as any report was
+    concerned, and nobody found out until the roll-call was grouped by one.
+    """
+
+    name = models.CharField(max_length=80, unique=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Employee(SoftDeleteModel, TimeStampedModel):
     """
     The employee register. Deactivation preserves all history — the record
@@ -31,7 +50,13 @@ class Employee(SoftDeleteModel, TimeStampedModel):
     )
     staff_id = models.CharField(max_length=30, unique=True)
     job_title = models.CharField(max_length=80, blank=True)
-    department = models.CharField(max_length=80, blank=True)
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="employees",
+    )
     phone = models.CharField(max_length=40, blank=True)
     supervisor = models.ForeignKey(
         "self",

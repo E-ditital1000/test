@@ -14,6 +14,9 @@
   register rights is unaffected and an Executive gets the report without
   the correction trail.
   {% endcomment %}
+  {% if perms_held.manage_employees %}
+    <a class="btn btn-sec" href="{% url 'hr-departments' %}">Departments</a>
+  {% endif %}
   {% if perms_held.view_attendance_records %}
     <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Daily roll-call</a>
   {% endif %}
@@ -29,6 +32,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "shell/_hr_nav.html" with active="register" %}
+
   <form method="get" class="filters">
     <input type="search" name="q" value="{{ query }}" style="max-width:340px"
            placeholder="Search name, staff ID or department" aria-label="Search employees">
@@ -63,7 +68,7 @@
                 <td class="mono dim2">{{ employee.staff_id }}</td>
                 <td><b>{{ employee|a1register_name }}</b></td>
                 <td>{{ employee.job_title|default:"—" }}</td>
-                <td>{{ employee.department|default:"—" }}</td>
+                <td>{{ employee.department.name|default:"—" }}</td>
                 <td>{% if employee.supervisor %}{{ employee.supervisor.user|a1name }}{% else %}<span class="dim">—</span>{% endif %}</td>
                 <td>
                   {% if employee.is_active %}

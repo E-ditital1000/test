@@ -14,7 +14,7 @@ row that already exists instead of creating a second one.
 
 {% block page_title %}{% a1greeting %}, {{ user.first_name|default:user.email }}{% endblock %}
 {% block page_sub %}
-  {% if employee %}{{ employee.staff_id }} · {{ employee.department|default:"A-1 Technical" }}{% else %}A-1 Technical{% endif %}
+  {% if employee %}{{ employee.staff_id }} · {{ employee.department.name|default:"A-1 Technical" }}{% else %}A-1 Technical{% endif %}
 {% endblock %}
 
 {% block content %}

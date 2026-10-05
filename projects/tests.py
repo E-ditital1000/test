@@ -314,6 +314,40 @@ class TaskAssignmentTests(TestCase):
                 )
                 self.assertTrue(form.is_valid(), form.errors)
 
+    def test_work_can_be_assigned_before_anybody_is_in_the_hr_register(self):
+        """
+        The one the client hit. Assignment used to require a record in the
+        employee register as well as an account, so on a system whose
+        register had not been filled in yet the dropdown was empty and no
+        task could be given to anyone — with nothing on screen saying why,
+        because an empty dropdown looks like a dropdown.
+        """
+        from config.models import StatusOption
+        from crm.models import Customer
+
+        from .forms import TaskForm
+        from .models import Project
+
+        # An account that can sign in, with nobody having got round to
+        # entering them in HR yet — which is every account on a new system.
+        unregistered = User.objects.create_user(
+            username="newadmin@test.local", email="newadmin@test.local"
+        )
+        self.assertFalse(hasattr(unregistered, "employee"))
+
+        bare = Project.objects.create(
+            reference="PRJ-0099", name="Nobody on the crew yet",
+            customer=Customer.objects.first(),
+            service_type=self.project.service_type,
+            status=StatusOption.objects.get(code="active"),
+        )
+        offered = TaskForm(project=bare).fields["assignee"].queryset
+        self.assertIn(
+            unregistered, offered,
+            "an account with no HR record must still be assignable, or a new "
+            "system can give work to nobody at all",
+        )
+
     def test_before_a_crew_exists_everyone_is_offered(self):
         """
         A form that cannot be used is worse than a long list, so an empty

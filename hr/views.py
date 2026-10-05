@@ -13,7 +13,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -26,8 +26,8 @@ from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
 from . import services
-from .forms import AttendanceCorrectionForm, EmployeeForm, EmployeeOnboardingForm
-from .models import AttendanceDay, AttendanceEvent, Employee
+from .forms import DepartmentForm, AttendanceCorrectionForm, EmployeeForm, EmployeeOnboardingForm
+from .models import AttendanceDay, AttendanceEvent, Department, Employee
 
 
 # --------------------------------------------------------------------------
@@ -47,7 +47,7 @@ def employees(request):
             Q(staff_id__icontains=query)
             | Q(user__first_name__icontains=query)
             | Q(user__last_name__icontains=query)
-            | Q(department__icontains=query)
+            | Q(department__name__icontains=query)
         )
 
     # A supervisor granted "view_employees" at own-team scope sees their
@@ -465,7 +465,7 @@ def _monthly_csv(summary, year, month):
                 employee.staff_id,
                 employee.user.last_name,
                 employee.user.first_name,
-                employee.department,
+                employee.department.name if employee.department else "",
                 row["days_present"],
                 row["days_absent"],
                 row["late_arrivals"],
@@ -474,3 +474,46 @@ def _monthly_csv(summary, year, month):
             ]
         )
     return response
+
+
+# --------------------------------------------------------------------------
+# Departments
+#
+# The list behind the dropdown on an employee record. HR's, not Settings':
+# the person who hires knows what the departments are, and holds
+# manage_employees already — putting it under Settings would have hidden it
+# from them behind permissions they do not have.
+# --------------------------------------------------------------------------
+
+@require_permission("manage_employees")
+def departments(request):
+    return render(
+        request,
+        "hr/departments.html",
+        {
+            "departments": Department.objects.annotate(
+                headcount=Count("employees", filter=Q(employees__is_active=True))
+            ),
+        },
+    )
+
+
+@require_permission("manage_employees")
+def department_edit(request, pk=None):
+    instance = get_object_or_404(Department, pk=pk) if pk else None
+    form = DepartmentForm(request.POST or None, instance=instance)
+    if request.method == "POST" and form.is_valid():
+        before = audit.snapshot(instance, fields=["name", "order", "is_active"])
+        department = form.save()
+        audit.record_change(
+            actor=request.user,
+            action="department.saved",
+            target=department,
+            before=before,
+            after=audit.snapshot(department, fields=["name", "order", "is_active"]),
+        )
+        messages.success(request, f"Department “{department.name}” saved.")
+        return redirect("hr-departments")
+    return render(
+        request, "hr/department_form.html", {"form": form, "instance": instance}
+    )

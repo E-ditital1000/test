@@ -10,6 +10,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "shell/_hr_nav.html" with active="codes" %}
+
   {% if expiring_soon %}
     <div class="msg msg-warning">
       {{ expiring_soon|length }} code{{ expiring_soon|pluralize }} expire{{ expiring_soon|pluralize:"s," }}

@@ -21,7 +21,7 @@ from accounts.services import assignable_roles
 from config.csv_import import Report, read_rows
 
 from .forms import EmployeeOnboardingForm
-from .models import Employee
+from .models import Department, Employee
 
 REQUIRED = ["first_name", "last_name", "email", "staff_id"]
 KNOWN = REQUIRED + ["phone", "job_title", "department", "supervisor", "start_date", "roles"]
@@ -72,6 +72,18 @@ def plan(raw, *, actor):
             else:
                 report.error(line, f"There is no role called '{name}'.")
 
+        # A spreadsheet carries a department's name, and the form now wants
+        # a row from the list. At cutover that spreadsheet IS where the list
+        # comes from, so an unknown name creates one — and says so, because a
+        # typo would otherwise become a department of one person for ever.
+        department = None
+        raw_department = " ".join(v.get("department", "").split())
+        if raw_department:
+            department = Department.objects.filter(name__iexact=raw_department).first()
+            if department is None:
+                department = Department.objects.create(name=raw_department)
+                report.warn(line, f"Added '{raw_department}' to the department list.")
+
         start = None
         if v.get("start_date"):
             start, problem = _parse_date(v["start_date"])
@@ -86,7 +98,7 @@ def plan(raw, *, actor):
                 "phone": v.get("phone", ""),
                 "staff_id": v.get("staff_id", ""),
                 "job_title": v.get("job_title", ""),
-                "department": v.get("department", ""),
+                "department": department.pk if department else "",
             },
             actor=actor,
         )

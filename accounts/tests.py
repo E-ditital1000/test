@@ -62,6 +62,9 @@ ENDPOINTS = {
     # The office's view of everybody's work, as against a technician's own.
     "fieldjobs-board": "view_field_jobs",
     "hr-roll-call": "view_attendance_records",
+    # The HR-owned list behind an employee's department.
+    "hr-departments": "manage_employees",
+    "hr-department-create": "manage_employees",
     "hr-monthly-report": "view_attendance_reports",
     "finance-expenses": "log_expense",
     "finance-expense-create": "log_expense",

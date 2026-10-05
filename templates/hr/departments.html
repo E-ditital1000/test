@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Departments — HR — A1 360{% endblock %}
+
+{% block page_title %}Departments{% endblock %}
+{% block page_sub %}The list an employee's department is chosen from{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-employees' %}">Employee register</a>
+  <a class="btn btn-pri" href="{% url 'hr-department-create' %}">Add department</a>
+{% endblock %}
+
+{% comment %}
+This was a text box, and "Operations", "operations" and "Ops" were three
+departments as far as any report was concerned. A list is the fix, and the
+headcount beside each one is how a duplicate gives itself away.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="departments" %}
+
+  {% if departments %}
+    <div class="card">
+      <div class="scroll-x">
+        <table style="min-width:560px">
+          <thead>
+            <tr>
+              <th scope="col">Department</th>
+              <th scope="col" class="num">People</th>
+              <th scope="col">Offered on new records</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for department in departments %}
+              <tr>
+                <td><b>{{ department.name }}</b></td>
+                <td class="num">{{ department.headcount }}</td>
+                <td>
+                  {% if department.is_active %}
+                    <span class="pill p-appr"><i></i>Offered</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Retired</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-department-edit' department.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    {% url 'hr-department-create' as create_url %}
+    {% include "shell/_empty.html" with icon="hr" heading="No departments yet" body="An employee's department is chosen from this list. Until there is one, the box on their record stays empty — which does not stop anybody being taken on, it just leaves them unfiled. Add the parts of the company people belong to." primary_label="Add the first department" primary_url=create_url %}
+  {% endif %}
+{% endblock %}

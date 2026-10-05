@@ -718,14 +718,21 @@ class OnboardingTests(TestCase):
     def _payload(self, **overrides):
         from accounts.models import Role
 
+        from .models import Department
+
+        # Department is chosen from HR's list now, not typed, so the form
+        # takes a row rather than whatever spelling somebody reached for.
+        field_ops, _ = Department.objects.get_or_create(name="Field ops")
+
         payload = {
             "first_name": "Moses",
+            "middle_name": "",
             "last_name": "Toe",
             "email": "moses.toe@a1technical.test",
             "phone": "0770442118",
             "staff_id": "A1-0017",
             "job_title": "Technician",
-            "department": "Field ops",
+            "department": field_ops.pk,
             "supervisor": "",
             "start_date": "",
             "roles": [Role.objects.get(name="Employee").pk],
@@ -746,7 +753,7 @@ class OnboardingTests(TestCase):
         # All three, from one form.
         self.assertEqual(account.email, "moses.toe@a1technical.test")
         self.assertEqual(account.username, "moses.toe@a1technical.test")
-        self.assertEqual(employee.department, "Field ops")
+        self.assertEqual(employee.department.name, "Field ops")
         self.assertEqual(
             [r.role.name for r in account.user_roles.all()], ["Employee"]
         )
@@ -851,3 +858,140 @@ class OnboardingTests(TestCase):
         self.assertEqual(
             self.client.get(reverse("hr-employee-create")).status_code, 403
         )
+
+
+class DepartmentListTests(TestCase):
+    """
+    Department was a text box, so "Operations", "operations" and "Ops" were
+    three departments as far as any report was concerned. The client asked
+    for a dropdown; this is the list behind it.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+
+        call_command("seed_permissions", verbosity=0)
+        cls.hr = User.objects.create_user(
+            username="hr2@test.local", email="hr2@test.local", password="Testing!12345"
+        )
+        cls.hr.must_reset_password = False
+        cls.hr.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=cls.hr, role=Role.objects.get(name="HR"))
+
+    def setUp(self):
+        self.client.force_login(self.hr)
+
+    def test_hr_can_add_a_department(self):
+        from .models import Department
+
+        response = self.client.post(
+            reverse("hr-department-create"),
+            {"name": "Field Operations", "order": 0, "is_active": "on"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Department.objects.get().name, "Field Operations")
+
+    def test_the_same_department_cannot_be_added_twice_under_another_spelling(self):
+        """The thing the list exists to prevent."""
+        from .models import Department
+
+        Department.objects.create(name="Field Operations")
+        response = self.client.post(
+            reverse("hr-department-create"),
+            {"name": "field operations", "order": 0, "is_active": "on"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already a department")
+        self.assertEqual(Department.objects.count(), 1)
+
+    def test_taking_somebody_on_offers_the_list_and_says_where_it_lives(self):
+        from .forms import EmployeeOnboardingForm
+        from .models import Department
+
+        empty = EmployeeOnboardingForm(actor=self.hr).fields["department"]
+        self.assertEqual(list(empty.queryset), [])
+        self.assertIn("No departments yet", empty.help_text)
+
+        Department.objects.create(name="Field Operations")
+        filled = EmployeeOnboardingForm(actor=self.hr).fields["department"]
+        self.assertEqual([d.name for d in filled.queryset], ["Field Operations"])
+
+    def test_a_retired_department_is_not_offered_but_keeps_its_people(self):
+        from .forms import EmployeeOnboardingForm
+        from .models import Department
+
+        retired = Department.objects.create(name="Old Workshop", is_active=False)
+        offered = EmployeeOnboardingForm(actor=self.hr).fields["department"].queryset
+        self.assertNotIn(retired, offered)
+
+    def test_the_department_is_reachable_from_the_register(self):
+        response = self.client.get(reverse("hr-employees"))
+        self.assertContains(response, reverse("hr-departments"))
+
+
+class MiddleNameTests(TestCase):
+    """
+    Django gives a person two names; plenty of people here have three. The
+    office was typing the middle name into the first-name box, so every
+    screen that greets somebody said "Good morning, Daniel M C".
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.core.management import call_command
+
+        from accounts.models import Role, UserRole
+
+        call_command("seed_permissions", verbosity=0)
+        cls.hr = User.objects.create_user(
+            username="hr3@test.local", email="hr3@test.local", password="Testing!12345"
+        )
+        cls.hr.must_reset_password = False
+        cls.hr.save(update_fields=["must_reset_password"])
+        UserRole.objects.create(user=cls.hr, role=Role.objects.get(name="HR"))
+
+    def test_a_full_name_carries_all_three(self):
+        User = get_user_model()
+        person = User.objects.create_user(
+            username="dp@test.local", email="dp@test.local",
+            first_name="Daniel", middle_name="M C", last_name="Padmore",
+        )
+        self.assertEqual(person.get_full_name(), "Daniel M C Padmore")
+
+    def test_two_names_still_read_as_two(self):
+        """No stray double space where there is no middle name."""
+        User = get_user_model()
+        person = User.objects.create_user(
+            username="mt@test.local", email="mt@test.local",
+            first_name="Moses", last_name="Toe",
+        )
+        self.assertEqual(person.get_full_name(), "Moses Toe")
+
+    def test_the_greeting_still_uses_the_first_name_alone(self):
+        """Which is the point of giving the middle name its own box."""
+        User = get_user_model()
+        person = User.objects.create_user(
+            username="dp2@test.local", email="dp2@test.local",
+            first_name="Daniel", middle_name="M C", last_name="Padmore",
+        )
+        self.assertEqual(person.first_name, "Daniel")
+
+    def test_somebody_can_be_taken_on_with_a_middle_name(self):
+        from .models import Department
+
+        Department.objects.create(name="Field Operations")
+        self.client.force_login(self.hr)
+        self.client.post(reverse("hr-employee-create"), {
+            "first_name": "Daniel", "middle_name": "M C", "last_name": "Padmore",
+            "email": "daniel.padmore@test.local", "phone": "",
+            "staff_id": "A1-0099", "job_title": "", "department": "",
+            "supervisor": "", "start_date": "",
+            "roles": [__import__("accounts.models", fromlist=["Role"]).Role.objects.get(name="Employee").pk],
+        })
+        User = get_user_model()
+        person = User.objects.get(email="daniel.padmore@test.local")
+        self.assertEqual(person.middle_name, "M C")
+        self.assertEqual(person.get_full_name(), "Daniel M C Padmore")

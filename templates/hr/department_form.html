@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit department{% else %}Add department{% endif %} — HR — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit {{ instance.name }}{% else %}Add department{% endif %}{% endblock %}
+{% block page_sub %}Departments are retired, never deleted{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Retiring a department keeps everybody already filed under it exactly
+        where they are, and stops it being offered on new records. Deleting
+        one would orphan those records, so the system does not offer it.
+      </div>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'hr-departments' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

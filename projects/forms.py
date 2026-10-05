@@ -42,18 +42,25 @@ class TaskForm(forms.ModelForm):
         self.fields["assignee"].required = False
         self.fields["assignee"].empty_label = "Unassigned"
 
-        # A task on this project goes to somebody on this project. Offering
-        # all 38 employees invites picking a name that has nothing to do with
-        # the job, and buries the four people who do.
-        people = User.objects.filter(is_active=True, employee__is_active=True)
+        # Who can be given work is who can sign in and see it. It used to be
+        # who had a record in the HR register as well, which reads as the
+        # same thing and is not: on a system whose register has not been
+        # filled in yet — a new one, or the morning after go-live — the list
+        # was empty and no task could be assigned to anybody at all. Nothing
+        # said why, because an empty dropdown looks like a dropdown.
+        #
+        # The register is HR's record of employment. Assignment is about who
+        # holds an account, which is also what every screen that shows a
+        # person their own work reads from.
+        people = User.objects.filter(is_active=True)
         if project is not None:
             on_project = Q(employee__project_assignments__project=project)
             if project.manager_id:
                 on_project |= Q(pk=project.manager_id)
             crewed = people.filter(on_project).distinct()
-            # Before a crew is assembled there is nobody to choose, and a
-            # form that cannot be used is worse than a long list — so fall
-            # back to everyone and say why.
+            # Narrowed to the crew where there is one, because offering forty
+            # names buries the four who are on the job. Never narrowed to
+            # nothing.
             if crewed.exists():
                 people = crewed
                 self.fields["assignee"].help_text = (

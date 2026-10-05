@@ -23,6 +23,8 @@
 {% endblock %}
 
 {% block content %}
+  {% include "shell/_hr_nav.html" with active="report" %}
+
   <div class="mrow">
     <div class="metric"><span>Headcount</span><b>{{ summary.rows|length }}</b><em>active employees</em></div>
     <div class="metric"><span>Days present</span><b>{{ totals.days_present }}</b><em>across the month</em></div>
@@ -54,7 +56,7 @@
               <tr>
                 <td><b>{{ row.employee|a1register_name }}</b></td>
                 <td class="mono dim2">{{ row.employee.staff_id }}</td>
-                <td>{{ row.employee.department|default:"—" }}</td>
+                <td>{{ row.employee.department.name|default:"—" }}</td>
                 <td class="num">{{ row.days_present }}</td>
                 <td class="num {% if row.days_absent %}bad{% else %}dim{% endif %}">{{ row.days_absent }}</td>
                 <td class="num {% if row.late_arrivals %}warn{% else %}dim{% endif %}">{{ row.late_arrivals }}</td>

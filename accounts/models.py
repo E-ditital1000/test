@@ -20,9 +20,22 @@ class User(AbstractUser):
     permission/auth layer never depends on the HR module being present.
     """
 
+    # Django gives a person two names. Plenty of people here have three, and
+    # the middle one is not decoration — it is how two Daniel Padmores are
+    # told apart on a payroll line. Without it the office types it into the
+    # first-name box, and every screen that greets somebody by their first
+    # name then says "Good morning, Daniel M C".
+    middle_name = models.CharField(max_length=60, blank=True)
+
     must_reset_password = models.BooleanField(default=True)
     failed_login_attempts = models.PositiveIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
+
+    def get_full_name(self):
+        """All three names where there are three, with no double spaces."""
+        return " ".join(
+            part for part in (self.first_name, self.middle_name, self.last_name) if part
+        ).strip()
 
     def is_locked_out(self):
         return bool(self.locked_until and self.locked_until > timezone.now())

@@ -8,7 +8,7 @@ from accounts.models import Role
 from accounts.services import assignable_roles
 from config.models import CorrectionReason
 
-from .models import AttendanceCode, AttendanceCorrection, Employee
+from .models import AttendanceCode, AttendanceCorrection, Department, Employee
 
 User = get_user_model()
 
@@ -43,11 +43,49 @@ class EmployeeForm(forms.ModelForm):
             "supervisor": "Whose roll-call they appear on.",
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        departments = Department.objects.filter(is_active=True)
+        self.fields["department"].queryset = departments
+        self.fields["department"].empty_label = "Not set"
+        self.fields["department"].help_text = (
+            "Kept in HR → Departments." if departments.exists()
+            else "No departments yet — add them in HR → Departments."
+        )
+
     def clean_supervisor(self):
         supervisor = self.cleaned_data.get("supervisor")
         if supervisor and self.instance.pk and supervisor.pk == self.instance.pk:
             raise forms.ValidationError("An employee cannot be their own supervisor.")
         return supervisor
+
+
+class DepartmentForm(forms.ModelForm):
+    """The HR-owned list behind the department dropdown."""
+
+    class Meta:
+        model = Department
+        fields = ["name", "order", "is_active"]
+        labels = {
+            "order": "Position in the list",
+            "is_active": "Still offered",
+        }
+        help_texts = {
+            "is_active": "Turning this off hides it from new records and "
+                         "leaves everybody already in it where they are.",
+        }
+
+    def clean_name(self):
+        name = " ".join(self.cleaned_data["name"].split())
+        existing = Department.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise forms.ValidationError(
+                "There is already a department with that name. Two spellings "
+                "of one department is the thing this list exists to prevent."
+            )
+        return name
 
 
 class AttendanceCorrectionForm(forms.Form):
@@ -147,6 +185,11 @@ class EmployeeOnboardingForm(forms.Form):
 
     # -- who they are -----------------------------------------------------
     first_name = forms.CharField(max_length=150, label="First name")
+    middle_name = forms.CharField(
+        max_length=60, required=False, label="Middle name",
+        help_text="Optional, and kept in its own box so the first name stays "
+                  "the name they are greeted by.",
+    )
     last_name = forms.CharField(max_length=150, label="Surname")
     email = forms.EmailField(
         label="Work email",
@@ -158,7 +201,12 @@ class EmployeeOnboardingForm(forms.Form):
     # -- what they do -----------------------------------------------------
     staff_id = forms.CharField(max_length=30, label="Staff ID")
     job_title = forms.CharField(max_length=80, required=False, label="Job title")
-    department = forms.CharField(max_length=80, required=False)
+    department = forms.ModelChoiceField(
+        queryset=Department.objects.none(),
+        required=False,
+        label="Department",
+        empty_label="Not set",
+    )
     supervisor = forms.ModelChoiceField(
         queryset=Employee.objects.none(),
         required=False,
@@ -188,6 +236,16 @@ class EmployeeOnboardingForm(forms.Form):
         self.fields["supervisor"].queryset = Employee.objects.filter(
             is_active=True
         ).select_related("user")
+
+        departments = Department.objects.filter(is_active=True)
+        self.fields["department"].queryset = departments
+        # An empty dropdown reads as a broken one. Say where the list comes
+        # from instead, and let somebody be taken on without waiting for it.
+        self.fields["department"].help_text = (
+            "Kept in HR → Departments." if departments.exists()
+            else "No departments yet — add them in HR → Departments. "
+                 "Somebody can be taken on without one."
+        )
         # You cannot confer power you do not hold, so the list only offers
         # roles this person could grant. An HR user sees Technician and
         # Employee; they do not see Admin, and posting it would be refused

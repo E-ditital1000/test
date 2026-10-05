@@ -437,6 +437,7 @@ def onboard_employee(*, actor, data, roles):
         username=email,
         email=email,
         first_name=data["first_name"].strip(),
+        middle_name=data.get("middle_name", "").strip(),
         last_name=data["last_name"].strip(),
         must_reset_password=True,
     )
@@ -447,7 +448,7 @@ def onboard_employee(*, actor, data, roles):
         user=user,
         staff_id=data["staff_id"].strip(),
         job_title=data.get("job_title", "").strip(),
-        department=data.get("department", "").strip(),
+        department=data.get("department") or None,
         phone=data.get("phone", "").strip(),
         supervisor=data.get("supervisor"),
         start_date=data.get("start_date"),
