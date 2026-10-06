@@ -226,7 +226,19 @@ def user_edit(request, pk=None):
             messages.success(request, "Account updated." + register)
         return redirect("settings-users")
 
-    return render(request, "accounts/user_form.html", {"form": form, "instance": instance})
+    # The same person's employment, so the two halves are one click apart
+    # rather than two screens somebody has to know about.
+    employee = None
+    if instance is not None:
+        from hr.models import Employee
+
+        employee = Employee.objects.filter(user=instance).select_related("department").first()
+
+    return render(
+        request,
+        "accounts/user_form.html",
+        {"form": form, "instance": instance, "employee": employee},
+    )
 
 
 def _put_on_the_register(request, user, form):

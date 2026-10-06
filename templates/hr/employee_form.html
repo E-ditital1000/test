@@ -15,6 +15,42 @@
       </div>
     </div>
 
+    {% comment %}
+    The other half of the same person. Their name, sign-in and roles live on
+    the account, not here — said plainly, with the way there, so nobody edits
+    this screen looking for a role and concludes it is broken.
+    {% endcomment %}
+    {% if instance %}
+      <div class="card">
+        <div class="hd">
+          <b>Their account</b>
+          <span class="meta">{{ instance.user.email }}</span>
+        </div>
+        <dl style="margin:0">
+          <div class="kv"><dt>Name</dt><dd>{{ instance.user.get_full_name|default:"—" }}</dd></div>
+          <div class="kv">
+            <dt>Roles</dt>
+            <dd>
+              {% for user_role in instance.user.user_roles.all %}
+                {{ user_role.role.name }}{% if not forloop.last %}, {% endif %}
+              {% empty %}No role yet{% endfor %}
+            </dd>
+          </div>
+        </dl>
+        <div class="note">
+          Name, sign-in address and roles belong to the account. What somebody
+          may reach is decided there, not by anything on this screen.
+        </div>
+        {% if perms_held.manage_users %}
+          <div class="stack">
+            <a class="btn btn-sec btn-wide" href="{% url 'settings-user-edit' instance.user.pk %}">
+              Edit their account and roles
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
     <div class="card">
       <div class="stack">
         <div class="fld">

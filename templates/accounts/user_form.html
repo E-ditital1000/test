@@ -39,12 +39,31 @@
 
     {% if form.already_on_register %}
       <div class="card">
-        <div class="hd"><b>Staff register</b></div>
+        <div class="hd">
+          <b>Staff register</b>
+          <span class="meta">{{ employee.staff_id }}</span>
+        </div>
+        <dl style="margin:0">
+          <div class="kv"><dt>Staff ID</dt><dd class="mono">{{ employee.staff_id }}</dd></div>
+          <div class="kv"><dt>Job title</dt><dd>{{ employee.job_title|default:"—" }}</dd></div>
+          <div class="kv"><dt>Department</dt><dd>{{ employee.department.name|default:"Not set" }}</dd></div>
+          <div class="kv"><dt>Supervisor</dt><dd>{{ employee.supervisor.full_name|default:"Nobody yet" }}</dd></div>
+        </dl>
         <div class="note">
-          This person is on the register already. Their staff ID, department,
-          supervisor and start date are kept in HR, where the rest of their
-          employment lives — changing them in two places would mean two
-          answers to one question.
+          Their employment is kept in HR, where the rest of it lives —
+          changing it in two places would mean two answers to one question.
+        </div>
+        <div class="stack">
+          {% if perms_held.manage_employees %}
+            <a class="btn btn-sec btn-wide" href="{% url 'hr-employee-edit' employee.pk %}">
+              Edit their employment in HR
+            </a>
+          {% endif %}
+          {% if perms_held.view_attendance_records %}
+            <a class="btn btn-sec btn-wide" href="{% url 'hr-employee-attendance' employee.pk %}">
+              Their attendance
+            </a>
+          {% endif %}
         </div>
       </div>
     {% elif form.employee_fields %}

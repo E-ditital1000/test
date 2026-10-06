@@ -1041,3 +1041,78 @@ class OneActMakesAWholePersonTests(TestCase):
         make_user("nobody@test.local", ["Employee"])
         body = self.client.get(reverse("settings-users")).content.decode()
         self.assertIn("Not on the staff register", body)
+
+    def test_an_account_made_without_a_record_can_be_put_on_the_register_later(self):
+        """
+        The ones already made the old way. Editing them offers the same
+        register section, so they are repaired where they are rather than
+        deleted and made again.
+        """
+        from hr.models import Employee
+
+        self._post()  # account only, the old shape
+        branda = User.objects.get(email="branda@test.local")
+        self.assertFalse(Employee.objects.filter(user=branda).exists())
+
+        response = self.client.post(
+            reverse("settings-user-edit", args=[branda.pk]),
+            {
+                "first_name": "Branda", "middle_name": "", "last_name": "Allision",
+                "email": "branda@test.local", "is_active": "on",
+                "roles": [Role.objects.get(name="Employee").pk],
+                "is_employee": "on", "staff_id": "A1-0502",
+                "job_title": "Technician",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Employee.objects.get(user=branda).staff_id, "A1-0502")
+
+    def test_the_two_doors_make_the_same_person(self):
+        """
+        HR's "take somebody on" and this screen are different doors to one
+        act, and must not produce different people.
+        """
+        from hr.models import Employee
+        from hr.services import onboard_employee
+
+        self._post(is_employee="on", staff_id="A1-0510", job_title="Technician")
+        through_settings = Employee.objects.get(staff_id="A1-0510")
+
+        employee, _ = onboard_employee(
+            actor=self.admin,
+            data={
+                "first_name": "Moses", "middle_name": "", "last_name": "Toe",
+                "email": "moses@test.local", "staff_id": "A1-0511",
+                "job_title": "Technician", "phone": "",
+            },
+            roles=[Role.objects.get(name="Employee")],
+        )
+
+        for field in ("job_title", "department", "supervisor", "start_date"):
+            self.assertEqual(
+                getattr(through_settings, field) or "",
+                getattr(employee, field) or "",
+                f"the two doors disagree about {field}",
+            )
+        for person in (through_settings.user, employee.user):
+            self.assertTrue(person.must_reset_password)
+            self.assertTrue(Employee.objects.filter(user=person).exists())
+
+    def test_each_half_points_at_the_other(self):
+        """
+        One person, two records. Whichever you are looking at tells you where
+        the rest of them is, so neither screen reads as the whole truth.
+        """
+        from hr.models import Employee
+
+        self._post(is_employee="on", staff_id="A1-0520")
+        person = User.objects.get(email="branda@test.local")
+        employee = Employee.objects.get(user=person)
+
+        account = self.client.get(reverse("settings-user-edit", args=[person.pk]))
+        self.assertContains(account, reverse("hr-employee-edit", args=[employee.pk]))
+        self.assertContains(account, "A1-0520")
+
+        employment = self.client.get(reverse("hr-employee-edit", args=[employee.pk]))
+        self.assertContains(employment, reverse("settings-user-edit", args=[person.pk]))
+        self.assertContains(employment, "Employee")
