@@ -93,6 +93,11 @@ def project_detail(request, pk):
         for index, (code, label) in enumerate(Project.STAGES)
     ]
 
+    from fieldjobs.models import FieldJob
+
+    visits = list(
+        project.field_jobs.select_related("assigned_to", "site").order_by("scheduled_for")
+    )
     can_see_cost = user_has_permission(request.user, "view_project_cost")
     return render(
         request,
@@ -106,7 +111,13 @@ def project_detail(request, pk):
             "crew": project.crew.select_related("employee__user"),
             "documents": project.documents.select_related("uploaded_by"),
             "requisitions": project.requisitions.select_related("raised_by").prefetch_related("items"),
-            "field_jobs": project.field_jobs.select_related("assigned_to", "site").order_by("scheduled_for"),
+            "field_jobs": visits,
+            # How far through the sites a contract is. There is no list of
+            # the twelve facilities to count against — a visit is the record
+            # that one exists — so this counts what has been booked, which is
+            # the honest figure rather than a percentage of a guess.
+            "visits_total": len(visits),
+            "visits_done": sum(1 for v in visits if v.state == FieldJob.COMPLETED),
             "stage_events": project.stage_events.select_related("actor"),
             # Cost is a separate permission from seeing the project at all.
             "can_see_cost": can_see_cost,

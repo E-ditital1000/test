@@ -137,7 +137,18 @@
     <div style="display:flex;flex-direction:column;gap:20px">
 
       <div class="card">
-        <div class="hd"><b>Linked records</b><span class="meta">one job lineage</span></div>
+        <div class="hd">
+          <b>Linked records</b>
+          {% comment %} For a contract run across several sites, the visits
+             are the sites — so how many are finished is the progress. {% endcomment %}
+          <span class="meta">
+            {% if visits_total %}
+              {{ visits_done }} of {{ visits_total }} visit{{ visits_total|pluralize }} done
+            {% else %}
+              one job lineage
+            {% endif %}
+          </span>
+        </div>
         {% if project.ticket %}
           <div class="row-i">
             <div class="two g">
@@ -146,16 +157,30 @@
             </div>
           </div>
         {% endif %}
+        {% comment %}
+        A contract across a dozen facilities records each one as its own
+        visit, so this list is the sites. Without the site on the row they
+        are twelve references nobody can tell apart.
+        {% endcomment %}
         {% for job in field_jobs %}
-          <div class="row-i">
+          <a class="row-i" href="{% url 'fieldjobs-job-detail' job.pk %}"
+             style="text-decoration:none;color:inherit">
             <div class="two g">
               <b class="mono">{{ job.reference }}</b>
               <span>
-                {{ job.assigned_to|a1name }}{% if job.crew_size > 1 %} +{{ job.crew.count }} crew{% endif %}
+                <b>{{ job.site.name|default:"No site" }}</b>
+                · {{ job.assigned_to|a1name }}{% if job.crew_size > 1 %} +{{ job.crew.count }} crew{% endif %}
                 · {{ job.scheduled_for|a1datetime }}
               </span>
             </div>
-          </div>
+            {% if job.state == "completed" %}
+              <span class="pill p-appr"><i></i>Done</span>
+            {% elif job.state == "in_progress" %}
+              <span class="pill p-prog"><i></i>On site</span>
+            {% else %}
+              <span class="pill p-open"><i></i>Scheduled</span>
+            {% endif %}
+          </a>
         {% endfor %}
         {% for requisition in requisitions %}
           <div class="row-i">

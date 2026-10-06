@@ -131,3 +131,83 @@ class ContractProjectTests(TestCase):
 
         converted = Project.objects.get(ticket=ticket)
         self.assertEqual(converted.job_ref, ticket.job_ref)
+
+
+class ContractAcrossSitesTests(TestCase):
+    """
+    A contract across several facilities records each one as its own visit.
+    There is no list of the twelve to count against — a visit is the record
+    that a facility is being worked at — so the project page has to make the
+    visits readable as sites, or they are a dozen references nobody can tell
+    apart.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0, reset_system_roles=True)
+        cls.service = ServiceType.objects.create(code="solar", name="Solar Installation")
+        cls.status = StatusOption.objects.create(
+            kind=StatusOption.PROJECT, code="active", label="Active", is_default=True
+        )
+        cls.customer = Customer.objects.create(name="Catholic Relief Services")
+        cls.manager = make_user("pm2@t.local", ["Project Manager"])
+        cls.technician = make_user("tech2@t.local", ["Technician"])
+
+        cls.project = Project.objects.create(
+            reference="PRJ-5000", name="CRS: 50 kW solar at 12 health facilities",
+            customer=cls.customer, service_type=cls.service, status=cls.status,
+            manager=cls.manager,
+        )
+
+    def _visit(self, reference, facility, state):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from fieldjobs.models import FieldJob
+
+        site = Site.objects.create(customer=self.customer, name=facility)
+        return FieldJob.objects.create(
+            reference=reference, project=self.project, customer=self.customer,
+            site=site, service_type=self.service, assigned_to=self.technician,
+            scheduled_for=timezone.now() + timedelta(days=1), state=state,
+            job_ref=self.project.job_ref,
+        )
+
+    def test_each_facility_is_named_on_the_project(self):
+        from fieldjobs.models import FieldJob
+
+        self._visit("FJ-5001", "Zwedru Health Centre", FieldJob.COMPLETED)
+        self._visit("FJ-5002", "Harper Clinic", FieldJob.SCHEDULED)
+
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("projects-detail", args=[self.project.pk]))
+        self.assertContains(response, "Zwedru Health Centre")
+        self.assertContains(response, "Harper Clinic")
+
+    def test_how_many_facilities_are_finished(self):
+        from fieldjobs.models import FieldJob
+
+        self._visit("FJ-5001", "Zwedru Health Centre", FieldJob.COMPLETED)
+        self._visit("FJ-5002", "Harper Clinic", FieldJob.COMPLETED)
+        self._visit("FJ-5003", "Voinjama Clinic", FieldJob.SCHEDULED)
+
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("projects-detail", args=[self.project.pk]))
+        self.assertEqual(response.context["visits_total"], 3)
+        self.assertEqual(response.context["visits_done"], 2)
+        self.assertContains(response, "2 of 3 visits done")
+
+    def test_a_contract_with_no_visits_booked_yet_says_nothing_misleading(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("projects-detail", args=[self.project.pk]))
+        self.assertEqual(response.context["visits_total"], 0)
+        self.assertNotContains(response, "0 of 0")
+
+    def test_each_facility_opens_from_the_project(self):
+        from fieldjobs.models import FieldJob
+
+        visit = self._visit("FJ-5001", "Zwedru Health Centre", FieldJob.SCHEDULED)
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("projects-detail", args=[self.project.pk]))
+        self.assertContains(response, reverse("fieldjobs-job-detail", args=[visit.pk]))
