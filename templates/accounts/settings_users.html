@@ -60,13 +60,24 @@
                   <a class="btn btn-sec btn-sm" href="{% url 'settings-user-edit' row.pk %}">Edit</a>
                   {% comment %} Absent, not disabled: there is no state in which you
                      deactivate an already-deactivated account. {% endcomment %}
-                  {% if row.is_active and row != user %}
-                    <a class="btn btn-sec btn-sm"
-                       href="{% url 'settings-user-temporary-password' row.pk %}">Reset password</a>
-                  {% endif %}
-                  {% if row.is_active %}
-                    <a class="btn btn-gho btn-sm" style="color:var(--red)"
-                       href="{% url 'settings-user-deactivate' row.pk %}">Deactivate</a>
+                  {% comment %} An administrator's account is not another
+                     administrator's to reset or close: a reset hands over a
+                     working credential, and whatever is done next is done
+                     under their name. They give up the role themselves, and
+                     the account can then be closed like any other. {% endcomment %}
+                  {% if row.is_peer_administrator %}
+                    <span class="dim t-small" title="An administrator's account is not another administrator's to hold">
+                      Administrator
+                    </span>
+                  {% else %}
+                    {% if row.is_active and row != user %}
+                      <a class="btn btn-sec btn-sm"
+                         href="{% url 'settings-user-temporary-password' row.pk %}">Reset password</a>
+                    {% endif %}
+                    {% if row.is_active %}
+                      <a class="btn btn-gho btn-sm" style="color:var(--red)"
+                         href="{% url 'settings-user-deactivate' row.pk %}">Deactivate</a>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>

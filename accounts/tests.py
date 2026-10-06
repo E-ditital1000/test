@@ -864,3 +864,84 @@ class PaginationTests(TestCase):
         self.assertEqual(
             offenders, [], "These lists are truncated rather than paged: " + "; ".join(offenders)
         )
+
+
+class AdministratorsArePeersTests(TestCase):
+    """
+    One administrator does not hold another's account.
+
+    Resetting a password hands the person doing it a working credential for
+    somebody else: whatever happens next happens under that name, and the
+    trail says it was them. Between two people who both hold the power to
+    grant power, that is impersonation rather than administration.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+        cls.one = make_user("admin.one@test.local", ["Admin"])
+        cls.two = make_user("admin.two@test.local", ["Admin"])
+        cls.technician = make_user("tech@test.local", ["Technician"])
+
+    def test_an_administrator_cannot_reset_another_administrators_password(self):
+        from accounts import services
+
+        with self.assertRaises(PermissionDenied):
+            services.issue_temporary_password(actor=self.one, user=self.two)
+
+    def test_an_administrator_cannot_deactivate_another_administrator(self):
+        from accounts import services
+
+        with self.assertRaises(PermissionDenied):
+            services.deactivate_user(actor=self.one, user=self.two)
+        self.two.refresh_from_db()
+        self.assertTrue(self.two.is_active)
+
+    def test_the_route_refuses_it_too_not_only_the_screen(self):
+        """Hiding the button is a convenience; the refusal is the control."""
+        self.client.force_login(self.one)
+        self.client.post(reverse("settings-user-deactivate", args=[self.two.pk]), {})
+        self.two.refresh_from_db()
+        self.assertTrue(self.two.is_active)
+
+    def test_and_the_buttons_are_not_offered(self):
+        self.client.force_login(self.one)
+        body = self.client.get(reverse("settings-users")).content.decode()
+        self.assertNotIn(
+            reverse("settings-user-deactivate", args=[self.two.pk]), body
+        )
+        self.assertNotIn(
+            reverse("settings-user-temporary-password", args=[self.two.pk]), body
+        )
+
+    def test_an_ordinary_account_is_still_managed_normally(self):
+        from accounts import services
+
+        services.issue_temporary_password(actor=self.one, user=self.technician)
+        services.deactivate_user(actor=self.one, user=self.technician)
+        self.technician.refresh_from_db()
+        self.assertFalse(self.technician.is_active)
+
+    def test_an_administrator_can_still_step_down_and_then_be_closed(self):
+        """The way a leaver is removed, and the reason the rule is not a trap."""
+        from accounts import services
+        from accounts.models import Role, UserRole
+
+        UserRole.objects.filter(
+            user=self.two, role=Role.objects.get(name="Admin")
+        ).delete()
+        services.forget_permissions(self.two)
+
+        services.deactivate_user(actor=self.one, user=self.two)
+        self.two.refresh_from_db()
+        self.assertFalse(self.two.is_active)
+
+    def test_a_superuser_is_the_way_back_in(self):
+        """Made on the server, not through this screen."""
+        from accounts import services
+
+        self.one.is_superuser = True
+        self.one.save(update_fields=["is_superuser"])
+        services.deactivate_user(actor=self.one, user=self.two)
+        self.two.refresh_from_db()
+        self.assertFalse(self.two.is_active)

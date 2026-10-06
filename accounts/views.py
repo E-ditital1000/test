@@ -144,11 +144,23 @@ def settings_users(request):
             | Q(last_name__icontains=query)
             | Q(email__icontains=query)
         )
+    # Administrators are peers: one does not hold another's account. Marked
+    # per row so the two actions that are refused are not offered, rather
+    # than offered and then refused.
+    administrators = services.admin_user_ids()
+    page = paginate(request, users)
+    for row in page:
+        row.is_peer_administrator = (
+            row.pk in administrators
+            and row.pk != request.user.pk
+            and not request.user.is_superuser
+        )
+
     return render(
         request,
         "accounts/settings_users.html",
         {
-            "users": paginate(request, users),
+            "users": page,
             "query": query,
             "roles": Role.objects.all(),
             # "Nothing matches" must say how many records exist in total,

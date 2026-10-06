@@ -61,6 +61,35 @@ def _assert_not_last_admin(user):
         )
 
 
+def _assert_not_a_peer_administrator(*, actor, user, verb):
+    """
+    Administrators are peers, and peers do not hold each other's accounts.
+
+    Resetting a password hands the person doing it a working credential for
+    somebody else's account: whatever is done next is done under that name,
+    and the trail says it was them. Between two people who both hold the
+    power to grant power, that is not administration, it is impersonation.
+    Deactivating is the same argument from the other end — one administrator
+    should not be able to shut another out of the system they share.
+
+    An administrator may still step down themselves, which is the way a
+    leaver is removed: give up the role first, and the account becomes an
+    ordinary one that an administrator can close. A superuser — made on the
+    server, not through this screen — is the way back in if nobody can.
+    """
+    if actor.is_superuser:
+        return
+    if user.pk == actor.pk:
+        return
+    if user.pk in admin_user_ids():
+        raise PermissionDenied(
+            f"{user.get_full_name() or user.email} is an administrator, and an "
+            f"administrator's account cannot be {verb} by another one. They can "
+            "give up the role themselves, and the account can then be closed "
+            "like any other."
+        )
+
+
 @transaction.atomic
 def create_role(*, actor, name, grants):
     """`grants` is an iterable of (permission_code, scope)."""
@@ -228,6 +257,11 @@ def issue_temporary_password(*, actor, user, reason=""):
         )
     if not user.is_active:
         raise ValidationError("This account is deactivated. Reactivate it first.")
+    # The guard below catches an account holding MORE than the actor. Two
+    # administrators hold exactly the same thing, so it never fired between
+    # them — which is the one pairing where a reset is impersonation rather
+    # than help.
+    _assert_not_a_peer_administrator(actor=actor, user=user, verb="reset")
 
     held_by_target = set(
         Permission.objects.filter(role__user_roles__user=user).values_list("code", flat=True)
@@ -267,6 +301,7 @@ def deactivate_user(*, actor, user, reason=""):
     if not user_has_permission(actor, "manage_users"):
         raise PermissionDenied("missing permission: manage_users")
     _assert_not_last_admin(user)
+    _assert_not_a_peer_administrator(actor=actor, user=user, verb="deactivated")
     before = {"is_active": user.is_active}
     user.is_active = False
     user.save(update_fields=["is_active"])
