@@ -55,6 +55,14 @@
                   {% if row.is_locked_out %}
                     <span class="pill p-over"><i></i>Locked out</span>
                   {% endif %}
+                  {% comment %} An account with no employment record behind it
+                     cannot clock in and is on no roll-call. Said here because
+                     it used to be invisible. {% endcomment %}
+                  {% if not row.is_on_register %}
+                    <span class="pill p-wait" title="No employment record: cannot clock in or appear on a roll-call">
+                      <i></i>Not on the staff register
+                    </span>
+                  {% endif %}
                 </td>
                 <td class="acts">
                   <a class="btn btn-sec btn-sm" href="{% url 'settings-user-edit' row.pk %}">Edit</a>

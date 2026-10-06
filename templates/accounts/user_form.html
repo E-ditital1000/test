@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if instance %}Edit user{% else %}Add user{% endif %} — Settings — A1 360{% endblock %}
 
+
 {% block page_title %}{% if instance %}Edit {{ instance }}{% else %}Add user{% endif %}{% endblock %}
 {% block page_sub %}Everything this person can do comes from the roles ticked below{% endblock %}
 
@@ -13,8 +14,7 @@
       <div class="stack">
         {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
         <div class="form-rows">
-          {% for field in form %}
-            {% if field.name != "roles" %}
+          {% for field in form.account_fields %}
               {% if field.widget_type == "checkbox" %}
                 <div class="fld narrow {% if field.errors %}has-error{% endif %}">
                   <label class="chk" for="{{ field.id_for_label }}">
@@ -32,11 +32,57 @@
                   {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
                 </div>
               {% endif %}
-            {% endif %}
           {% endfor %}
         </div>
       </div>
     </div>
+
+    {% if form.already_on_register %}
+      <div class="card">
+        <div class="hd"><b>Staff register</b></div>
+        <div class="note">
+          This person is on the register already. Their staff ID, department,
+          supervisor and start date are kept in HR, where the rest of their
+          employment lives — changing them in two places would mean two
+          answers to one question.
+        </div>
+      </div>
+    {% elif form.employee_fields %}
+      {% comment %}
+      The half that used to be a different screen. An account with the
+      Employee role and no record here cannot clock in, does not appear on a
+      roll-call and is on no report — while looking complete on the user list.
+      {% endcomment %}
+      <div class="card">
+        <div class="hd">
+          <b>Staff register</b>
+          <span class="meta">Only if this person works here</span>
+        </div>
+        <div class="stack">
+          <div class="form-rows">
+            {% for field in form.employee_fields %}
+              {% if field.widget_type == "checkbox" %}
+                <div class="fld wide {% if field.errors %}has-error{% endif %}">
+                  <label class="chk" for="{{ field.id_for_label }}">
+                    {{ field }}<span>{{ field.label }}</span>
+                  </label>
+                  {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+                  {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+                </div>
+              {% else %}
+                <div class="fld {% if field.widget_type == 'date' %}narrow{% endif %} {% if field.errors %}has-error{% endif %}"
+                     data-employee-field hidden>
+                  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}<span class="help">{{ field.help_text }}</span>{% endif %}
+                  {% for error in field.errors %}<span class="err">{{ error }}</span>{% endfor %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
 
     <div class="card">
       <div class="hd">
@@ -82,4 +128,25 @@
       <button class="btn btn-pri" type="submit">Save</button>
     </div>
   </form>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+(function () {
+  "use strict";
+  // Progressive: with the script off, every field shows and the server
+  // ignores them unless the box is ticked.
+  var box = document.getElementById("id_is_employee");
+  var fields = document.querySelectorAll("[data-employee-field]");
+  if (!box || !fields.length) return;
+
+  function show() {
+    Array.prototype.forEach.call(fields, function (field) {
+      field.hidden = !box.checked;
+    });
+  }
+  box.addEventListener("change", show);
+  show();
+})();
+</script>
 {% endblock %}

@@ -945,3 +945,99 @@ class AdministratorsArePeersTests(TestCase):
         services.deactivate_user(actor=self.one, user=self.two)
         self.two.refresh_from_db()
         self.assertFalse(self.two.is_active)
+
+
+class OneActMakesAWholePersonTests(TestCase):
+    """
+    Adding a user and putting somebody on the staff register were two
+    screens, and the gap between them made half a person: an account
+    carrying the Employee role with no employment record, which cannot clock
+    in, appears on no roll-call and is in no report — while looking complete
+    on the user list. Whoever filled in the first screen had no reason to
+    know the second existed.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+        cls.admin = make_user("admin.whole@test.local", ["Admin"])
+
+    def setUp(self):
+        self.client.force_login(self.admin)
+
+    def _post(self, **extra):
+        payload = {
+            "first_name": "Branda", "middle_name": "", "last_name": "Allision",
+            "email": "branda@test.local", "is_active": "on",
+            "roles": [Role.objects.get(name="Employee").pk],
+        }
+        payload.update(extra)
+        return self.client.post(reverse("settings-user-create"), payload)
+
+    def test_an_account_can_be_put_on_the_register_as_it_is_made(self):
+        from hr.models import Employee
+
+        response = self._post(is_employee="on", staff_id="A1-0501", job_title="Technician")
+        self.assertEqual(response.status_code, 302)
+
+        user = User.objects.get(email="branda@test.local")
+        employee = Employee.objects.get(user=user)
+        self.assertEqual(employee.staff_id, "A1-0501")
+        self.assertEqual(employee.job_title, "Technician")
+
+    def test_an_account_that_is_not_a_member_of_staff_stays_an_account(self):
+        """Not every account is a person who works here."""
+        from hr.models import Employee
+
+        self._post()
+        user = User.objects.get(email="branda@test.local")
+        self.assertFalse(Employee.objects.filter(user=user).exists())
+
+    def test_the_register_half_needs_a_staff_id(self):
+        from hr.models import Employee
+
+        response = self._post(is_employee="on", staff_id="")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "staff ID")
+        self.assertFalse(User.objects.filter(email="branda@test.local").exists())
+        self.assertFalse(Employee.objects.exists())
+
+    def test_a_staff_id_somebody_already_has_is_refused(self):
+        from hr.models import Employee
+
+        taken = make_user("taken@test.local")
+        Employee.objects.create(user=taken, staff_id="A1-0501")
+
+        response = self._post(is_employee="on", staff_id="A1-0501")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already belongs to somebody")
+
+    def test_neither_half_survives_the_other_failing(self):
+        """One act: either the person exists whole or not at all."""
+        from hr.models import Employee
+
+        taken = make_user("taken2@test.local")
+        Employee.objects.create(user=taken, staff_id="A1-0777")
+
+        self._post(is_employee="on", staff_id="A1-0777")
+        self.assertFalse(User.objects.filter(email="branda@test.local").exists())
+        self.assertEqual(Employee.objects.count(), 1)
+
+    def test_somebody_already_on_the_register_is_not_asked_again(self):
+        """Their employment is kept in HR; two places would mean two answers."""
+        from hr.models import Employee
+
+        from .forms import UserForm
+
+        person = make_user("onreg@test.local")
+        Employee.objects.create(user=person, staff_id="A1-0600")
+
+        form = UserForm(instance=person)
+        self.assertTrue(form.already_on_register)
+        self.assertEqual(form.employee_fields(), [])
+
+    def test_the_list_says_who_is_not_on_the_register(self):
+        """The existing half-made accounts, made findable."""
+        make_user("nobody@test.local", ["Employee"])
+        body = self.client.get(reverse("settings-users")).content.decode()
+        self.assertIn("Not on the staff register", body)

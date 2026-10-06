@@ -16,6 +16,7 @@ from django.contrib.auth import (
 )
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -147,7 +148,13 @@ def settings_users(request):
     # Administrators are peers: one does not hold another's account. Marked
     # per row so the two actions that are refused are not offered, rather
     # than offered and then refused.
+    from hr.models import Employee
+
     administrators = services.admin_user_ids()
+    # Accounts with no employment record behind them. One carrying a staff
+    # role and nothing on the register cannot clock in, is on no roll-call
+    # and in no report — and until this said so, looked complete.
+    on_register = set(Employee.objects.values_list("user_id", flat=True))
     page = paginate(request, users)
     for row in page:
         row.is_peer_administrator = (
@@ -155,6 +162,7 @@ def settings_users(request):
             and row.pk != request.user.pk
             and not request.user.is_superuser
         )
+        row.is_on_register = row.pk in on_register
 
     return render(
         request,
@@ -171,6 +179,7 @@ def settings_users(request):
 
 
 @require_permission("manage_users")
+@transaction.atomic
 def user_edit(request, pk=None):
     instance = get_object_or_404(User, pk=pk) if pk else None
     form = UserForm(request.POST or None, instance=instance)
@@ -191,6 +200,11 @@ def user_edit(request, pk=None):
             user.must_reset_password = True
         user.save()
 
+        # The register, in the same act. Half a person — an account carrying
+        # the Employee role with no employment record behind it — is what
+        # happens when this is a second screen somebody has to know about.
+        on_register = _put_on_the_register(request, user, form)
+
         _sync_roles(request, user, form.cleaned_data["roles"])
         audit.record_change(
             actor=request.user,
@@ -200,18 +214,56 @@ def user_edit(request, pk=None):
             after=audit.snapshot(user, fields=tracked),
             reason=request.POST.get("reason", ""),
         )
+        register = " They are on the staff register as {}.".format(on_register.staff_id) if on_register else ""
         if temporary:
             messages.success(
                 request,
-                "Account created. Temporary password: {} - the user must "
-                "change it at first login.".format(temporary),
+                "Account created.{} Temporary password: {} - the user must "
+                "change it at first login.".format(register, temporary),
                 extra_tags="sticky",
             )
         else:
-            messages.success(request, "Account updated.")
+            messages.success(request, "Account updated." + register)
         return redirect("settings-users")
 
     return render(request, "accounts/user_form.html", {"form": form, "instance": instance})
+
+
+def _put_on_the_register(request, user, form):
+    """
+    Create the employment record alongside the account, where the person
+    filling this in said there should be one.
+
+    The HR screen does the same thing through `onboard_employee`, which also
+    makes the account; here the account exists already, so only the register
+    half is written — the same fields, the same rules, one transaction with
+    the account above it.
+    """
+    from hr.models import Employee
+
+    if not form.cleaned_data.get("is_employee"):
+        return None
+    if Employee.objects.filter(user=user).exists():
+        return None
+
+    employee = Employee.objects.create(
+        user=user,
+        staff_id=form.cleaned_data["staff_id"].strip(),
+        job_title=form.cleaned_data.get("job_title", "").strip(),
+        department=form.cleaned_data.get("department"),
+        phone=form.cleaned_data.get("phone", "").strip(),
+        supervisor=form.cleaned_data.get("supervisor"),
+        start_date=form.cleaned_data.get("start_date"),
+    )
+    audit.record_change(
+        actor=request.user,
+        action="employee.onboarded",
+        target=employee,
+        before=None,
+        after={"staff_id": employee.staff_id, "email": user.email},
+        reason="Added to the register with the account",
+    )
+    return employee
 
 
 def _sync_roles(request, user, selected_roles):

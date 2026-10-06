@@ -28,17 +28,75 @@ class ForcedPasswordResetForm(SetPasswordForm):
 
 
 class UserForm(forms.ModelForm):
+    """
+    An account, and — where the person works here — their place on the staff
+    register in the same act.
+
+    These were two screens, and the gap between them made half a person: an
+    account carrying the Employee role but no employment record, which cannot
+    clock in, does not appear on a roll-call and is not on any report, while
+    looking perfectly complete on this list. Whoever filled in the first
+    screen had no reason to know a second one existed.
+    """
+
     roles = forms.ModelMultipleChoiceField(
         queryset=Role.objects.all(),
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
 
+    # -- and are they on the staff register --------------------------------
+    is_employee = forms.BooleanField(
+        required=False,
+        label="This person works here",
+        help_text="Puts them on the staff register so they can clock in and "
+                  "appear on a roll-call. Leave it off for an account that is "
+                  "not a member of staff.",
+    )
+    staff_id = forms.CharField(max_length=30, required=False, label="Staff ID")
+    job_title = forms.CharField(max_length=80, required=False, label="Job title")
+    department = forms.ModelChoiceField(
+        queryset=None, required=False, label="Department", empty_label="Not set"
+    )
+    phone = forms.CharField(max_length=40, required=False, label="Phone")
+    supervisor = forms.ModelChoiceField(
+        queryset=None, required=False, label="Supervisor",
+        empty_label="Nobody yet", help_text="Whose roll-call they appear on.",
+    )
+    start_date = forms.DateField(
+        required=False, label="Start date",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+    EMPLOYEE_FIELDS = [
+        "is_employee", "staff_id", "job_title", "department", "phone",
+        "supervisor", "start_date",
+    ]
+
     class Meta:
         model = User
         fields = ["first_name", "middle_name", "last_name", "email", "is_active"]
         labels = {"middle_name": "Middle name"}
         help_texts = {"middle_name": "Optional. Shown in full on the employee register."}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from hr.models import Department, Employee
+
+        self.fields["department"].queryset = Department.objects.filter(is_active=True)
+        self.fields["supervisor"].queryset = Employee.objects.filter(
+            is_active=True
+        ).select_related("user")
+
+        # Somebody already on the register is managed in HR, where the rest
+        # of their employment lives. Asking again here would be two places to
+        # change one thing.
+        self.already_on_register = bool(
+            self.instance.pk and Employee.objects.filter(user=self.instance).exists()
+        )
+        if self.already_on_register:
+            for name in self.EMPLOYEE_FIELDS:
+                del self.fields[name]
 
     def clean_email(self):
         email = self.cleaned_data["email"].strip().lower()
@@ -48,6 +106,34 @@ class UserForm(forms.ModelForm):
         if existing.exists():
             raise forms.ValidationError("An account already uses this email address.")
         return email
+
+    def clean_staff_id(self):
+        from hr.models import Employee
+
+        staff_id = (self.cleaned_data.get("staff_id") or "").strip()
+        if staff_id and Employee.objects.filter(staff_id__iexact=staff_id).exists():
+            raise forms.ValidationError("That staff ID already belongs to somebody.")
+        return staff_id
+
+    def clean(self):
+        cleaned = super().clean()
+        if "is_employee" not in self.fields:
+            return cleaned
+        if cleaned.get("is_employee") and not cleaned.get("staff_id"):
+            self.add_error(
+                "staff_id",
+                "A staff ID is what the register is keyed on, so somebody on "
+                "it needs one.",
+            )
+        return cleaned
+
+    def employee_fields(self):
+        """The register half, rendered as its own block."""
+        return [self[name] for name in self.EMPLOYEE_FIELDS if name in self.fields]
+
+    def account_fields(self):
+        return [self[name] for name in
+                ("first_name", "middle_name", "last_name", "email", "is_active")]
 
 
 class RoleForm(forms.ModelForm):
