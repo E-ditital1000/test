@@ -59,6 +59,9 @@
             <dd>
               {% if ticket.assigned_to %}
                 {{ ticket.assigned_to|a1name }} · {{ ticket.assigned_at|a1datetime }}
+                {% if ticket.start_date or ticket.due_date %}
+                  <br><span class="dim">{{ ticket.start_date|a1daterange:ticket.due_date }}</span>
+                {% endif %}
               {% else %}
                 <span class="bad">Unassigned</span>
               {% endif %}
@@ -144,6 +147,20 @@
               <div class="fld">
                 <label for="{{ assign_form.assigned_to.id_for_label }}">Technician</label>
                 {{ assign_form.assigned_to }}
+              </div>
+              {% comment %} When the work is expected, as against when it was
+                 handed over. Both optional — plenty of tickets are "today,
+                 when you get a minute". {% endcomment %}
+              <div class="form-rows">
+                <div class="fld narrow">
+                  <label for="{{ assign_form.start_date.id_for_label }}">From</label>
+                  {{ assign_form.start_date }}
+                </div>
+                <div class="fld narrow {% if assign_form.due_date.errors %}has-error{% endif %}">
+                  <label for="{{ assign_form.due_date.id_for_label }}">Due by</label>
+                  {{ assign_form.due_date }}
+                  {% for e in assign_form.due_date.errors %}<span class="err">{{ e }}</span>{% endfor %}
+                </div>
               </div>
               <button class="btn btn-sec btn-wide" type="submit">Save assignment</button>
             </div>

@@ -17,6 +17,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from config.pagination import paginate
+from config.references import next_reference
 from accounts.decorators import require_permission, user_has_permission
 from accounts.scoping import apply_scope
 
@@ -26,6 +27,7 @@ from .forms import (
     RequisitionItemFormSet,
     RequisitionRequestForm,
     TaskCompletionForm,
+    ProjectForm,
     TaskForm,
 )
 from .models import Project, ProjectCrew, Requisition, Task
@@ -314,3 +316,38 @@ def requisition_create(request, pk):
         "projects/requisition_form.html",
         {"project": project, "form": form, "formset": formset},
     )
+
+
+@require_permission("create_project")
+@transaction.atomic
+def project_create(request):
+    """
+    Start a project that did not come from a ticket.
+
+    Most projects are converted from one, and that route is unchanged: it is
+    what keeps a customer's phone call joined to the invoice at the end. This
+    is for the work that never was a phone call — a contract signed with an
+    institution, to install across a dozen sites over months.
+
+    It mints its own job reference, the way a quotation written before there
+    was a project does. Everything downstream joins the project itself, so a
+    project that started here behaves like any other from the moment it
+    exists.
+    """
+    form = ProjectForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        project = form.save(commit=False)
+        project.reference = next_reference(Project, "PRJ")
+        project.save()
+        project.advance_to(
+            project.stage,
+            request.user,
+            note="Started directly — not converted from a ticket",
+        )
+        messages.success(
+            request,
+            f"{project.reference} started. Schedule its field jobs from here, "
+            "one for each site it covers.",
+        )
+        return redirect("projects-detail", pk=project.pk)
+    return render(request, "projects/project_form.html", {"form": form})

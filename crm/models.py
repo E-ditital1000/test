@@ -140,6 +140,13 @@ class Ticket(JobLineageModel, TimeStampedModel):
         related_name="tickets_assigned",
     )
     assigned_at = models.DateTimeField(null=True, blank=True)
+    # When the work is expected to happen, as opposed to when it was handed
+    # over. `assigned_at` records the moment a supervisor pressed the button;
+    # these two are what the technician is being asked for, and what anybody
+    # planning around them needs to see. Both optional: plenty of tickets are
+    # "today, when you get a minute".
+    start_date = models.DateField(null=True, blank=True)
+    due_date = models.DateField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
     objects = TicketQuerySet.as_manager()

@@ -56,6 +56,8 @@ ENDPOINTS = {
     # Wave 2 — Customers & Tickets
     "crm-tickets": "view_ticket_status",
     "crm-ticket-create": "create_ticket",
+    # Work that never was a phone call: a contract, started directly.
+    "projects-create": "create_project",
     "crm-customer-create": "create_customer",
     # Wave 2 — Field Jobs, HR attendance and Finance
     "fieldjobs-schedule": "schedule_field_job",

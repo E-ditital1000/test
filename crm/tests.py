@@ -239,3 +239,86 @@ class TicketFlowTests(TestCase):
         )
         ticket.refresh_from_db()
         self.assertEqual(ticket.age_label, "3d")
+
+
+class TicketWorkWindowTests(TestCase):
+    """
+    When a ticket is handed to a technician, over what days.
+
+    `assigned_at` records the moment a supervisor pressed the button, which
+    is not the same question. Without these, handing a ticket over said only
+    that it was somebody else's problem now.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0)
+        cls.service_type = ServiceType.objects.create(code="solar", name="Solar")
+        cls.status = StatusOption.objects.create(
+            kind=StatusOption.TICKET, code="new", label="New", is_default=True
+        )
+        cls.customer = Customer.objects.create(name="Duport Road Clinic")
+        cls.supervisor = make_user("sup.window@test.local", ["Supervisor"])
+        cls.technician = make_user("tech.window@test.local", ["Technician"])
+
+    def _ticket(self):
+        return Ticket.objects.create(
+            reference="TKT-7001", customer=self.customer,
+            service_type=self.service_type, status=self.status,
+            description="Inverter fault.",
+        )
+
+    def test_assigning_records_the_days_the_work_is_expected(self):
+        from datetime import date, timedelta
+
+        ticket = self._ticket()
+        self.client.force_login(self.supervisor)
+        start = date.today()
+        due = start + timedelta(days=3)
+        self.client.post(reverse("crm-ticket-assign", args=[ticket.pk]), {
+            "assigned_to": self.technician.pk,
+            "start_date": start.isoformat(),
+            "due_date": due.isoformat(),
+        })
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.assigned_to, self.technician)
+        self.assertEqual(ticket.start_date, start)
+        self.assertEqual(ticket.due_date, due)
+
+    def test_the_dates_are_optional(self):
+        """Plenty of tickets are "today, when you get a minute"."""
+        ticket = self._ticket()
+        self.client.force_login(self.supervisor)
+        self.client.post(reverse("crm-ticket-assign", args=[ticket.pk]), {
+            "assigned_to": self.technician.pk,
+        })
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.assigned_to, self.technician)
+        self.assertIsNone(ticket.start_date)
+
+    def test_a_window_that_ends_before_it_starts_is_refused(self):
+        from datetime import date, timedelta
+
+        ticket = self._ticket()
+        self.client.force_login(self.supervisor)
+        self.client.post(reverse("crm-ticket-assign", args=[ticket.pk]), {
+            "assigned_to": self.technician.pk,
+            "start_date": date.today().isoformat(),
+            "due_date": (date.today() - timedelta(days=1)).isoformat(),
+        })
+        ticket.refresh_from_db()
+        self.assertIsNone(ticket.assigned_to, "a backwards window assigns nobody")
+
+    def test_the_window_is_on_the_ticket_history(self):
+        """So "when was this due" is answerable months later."""
+        from datetime import date, timedelta
+
+        ticket = self._ticket()
+        self.client.force_login(self.supervisor)
+        self.client.post(reverse("crm-ticket-assign", args=[ticket.pk]), {
+            "assigned_to": self.technician.pk,
+            "start_date": date.today().isoformat(),
+            "due_date": (date.today() + timedelta(days=2)).isoformat(),
+        })
+        detail = [e.detail for e in ticket.events.all() if e.action in ("Assigned", "Reassigned")]
+        self.assertTrue(any("–" in d or "due" in d for d in detail), detail)

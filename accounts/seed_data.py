@@ -111,6 +111,7 @@ ROLE_GRANTS = {
         ("view_customers", SCOPE_ALL),
         ("view_ticket_status", SCOPE_ALL),
         ("convert_ticket_to_project", SCOPE_ALL),
+        ("create_project", SCOPE_ALL),
         ("schedule_field_job", SCOPE_ALL),
         ("view_field_jobs", SCOPE_ALL),
         ("view_projects", SCOPE_OWN_PROJECTS),

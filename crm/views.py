@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.pagination import paginate
+from accounts.templatetags.a1 import a1daterange
 from accounts.decorators import require_permission, user_has_permission
 from config.models import StatusOption
 from config.references import next_reference
@@ -294,6 +295,12 @@ def ticket_assign(request, pk):
     previous = ticket.assigned_to
     ticket.assigned_to = form.cleaned_data["assigned_to"]
     ticket.assigned_at = timezone.now()
+    # When the work is expected to happen, as against when it was handed
+    # over. Left alone if this assignment did not say.
+    if form.cleaned_data.get("start_date"):
+        ticket.start_date = form.cleaned_data["start_date"]
+    if form.cleaned_data.get("due_date"):
+        ticket.due_date = form.cleaned_data["due_date"]
 
     # Status values are Settings-owned, so advancing is best-effort: if the
     # business has renamed or removed "assigned", the assignment still
@@ -305,12 +312,18 @@ def ticket_assign(request, pk):
         if assigned_status:
             ticket.status = assigned_status
 
-    ticket.save(update_fields=["assigned_to", "assigned_at", "status"])
+    ticket.save(
+        update_fields=["assigned_to", "assigned_at", "status", "start_date", "due_date"]
+    )
     ticket.log(
         request.user,
         "Reassigned" if previous else "Assigned",
         f"to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}"
-        + (f" (was {previous.get_full_name() or previous.email})" if previous else ""),
+        + (f" (was {previous.get_full_name() or previous.email})" if previous else "")
+        + (
+            f" · {a1daterange(ticket.start_date, ticket.due_date)}"
+            if ticket.start_date or ticket.due_date else ""
+        ),
     )
     messages.success(request, f"{ticket.reference} assigned to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}.")
     return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))

@@ -3,7 +3,12 @@
 {% block title %}Projects — A1 360{% endblock %}
 
 {% block page_title %}Projects{% endblock %}
-{% block page_sub %}{{ active_count }} active of {{ total_projects }} · every one converted from a ticket{% endblock %}
+{% block page_sub %}{{ active_count }} active of {{ total_projects }}{% endblock %}
+{% block page_actions %}
+  {% if perms_held.create_project %}
+    <a class="btn btn-pri" href="{% url 'projects-create' %}">Start a project</a>
+  {% endif %}
+{% endblock %}
 
 {% block content %}
   <form method="get" class="filters">
@@ -76,6 +81,6 @@
     {% include "shell/_empty_filtered.html" with icon="projects" search_term=query total_count=total_projects total_noun="project" clear_url=clear_url %}
   {% else %}
     {% url 'crm-tickets' as tickets_url %}
-    {% include "shell/_empty.html" with icon="projects" heading="No projects yet" body="Projects are not created directly — they are converted from a ticket, which is what keeps one job traceable from the first phone call through to the invoice. Open a ticket and convert it." primary_label="Go to tickets" primary_url=tickets_url %}
+    {% include "shell/_empty.html" with icon="projects" heading="No projects yet" body="Most projects are converted from a ticket, which is what keeps one job traceable from the first phone call through to the invoice. Work that never was a phone call — a contract to install across several sites over months — can be started here directly." primary_label="Go to tickets" primary_url=tickets_url %}
   {% endif %}
 {% endblock %}

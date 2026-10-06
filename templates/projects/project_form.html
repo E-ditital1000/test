@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Start a project — A1 360{% endblock %}
+
+{% block page_title %}Start a project{% endblock %}
+{% block page_sub %}For work that did not come in as a ticket{% endblock %}
+
+{% comment %}
+Most projects are converted from a ticket, and that route is unchanged — it
+is what keeps a customer's phone call joined to the invoice at the end.
+
+This is the other kind: a contract signed with an institution, to install
+across a dozen sites over months. That never was a service call, and routing
+it through a ticket would have put an invented phone call at the head of a
+six-month job.
+{% endcomment %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+
+    <div class="card">
+      <div class="hd"><b>The contract</b></div>
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Work that spans several sites records each one on its own field job,
+        scheduled from the project once it exists. The main site above is
+        where the work is centred, if anywhere.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'projects-list' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Start the project</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block body_extra %}
+  {% include "crm/_site_picker_script.html" %}
+{% endblock %}

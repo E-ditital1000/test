@@ -255,7 +255,15 @@ def site_picker_data(customers, *, prompt, none_yet_help=NO_SITES_HELP):
 
 
 class TicketAssignForm(forms.Form):
-    """One action from the ticket list, as the brief requires."""
+    """
+    One action from the ticket list, as the brief requires — and the days it
+    is expected to take.
+
+    Handing a ticket over without saying when says only that it is somebody
+    else's problem now. The dates are what a technician plans their week
+    around and what anybody scheduling around them needs to see, so they are
+    asked for here rather than left to a phone call.
+    """
 
     assigned_to = forms.ModelChoiceField(
         queryset=User.objects.none(),
@@ -263,6 +271,21 @@ class TicketAssignForm(forms.Form):
         label="Technician",
         empty_label="Assign to…",
     )
+    start_date = forms.DateField(
+        required=False, label="From",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    due_date = forms.DateField(
+        required=False, label="Due by",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        start, due = cleaned.get("start_date"), cleaned.get("due_date")
+        if start and due and start > due:
+            self.add_error("due_date", "The due date cannot be before the start date.")
+        return cleaned
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

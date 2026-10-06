@@ -33,6 +33,10 @@ PERMISSIONS = [
 
     # Projects
     ("view_projects", "projects", "View project records"),
+    # Work that does not begin with a phone call: a contract to install at
+    # twelve sites over six months is not a service ticket and pretending it
+    # is would put a fiction at the head of the job.
+    ("create_project", "projects", "Start a project that did not come from a ticket"),
     ("manage_project", "projects", "Manage a project's tasks, crew and lifecycle stage"),
     ("view_project_cost", "projects", "View a project's running cost and revenue"),
     ("raise_requisition", "projects", "Raise a requisition against a project"),

@@ -9,7 +9,7 @@ from accounts.templatetags.a1 import a1datetime, a1name
 from fieldjobs.models import FieldJob
 from hr.models import Employee
 
-from .models import ProjectCrew, ProjectDocument, Requisition, RequisitionItem, Task
+from .models import Project, ProjectCrew, ProjectDocument, Requisition, RequisitionItem, Task
 
 User = get_user_model()
 
@@ -263,3 +263,100 @@ class RequisitionRequestForm(forms.ModelForm):
         if needed_by and needed_by < timezone.localdate():
             raise forms.ValidationError("That date has passed.")
         return needed_by
+
+
+class ProjectForm(forms.ModelForm):
+    """
+    A project that did not come from a ticket.
+
+    A ticket is a small job — a customer rings, or it comes off the day's
+    assignments — and most projects do grow out of one. A contract does not:
+    fifty kilowatts of solar across twelve health facilities over six months,
+    signed with an institution, never was a service call. Routing it through
+    a ticket would have put a fiction at the head of the job, and the first
+    thing anybody read about a six-month contract would have been an invented
+    phone call.
+
+    So this mints its own job reference and stands on its own. Everything
+    downstream — field jobs, requisitions, invoices — joins it exactly as it
+    joins a project that was converted, because they carry the project's
+    reference either way.
+    """
+
+    class Meta:
+        model = Project
+        fields = [
+            "name", "customer", "site", "service_type", "status", "manager",
+            "start_date", "target_end_date", "description",
+        ]
+        widgets = {
+            "start_date": forms.DateInput(attrs={"type": "date"}),
+            "target_end_date": forms.DateInput(attrs={"type": "date"}),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+        labels = {
+            "name": "What is the contract",
+            "site": "Main site",
+            "service_type": "Service type",
+            "start_date": "Starts",
+            "target_end_date": "Due to finish",
+            "description": "What was agreed",
+        }
+        help_texts = {
+            "name": "As somebody would say it out loud — "
+                    "“CRS: 50 kW solar at 12 health facilities”.",
+            "site": "Where the work is centred, if anywhere. Work that spans "
+                    "several sites records each one on its own field job.",
+            "manager": "Who owns it. They see it on their own project list.",
+            "target_end_date": "What was agreed with the customer, not a guess "
+                               "at when it will actually finish.",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from config.models import ServiceType, StatusOption
+        from crm.models import Customer
+
+        self.fields["customer"].queryset = Customer.objects.filter(is_active=True)
+        self.fields["service_type"].queryset = ServiceType.objects.filter(is_active=True)
+
+        statuses = StatusOption.objects.filter(kind=StatusOption.PROJECT, is_active=True)
+        self.fields["status"].queryset = statuses
+        default = statuses.filter(is_default=True).first()
+        if default is not None and not self.instance.pk:
+            self.fields["status"].initial = default.pk
+
+        self.fields["manager"].queryset = User.objects.filter(is_active=True).order_by(
+            "first_name", "last_name"
+        )
+        self.fields["manager"].empty_label = "Nobody yet"
+        self.fields["manager"].required = False
+
+        # The site is chosen from this customer's own, the same rule every
+        # other screen follows. Nothing is offered until a customer is.
+        from crm.forms import limit_sites_to_customer
+
+        customer_id = (
+            self.data.get("customer")
+            or getattr(self.instance, "customer_id", None)
+        )
+        limit_sites_to_customer(
+            self.fields["site"], customer_id, prompt="Which site?"
+        )
+
+    def site_picker(self):
+        from crm.forms import site_picker_data
+
+        return site_picker_data(
+            self.fields["customer"].queryset, prompt="Which site?"
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get("start_date"), cleaned.get("target_end_date")
+        if start and end and start > end:
+            self.add_error(
+                "target_end_date",
+                "A contract cannot be due to finish before it starts.",
+            )
+        return cleaned
