@@ -11,6 +11,8 @@ from decimal import Decimal
 
 from django.db import transaction
 
+from accounts.templatetags.a1 import a1date, a1money
+from config import notifications
 from config.references import next_reference
 
 from .models import Requisition, RequisitionItem
@@ -53,6 +55,23 @@ def raise_requisition(*, project, actor, description, items, needed_by=None):
     requisition.amount = requisition.items_total
     requisition.save(update_fields=["amount"])
     requisition.record_decision(decision="submitted", actor=actor)
+
+    # Tell whoever decides. A requisition raised on a site is waiting on an
+    # office that may not have the screen open, and the whole point of it is
+    # that somebody is standing there needing the parts.
+    notifications.send(
+        to=notifications.recipients_holding("approve_requisition", exclude=actor),
+        subject=f"Requisition to approve — {requisition.reference}",
+        template="requisition_raised",
+        context={
+            "requisition": requisition,
+            "amount": a1money(requisition.amount),
+            "raised_by": actor.get_full_name() or actor.email,
+            "needed": a1date(requisition.needed_by),
+            "threshold_note": approval_note(requisition),
+            "url": notifications.link("finance-requisitions"),
+        },
+    )
     return requisition
 
 

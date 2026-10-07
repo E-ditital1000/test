@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from config import notifications
 from config.pagination import paginate
 from accounts.templatetags.a1 import a1daterange
 from accounts.decorators import require_permission, user_has_permission
@@ -325,6 +326,21 @@ def ticket_assign(request, pk):
             if ticket.start_date or ticket.due_date else ""
         ),
     )
+    # Tell them. Never blocks the assignment: a technician who has been given
+    # work has been given it whether or not the mail server agreed.
+    notifications.send(
+        to=ticket.assigned_to.email,
+        subject=f"{ticket.reference} assigned to you",
+        template="ticket_assigned",
+        context={
+            "ticket": ticket,
+            "technician_name": ticket.assigned_to.first_name or "Hello",
+            "assigned_by": request.user.get_full_name() or request.user.email,
+            "dates": a1daterange(ticket.start_date, ticket.due_date),
+            "url": notifications.link("crm-ticket-detail", ticket.pk),
+        },
+    )
+
     messages.success(request, f"{ticket.reference} assigned to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}.")
     return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))
 

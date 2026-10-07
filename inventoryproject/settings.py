@@ -292,6 +292,46 @@ if CLOUDINARY_CLOUD_NAME and not TESTING:
     }
     STORAGES["default"]["BACKEND"] = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
+# --------------------------------------------------------------------------
+# Outgoing mail
+#
+# The system tells people when something is waiting on them. What it does
+# NOT do is send anybody a password or a sign-in link: staff here sign in
+# with work addresses that are not all read, and a link sitting in an unread
+# inbox helps nobody on site. That decision is unchanged — a person who is
+# locked out asks an administrator, who hands them a temporary password.
+#
+# Unconfigured, mail is printed to the console instead of being sent, so a
+# developer sees exactly what would have gone out and nothing leaves the
+# machine. Under test it goes to an in-memory outbox, whatever is set, for
+# the same reason media does: a test run must not post to the real world.
+# --------------------------------------------------------------------------
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=465)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+# 465 is implicit TLS; 587 negotiates it with STARTTLS. Setting both is a
+# configuration error Django will not catch until the first send fails.
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=EMAIL_PORT == 465)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=EMAIL_PORT == 587)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=20)
+
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL", default=f"A1 360 <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else ""
+)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL or "root@localhost"
+
+if TESTING:
+    EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+elif EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Where a link in a message points. A message saying somebody has work
+# waiting is worth little if it cannot say where.
+SITE_URL = env("SITE_URL", default=f"https://{RAILWAY_DOMAIN}" if RAILWAY_DOMAIN else "")
+
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard-index"
 LOGOUT_REDIRECT_URL = "login"

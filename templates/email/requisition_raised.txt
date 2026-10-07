@@ -1,0 +1,14 @@
+A requisition is waiting for a decision.
+
+  Project    {{ requisition.project.reference }} — {{ requisition.project.name }}
+  Customer   {{ requisition.project.customer.name }}
+  Amount     {{ amount }}
+  Raised by  {{ raised_by }}{% if needed %}
+  Needed by  {{ needed }}{% endif %}
+
+What it is for
+{{ requisition.description }}
+{% if url %}
+Open it: {{ url }}
+{% endif %}
+{{ threshold_note }}

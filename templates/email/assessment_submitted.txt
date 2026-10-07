@@ -1,0 +1,12 @@
+An assessment is waiting for review.
+
+  Job        {{ assessment.field_job.reference }}
+  Customer   {{ assessment.field_job.customer.name }}{% if assessment.field_job.site %}
+  Site       {{ assessment.field_job.site.name }}{% endif %}
+  Service    {{ assessment.field_job.service_type.name }}
+  Submitted  {{ submitted }} by {{ submitted_by }}
+  Answers    {{ answer_count }}, with {{ photo_count }} photograph{{ photo_count|pluralize }}
+{% if url %}
+Review it: {{ url }}
+{% endif %}
+Nothing is invoiced from this job until the assessment is approved.

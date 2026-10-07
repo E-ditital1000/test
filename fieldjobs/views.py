@@ -30,6 +30,8 @@ from accounts.decorators import (
     require_permission,
     user_has_permission,
 )
+from accounts.templatetags.a1 import a1datetime
+from config import notifications
 from config.pagination import paginate
 from config.references import next_reference
 from projects.forms import RequisitionItemFormSet, RequisitionRequestForm
@@ -555,6 +557,24 @@ def assessment_submit(request, pk):
         job.state = FieldJob.COMPLETED
         job.completed_at = timezone.now()
         job.save(update_fields=["state", "completed_at"])
+
+    # Tell whoever reviews these that one is waiting. Sent after everything
+    # is recorded and never allowed to fail the submission: a technician on
+    # a hilltop has done their job the moment the assessment is saved, and a
+    # mail server is not their problem.
+    notifications.send(
+        to=notifications.recipients_holding("review_assessment", exclude=request.user),
+        subject=f"Assessment to review — {job.reference}",
+        template="assessment_submitted",
+        context={
+            "assessment": assessment,
+            "submitted": a1datetime(assessment.submitted_at or timezone.now()),
+            "submitted_by": request.user.get_full_name() or request.user.email,
+            "answer_count": assessment.answers.count(),
+            "photo_count": assessment.photos.count(),
+            "url": notifications.link("approvals-queue"),
+        },
+    )
 
     return JsonResponse(
         {"ok": True, "message": "Assessment submitted.", "reference": job.reference}

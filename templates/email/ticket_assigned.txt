@@ -1,0 +1,16 @@
+{{ technician_name }},
+
+{{ ticket.reference }} has been assigned to you.
+
+  Customer   {{ ticket.customer.name }}{% if ticket.site %}
+  Site       {{ ticket.site.name }}{% endif %}
+  Service    {{ ticket.service_type.name }}
+  Priority   {{ ticket.get_priority_display }}{% if dates %}
+  Expected   {{ dates }}{% endif %}
+
+What was reported
+{{ ticket.description }}
+{% if url %}
+Open it: {{ url }}
+{% endif %}
+Assigned by {{ assigned_by }}.
