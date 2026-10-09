@@ -82,3 +82,36 @@ def approval_note(requisition):
     if not requisition.has_estimates:
         return "No costs were given, so Finance will price it before approving."
     return "Finance can approve it."
+
+
+def notify_project_manager(project, *, actor):
+    """
+    Tell whoever owns a project that they own it.
+
+    A project with a manager who does not know is a project nobody is
+    running. Sent whichever way it came about — converted from a ticket or
+    started as a contract — because the person's position is the same
+    either way.
+    """
+    from accounts.templatetags.a1 import a1daterange
+    from config import notifications
+
+    if project.manager is None or not project.manager.email:
+        return
+    if actor is not None and project.manager_id == actor.pk:
+        # They just made it. They know.
+        return
+
+    notifications.send(
+        to=project.manager.email,
+        subject=f"{project.reference} is yours to run",
+        template="project_assigned",
+        context={
+            "project": project,
+            "first_name": project.manager.first_name or "Hello",
+            "started_by": actor.get_full_name() or actor.email if actor else "the office",
+            "dates": a1daterange(project.start_date, project.target_end_date),
+            "from_ticket": project.ticket.reference if project.ticket_id else "",
+            "url": notifications.link("projects-detail", project.pk),
+        },
+    )

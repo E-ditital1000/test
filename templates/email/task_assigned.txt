@@ -1,0 +1,15 @@
+{{ first_name }},
+
+A task has been given to you.
+
+  {{ task.title }}{% if project %}
+  Project    {{ project.reference }} — {{ project.name }}{% endif %}{% if visit %}
+  On visit   {{ visit.reference }}{% if visit.site %} at {{ visit.site.name }}{% endif %}{% endif %}{% if dates %}
+  Expected   {{ dates }}{% endif %}
+  Set by     {{ assigned_by }}
+{% if task.description %}
+What is needed
+{{ task.description }}
+{% endif %}{% if url %}
+Open it: {{ url }}
+{% endif %}

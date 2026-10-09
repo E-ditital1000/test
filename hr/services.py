@@ -287,7 +287,67 @@ def record_clock_event(
         since=event.device_timestamp - timedelta(days=1),
         until=event.device_timestamp + timedelta(days=1),
     )
+    _notify_supervisor_of_clock(event)
     return event, True
+
+
+def _notify_supervisor_of_clock(event):
+    """
+    Tell the supervisor whose roll-call this person appears on, and the
+    administrators.
+
+    An employee with no supervisor still reaches the administrators, so a
+    clock event is never recorded with nobody told. The person clocking is
+    never written to about their own event — they were standing there.
+
+    On volume: thirteen people clocking twice a day is twenty-six messages,
+    and every administrator receives all of them. That is a decision, not an
+    accident. If it becomes a mailbox nobody reads, the shape that survives
+    is a roll-call digest once a day rather than an alert each time — a
+    notification nobody reads is worse than none, because it teaches people
+    to ignore the ones that matter.
+    """
+    from accounts.templatetags.a1 import a1datetime, a1metres
+    from accounts.services import admin_user_ids
+    from config import notifications
+    from django.contrib.auth import get_user_model
+
+    addresses = []
+    supervisor = event.employee.supervisor
+    if supervisor is not None and supervisor.user.email:
+        addresses.append(supervisor.user.email)
+
+    administrators = (
+        get_user_model()
+        .objects.filter(pk__in=admin_user_ids(), is_active=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
+    addresses.extend(administrators)
+
+    # Nobody hears about their own clock, and nobody hears twice.
+    own = event.employee.user.email
+    addresses = [a for a in dict.fromkeys(addresses) if a and a != own]
+    if not addresses:
+        return
+
+    notifications.send(
+        to=addresses,
+        subject=f"{event.employee.full_name} clocked {event.kind}",
+        template="clock_event",
+        context={
+            "employee": event.employee,
+            "employee_name": event.employee.full_name,
+            "direction": event.kind,
+            "at": a1datetime(event.device_timestamp),
+            "location": (
+                "not available" if event.location_unavailable
+                else a1metres(event.accuracy_m)
+            ),
+            "code": event.attendance_code.location_name if event.attendance_code_id else "",
+            "url": notifications.link("hr-employee-attendance", event.employee.pk),
+        },
+    )
 
 
 @transaction.atomic
@@ -415,7 +475,9 @@ def onboard_employee(*, actor, data, roles):
     from accounts import audit
     from accounts.models import UserRole
     from accounts.permissions import forget_permissions
-    from accounts.services import can_grant_role, temporary_password
+    from accounts.services import (
+        can_grant_role, notify_account_created, temporary_password,
+    )
 
     from .models import Employee
 
@@ -469,5 +531,8 @@ def onboard_employee(*, actor, data, roles):
             "roles": sorted(role.name for role in roles),
         },
         reason=data.get("reason", "") or "Onboarded through the HR register",
+    )
+    notify_account_created(
+        user=user, actor=actor, roles=roles, staff_id=employee.staff_id
     )
     return employee, temporary

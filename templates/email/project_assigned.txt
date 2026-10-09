@@ -1,0 +1,17 @@
+{{ first_name }},
+
+You are managing {{ project.reference }}.
+
+  {{ project.name }}
+  Customer   {{ project.customer.name }}{% if project.site %}
+  Site       {{ project.site.name }}{% endif %}
+  Service    {{ project.service_type.name }}{% if dates %}
+  Runs       {{ dates }}{% endif %}
+  Started by {{ started_by }}{% if from_ticket %}
+  From       ticket {{ from_ticket }}{% endif %}
+{% if project.description %}
+What was agreed
+{{ project.description }}
+{% endif %}{% if url %}
+Open it: {{ url }}
+{% endif %}

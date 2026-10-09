@@ -16,6 +16,8 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from accounts.templatetags.a1 import a1daterange
+from config import notifications
 from config.pagination import paginate
 from config.references import next_reference
 from accounts.decorators import require_permission, user_has_permission
@@ -31,7 +33,7 @@ from .forms import (
     TaskForm,
 )
 from .models import Project, ProjectCrew, Requisition, Task
-from .services import approval_note, raise_requisition
+from .services import approval_note, notify_project_manager, raise_requisition
 
 
 def _visible_projects(user):
@@ -198,6 +200,20 @@ def task_create(request, pk):
             task.assigned_by = request.user
             task.save()
             if task.assignee:
+                notifications.send(
+                    to=task.assignee.email,
+                    subject=f"Task on {project.reference} — {task.title}",
+                    template="task_assigned",
+                    context={
+                        "task": task,
+                        "project": project,
+                        "visit": task.field_job,
+                        "first_name": task.assignee.first_name or "Hello",
+                        "assigned_by": request.user.get_full_name() or request.user.email,
+                        "dates": a1daterange(task.start_date, task.due_date),
+                        "url": notifications.link("projects-detail", project.pk),
+                    },
+                )
                 who = task.assignee.get_full_name() or task.assignee.email
                 messages.success(
                     request,
@@ -355,6 +371,7 @@ def project_create(request):
             request.user,
             note="Started directly — not converted from a ticket",
         )
+        notify_project_manager(project, actor=request.user)
         messages.success(
             request,
             f"{project.reference} started. Schedule its field jobs from here, "

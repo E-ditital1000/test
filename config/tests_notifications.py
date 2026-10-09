@@ -155,3 +155,102 @@ class WhoHearsAboutItTests(TestCase):
             "django.core.mail.backends.locmem.EmailBackend",
             "a test run must not post to the real world",
         )
+
+
+class ClockEventNotificationTests(TestCase):
+    """
+    Who hears that somebody clocked: their supervisor, and the
+    administrators. Not the person who just did it.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0, reset_system_roles=True)
+        from hr.models import Employee
+
+        cls.admin = make_user("admin.clock@test.local", ["Admin"])
+        cls.supervisor = make_user("sup.clock@test.local", ["Supervisor"])
+        cls.worker = make_user("worker.clock@test.local", ["Technician"], first_name="Moses")
+        cls.stranger = make_user("hr.clock@test.local", ["HR"])
+
+        cls.sup_employee = Employee.objects.create(user=cls.supervisor, staff_id="A1-100")
+        cls.employee = Employee.objects.create(
+            user=cls.worker, staff_id="A1-101", supervisor=cls.sup_employee
+        )
+
+    def setUp(self):
+        mail.outbox = []
+
+    def _clock(self, employee=None, kind="in"):
+        import uuid
+
+        from hr import services
+
+        return services.record_clock_event(
+            employee=employee or self.employee,
+            kind=kind,
+            client_uuid=uuid.uuid4(),
+            location_unavailable=True,
+            require_code=False,
+        )
+
+    def test_the_supervisor_and_the_administrators_are_told(self):
+        self._clock()
+        self.assertEqual(len(mail.outbox), 1)
+        recipients = set(mail.outbox[0].to)
+        self.assertIn("sup.clock@test.local", recipients)
+        self.assertIn("admin.clock@test.local", recipients)
+
+    def test_the_person_clocking_is_not_written_to(self):
+        """They were standing there."""
+        self._clock()
+        self.assertNotIn("worker.clock@test.local", mail.outbox[0].to)
+
+    def test_somebody_with_no_supervisor_still_reaches_the_administrators(self):
+        """A clock event is never recorded with nobody told."""
+        from hr.models import Employee
+
+        orphan = Employee.objects.create(
+            user=make_user("orphan.clock@test.local", ["Technician"]), staff_id="A1-102"
+        )
+        self._clock(employee=orphan)
+        self.assertEqual(mail.outbox[0].to, ["admin.clock@test.local"])
+
+    def test_nobody_unrelated_is_written_to(self):
+        self._clock()
+        self.assertNotIn("hr.clock@test.local", mail.outbox[0].to)
+
+    def test_the_message_says_which_way_they_clocked(self):
+        self._clock(kind="in")
+        self.assertIn("clocked in", mail.outbox[0].subject)
+        mail.outbox = []
+        self._clock(kind="out")
+        self.assertIn("clocked out", mail.outbox[0].subject)
+
+    def test_an_administrator_who_is_also_the_supervisor_hears_once(self):
+        from hr.models import Employee
+        from accounts.models import Role, UserRole
+
+        UserRole.objects.create(user=self.supervisor, role=Role.objects.get(name="Admin"))
+        from accounts.permissions import forget_permissions
+
+        forget_permissions(self.supervisor)
+
+        self._clock()
+        recipients = mail.outbox[0].to
+        self.assertEqual(
+            len(recipients), len(set(recipients)), "nobody should be written to twice"
+        )
+
+    def test_a_mail_failure_does_not_lose_the_clock_event(self):
+        """The guarantee that matters most here: somebody's day is recorded
+        whether or not the mail server agreed."""
+        from hr.models import AttendanceEvent
+
+        with patch(
+            "django.core.mail.EmailMessage.send", side_effect=OSError("refused")
+        ):
+            event, created = self._clock()
+
+        self.assertTrue(created)
+        self.assertTrue(AttendanceEvent.objects.filter(pk=event.pk).exists())

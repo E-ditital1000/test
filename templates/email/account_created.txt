@@ -1,0 +1,17 @@
+{{ first_name }},
+
+An account has been created for you on A1 360, A-1 Technical's system.
+
+  Sign in with   {{ user.email }}
+  Your access    {{ roles }}{% if staff_id %}
+  Staff ID       {{ staff_id }}{% endif %}
+
+Your password is not in this message, and never will be. {{ created_by }}
+has it and will give it to you directly — by phone or in person. You will
+be asked to replace it the first time you sign in, so nobody but you knows
+the one you end up with.
+{% if url %}
+Sign in: {{ url }}
+{% endif %}
+If you were not expecting this, tell an administrator rather than ignoring
+it: somebody has made an account in your name.

@@ -214,6 +214,14 @@ def user_edit(request, pk=None):
             after=audit.snapshot(user, fields=tracked),
             reason=request.POST.get("reason", ""),
         )
+        if temporary:
+            services.notify_account_created(
+                user=user,
+                actor=request.user,
+                roles=form.cleaned_data["roles"],
+                staff_id=on_register.staff_id if on_register else "",
+            )
+
         register = " They are on the staff register as {}.".format(on_register.staff_id) if on_register else ""
         if temporary:
             messages.success(

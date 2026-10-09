@@ -1,0 +1,11 @@
+{{ employee_name }} clocked {{ direction }}.
+
+  Staff ID   {{ employee.staff_id }}{% if employee.department %}
+  Department {{ employee.department.name }}{% endif %}
+  At         {{ at }}{% if location %}
+  Location   {{ location }}{% endif %}{% if code %}
+  Code       {{ code }}{% endif %}
+{% if url %}
+Their attendance: {{ url }}
+{% endif %}
+Sent to this person's supervisor and to the administrators.

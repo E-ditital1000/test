@@ -17,6 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config import notifications
+from projects.services import notify_project_manager
 from config.pagination import paginate
 from accounts.templatetags.a1 import a1daterange
 from accounts.decorators import require_permission, user_has_permission
@@ -430,6 +431,9 @@ def ticket_convert(request, pk):
     )
     ticket.log(request.user, "Converted to project", project.reference)
 
+    # A project with a manager who does not know is a project nobody is
+    # running, whichever way it came about.
+    notify_project_manager(project, actor=request.user)
     messages.success(
         request,
         f"{ticket.reference} converted to {project.reference}. Both records stay linked.",

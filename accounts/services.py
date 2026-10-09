@@ -313,3 +313,34 @@ def deactivate_user(*, actor, user, reason=""):
         after={"is_active": False},
         reason=reason,
     )
+
+
+def notify_account_created(*, user, actor, roles=(), staff_id=""):
+    """
+    Tell somebody an account has been made for them.
+
+    Not their password, and not a link that signs them in. The password is
+    handed over by the person who made the account, in person or by phone —
+    that decision predates this and the reason still holds: staff here sign
+    in with work addresses that are not all read, and a credential sitting
+    in an unread inbox is a credential anybody with the inbox can use.
+
+    What this does carry is the fact of the account, what it can reach, and
+    who made it, so somebody who was not expecting one can say so.
+    """
+    from config import notifications
+
+    names = ", ".join(sorted(role.name for role in roles)) or "No role yet"
+    notifications.send(
+        to=user.email,
+        subject="An account has been created for you",
+        template="account_created",
+        context={
+            "user": user,
+            "first_name": user.first_name or "Hello",
+            "roles": names,
+            "staff_id": staff_id,
+            "created_by": actor.get_full_name() or actor.email,
+            "url": notifications.link("login"),
+        },
+    )
