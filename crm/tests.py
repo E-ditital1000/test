@@ -322,3 +322,146 @@ class TicketWorkWindowTests(TestCase):
         })
         detail = [e.detail for e in ticket.events.all() if e.action in ("Assigned", "Reassigned")]
         self.assertTrue(any("–" in d or "due" in d for d in detail), detail)
+
+
+class AssignWhileRaisingTests(TestCase):
+    """
+    Whoever raises a ticket and already knows who is going can say so.
+
+    The step was a disabled box reading "A Supervisor assigns from the ticket
+    list" — shown to supervisors too. Somebody who had just agreed on the
+    phone which technician was attending had to save, leave, find the ticket
+    again and assign it there. The waiting was the system's, not the work's.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_permissions", verbosity=0, reset_system_roles=True)
+        cls.service_type = ServiceType.objects.create(code="solar", name="Solar")
+        StatusOption.objects.create(
+            kind=StatusOption.TICKET, code="new", label="New", is_default=True, order=1
+        )
+        StatusOption.objects.create(
+            kind=StatusOption.TICKET, code="assigned", label="Assigned", order=2
+        )
+        cls.customer = Customer.objects.create(name="Duport Road Clinic")
+        # Only Admin holds both create_ticket and assign_ticket today: a
+        # Receptionist raises and cannot assign, a Supervisor assigns and
+        # cannot raise. That is a role setting, not a rule of the system —
+        # see the last test.
+        cls.admin = make_user("admin.raise@test.local", ["Admin"])
+        cls.receptionist = make_user("recep.raise@test.local", ["Receptionist"])
+        cls.technician = make_user("tech.raise@test.local", ["Technician"])
+
+    def _payload(self, **extra):
+        payload = {
+            "customer": self.customer.pk, "site": "",
+            "service_type": self.service_type.pk, "priority": "high",
+            "description": "Inverter fault light since Tuesday.",
+        }
+        payload.update(extra)
+        return payload
+
+    def test_whoever_may_assign_can_do_it_as_they_raise_it(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("crm-ticket-create"),
+            self._payload(assigned_to=self.technician.pk),
+        )
+        self.assertEqual(response.status_code, 302)
+
+        ticket = Ticket.objects.get()
+        self.assertEqual(ticket.assigned_to, self.technician)
+        self.assertIsNotNone(ticket.assigned_at)
+
+    def test_it_goes_through_the_same_door_as_the_ticket_list(self):
+        """Status advanced, trail written, technician told — not a lesser
+        version of assigning because it happened here."""
+        from django.core import mail
+
+        mail.outbox = []
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse("crm-ticket-create"),
+            self._payload(assigned_to=self.technician.pk),
+        )
+        ticket = Ticket.objects.get()
+        self.assertEqual(ticket.status.code, "assigned")
+        self.assertIn("Assigned", [e.action for e in ticket.events.all()])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["tech.raise@test.local"])
+
+    def test_the_days_can_be_set_while_raising_it(self):
+        from datetime import date, timedelta
+
+        start = date.today()
+        self.client.force_login(self.admin)
+        self.client.post(reverse("crm-ticket-create"), self._payload(
+            assigned_to=self.technician.pk,
+            start_date=start.isoformat(),
+            due_date=(start + timedelta(days=2)).isoformat(),
+        ))
+        ticket = Ticket.objects.get()
+        self.assertEqual(ticket.start_date, start)
+        self.assertEqual(ticket.due_date, start + timedelta(days=2))
+
+    def test_leaving_it_unassigned_still_works(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("crm-ticket-create"), self._payload())
+        ticket = Ticket.objects.get()
+        self.assertIsNone(ticket.assigned_to)
+        self.assertTrue(ticket.status.is_default, "it goes to the unassigned queue")
+
+    def test_a_receptionist_is_not_offered_it_at_all(self):
+        """Absent, not disabled: no condition would make it usable for them."""
+        self.client.force_login(self.receptionist)
+        response = self.client.get(reverse("crm-ticket-create"))
+        self.assertFalse(response.context["form"].may_assign)
+        self.assertNotIn("assigned_to", response.context["form"].fields)
+        self.assertContains(response, "A Supervisor assigns this from the ticket list")
+
+    def test_and_cannot_assign_by_posting_one_anyway(self):
+        """The form is a convenience; the permission is the control."""
+        self.client.force_login(self.receptionist)
+        self.client.post(
+            reverse("crm-ticket-create"),
+            self._payload(assigned_to=self.technician.pk),
+        )
+        self.assertIsNone(Ticket.objects.get().assigned_to)
+
+    def test_a_backwards_window_is_refused_here_too(self):
+        from datetime import date, timedelta
+
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("crm-ticket-create"), self._payload(
+            assigned_to=self.technician.pk,
+            start_date=date.today().isoformat(),
+            due_date=(date.today() - timedelta(days=1)).isoformat(),
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Ticket.objects.exists())
+
+    def test_a_receptionist_could_be_given_this_by_a_role_change_alone(self):
+        """
+        The reason the control is permission-driven rather than hardcoded to
+        a job title. Nobody holds both create_ticket and assign_ticket but an
+        Admin today; tick assign_ticket onto Receptionist in Settings and the
+        person actually taking the call can assign, with no release.
+        """
+        from accounts.models import Permission, Role, RolePermission
+        from accounts.permissions import forget_permissions
+
+        RolePermission.objects.create(
+            role=Role.objects.get(name="Receptionist"),
+            permission=Permission.objects.get(code="assign_ticket"),
+            scope="all",
+        )
+        forget_permissions(self.receptionist)
+
+        self.client.force_login(self.receptionist)
+        response = self.client.post(
+            reverse("crm-ticket-create"),
+            self._payload(assigned_to=self.technician.pk),
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Ticket.objects.get().assigned_to, self.technician)

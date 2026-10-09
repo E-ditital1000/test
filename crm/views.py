@@ -32,7 +32,7 @@ from .forms import (
     TicketStatusForm,
 )
 from .models import Contact, Customer, Site, Ticket
-from .services import ensure_main_site
+from .services import assign_ticket, ensure_main_site
 
 
 # --------------------------------------------------------------------------
@@ -259,7 +259,7 @@ def ticket_detail(request, pk):
 @require_permission("create_ticket")
 @transaction.atomic
 def ticket_create(request):
-    form = TicketForm(request.POST or None)
+    form = TicketForm(request.POST or None, actor=request.user)
     if request.method == "POST" and form.is_valid():
         ticket = form.save(commit=False)
         ticket.reference = next_reference(Ticket, "TKT")
@@ -275,7 +275,27 @@ def ticket_create(request):
         ticket.status = status
         ticket.save()
         ticket.log(request.user, "Ticket created", f"Raised by {request.user.get_full_name() or request.user.email}")
-        messages.success(request, f"Ticket {ticket.reference} created.")
+
+        # Assigned here where whoever raised it already knew who was going.
+        # Through the same service the ticket list uses, so the status, the
+        # trail entry and the message to the technician are identical
+        # whichever door the assignment came through.
+        technician = form.cleaned_data.get("assigned_to")
+        if technician is not None:
+            assign_ticket(
+                ticket,
+                to=technician,
+                actor=request.user,
+                start_date=form.cleaned_data.get("start_date"),
+                due_date=form.cleaned_data.get("due_date"),
+            )
+            messages.success(
+                request,
+                f"Ticket {ticket.reference} created and assigned to "
+                f"{technician.get_full_name() or technician.email}.",
+            )
+        else:
+            messages.success(request, f"Ticket {ticket.reference} created.")
         return redirect("crm-ticket-detail", pk=ticket.pk)
 
     return render(request, "crm/ticket_form.html", {"form": form})
@@ -293,52 +313,12 @@ def ticket_assign(request, pk):
         messages.error(request, "Choose a technician to assign this ticket to.")
         return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))
 
-    previous = ticket.assigned_to
-    ticket.assigned_to = form.cleaned_data["assigned_to"]
-    ticket.assigned_at = timezone.now()
-    # When the work is expected to happen, as against when it was handed
-    # over. Left alone if this assignment did not say.
-    if form.cleaned_data.get("start_date"):
-        ticket.start_date = form.cleaned_data["start_date"]
-    if form.cleaned_data.get("due_date"):
-        ticket.due_date = form.cleaned_data["due_date"]
-
-    # Status values are Settings-owned, so advancing is best-effort: if the
-    # business has renamed or removed "assigned", the assignment still
-    # happens and the status simply stays where it is.
-    if ticket.status.is_default:
-        assigned_status = StatusOption.objects.filter(
-            kind=StatusOption.TICKET, code="assigned", is_active=True
-        ).first()
-        if assigned_status:
-            ticket.status = assigned_status
-
-    ticket.save(
-        update_fields=["assigned_to", "assigned_at", "status", "start_date", "due_date"]
-    )
-    ticket.log(
-        request.user,
-        "Reassigned" if previous else "Assigned",
-        f"to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}"
-        + (f" (was {previous.get_full_name() or previous.email})" if previous else "")
-        + (
-            f" · {a1daterange(ticket.start_date, ticket.due_date)}"
-            if ticket.start_date or ticket.due_date else ""
-        ),
-    )
-    # Tell them. Never blocks the assignment: a technician who has been given
-    # work has been given it whether or not the mail server agreed.
-    notifications.send(
-        to=ticket.assigned_to.email,
-        subject=f"{ticket.reference} assigned to you",
-        template="ticket_assigned",
-        context={
-            "ticket": ticket,
-            "technician_name": ticket.assigned_to.first_name or "Hello",
-            "assigned_by": request.user.get_full_name() or request.user.email,
-            "dates": a1daterange(ticket.start_date, ticket.due_date),
-            "url": notifications.link("crm-ticket-detail", ticket.pk),
-        },
+    assign_ticket(
+        ticket,
+        to=form.cleaned_data["assigned_to"],
+        actor=request.user,
+        start_date=form.cleaned_data.get("start_date"),
+        due_date=form.cleaned_data.get("due_date"),
     )
 
     messages.success(request, f"{ticket.reference} assigned to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}.")

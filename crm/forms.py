@@ -165,10 +165,50 @@ class TicketForm(forms.ModelForm):
             "service_type": "Sets the assessment questions the technician answers on site.",
         }
 
-    def __init__(self, *args, **kwargs):
+    # Shown only to somebody who may actually assign. A receptionist taking
+    # the call does not hold it and is not offered a control that would be
+    # refused; a supervisor raising a ticket for a technician they have
+    # already spoken to is not made to save, leave and come back.
+    assigned_to = forms.ModelChoiceField(
+        queryset=User.objects.none(),
+        required=False,
+        label="Assign to",
+        empty_label="Leave for a Supervisor to assign",
+    )
+    start_date = forms.DateField(
+        required=False, label="From",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+    due_date = forms.DateField(
+        required=False, label="Due by",
+        widget=forms.DateInput(attrs={"type": "date"}),
+    )
+
+    ASSIGNMENT_FIELDS = ["assigned_to", "start_date", "due_date"]
+
+    def __init__(self, *args, actor=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.actor = actor
         self.fields["customer"].queryset = Customer.objects.filter(is_active=True)
         self.fields["service_type"].queryset = ServiceType.objects.filter(is_active=True)
+
+        from accounts.decorators import user_has_permission
+
+        self.may_assign = actor is not None and user_has_permission(actor, "assign_ticket")
+        if not self.may_assign:
+            for name in self.ASSIGNMENT_FIELDS:
+                del self.fields[name]
+        else:
+            # Who can be sent to a job is a permission, not a job title —
+            # the same list the ticket list offers.
+            self.fields["assigned_to"].queryset = (
+                User.objects.filter(
+                    is_active=True,
+                    user_roles__role__permissions__code="view_own_job_list",
+                )
+                .distinct()
+                .order_by("first_name", "last_name")
+            )
         # Sites belong to a customer. Until one is chosen there is nothing
         # sensible to offer, and offering every site in the company invites
         # picking the wrong one. The page swaps the list in when a customer
@@ -176,6 +216,17 @@ class TicketForm(forms.ModelForm):
         # is checked against, so a site from another customer is refused.
         customer_id = self.data.get("customer") or getattr(self.instance, "customer_id", None)
         limit_sites_to_customer(self.fields["site"], customer_id, prompt="Which site?")
+
+    def clean(self):
+        cleaned = super().clean()
+        start, due = cleaned.get("start_date"), cleaned.get("due_date")
+        if start and due and start > due:
+            self.add_error("due_date", "The due date cannot be before the start date.")
+        return cleaned
+
+    def assignment_fields(self):
+        """The third step, rendered as its own block."""
+        return [self[name] for name in self.ASSIGNMENT_FIELDS if name in self.fields]
 
     def site_picker(self):
         return site_picker_data(self.fields["customer"].queryset, prompt="Which site?")
