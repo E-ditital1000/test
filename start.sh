@@ -66,6 +66,17 @@ python manage.py migrate --noinput
 echo "--> seeding permissions"
 python manage.py seed_permissions
 
+# The leave policy: the types, the entitlement bands and the public holiday
+# list. Here for the same reason the permissions are — without it the leave
+# screens deploy live and unusable, because nothing can be asked for until a
+# type exists, and no entitlement can be worked out until a band does.
+#
+# Idempotent in the way that matters: it creates what is missing and never
+# restates a figure HR has since changed, so a deploy cannot quietly put a
+# raised allowance back to the statutory floor.
+echo "--> seeding leave policy"
+python manage.py seed_leave
+
 echo "--> serving on ${PORT:-8000}"
 exec gunicorn inventoryproject.wsgi:application \
   --bind "0.0.0.0:${PORT:-8000}" \

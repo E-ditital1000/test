@@ -14,7 +14,7 @@ needs it or the camera will never start.
 | File | What it does |
 | --- | --- |
 | [`railway.json`](../railway.json) | Tells Railway to build with Nixpacks and start with `start.sh` |
-| [`start.sh`](../start.sh) | Migrates, seeds the permission list, then runs gunicorn on `$PORT` |
+| [`start.sh`](../start.sh) | Migrates, seeds the permission list and the leave policy, then runs gunicorn on `$PORT` |
 | [`.python-version`](../.python-version) | Pins the interpreter to 3.13, as used in development |
 | [`requirements.txt`](../requirements.txt) | Production dependencies only |
 | [`requirements-dev.txt`](../requirements-dev.txt) | The above plus pytest, esprima and Playwright |
@@ -80,7 +80,8 @@ system in earnest.
 
 ## 3. First deploy
 
-Push, or hit Deploy. `start.sh` migrates and seeds the permission list on the
+Push, or hit Deploy. `start.sh` migrates and seeds the permission list and
+the leave policy on the
 way up, so the database is ready without a manual step.
 
 Then create the first Admin, which is the only thing that cannot be
