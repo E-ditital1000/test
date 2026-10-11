@@ -24,7 +24,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase, tag
+from django.test import TestCase, override_settings, tag
 from django.urls import reverse
 
 from accounts.models import Role, UserRole
@@ -761,6 +761,63 @@ class LeaveScreenTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "employee register")
 
+
+
+    @tag("acceptance")
+    @override_settings(TESTING=False)
+    def test_a_hanging_mail_server_neither_errors_nor_loses_the_request(self):
+        """
+        The production incident, end to end.
+
+        A leave request submitted against a mail host that accepts the
+        connection and then says nothing came back "Internal Server Error"
+        and was gone afterwards: the send blocked on the request thread,
+        gunicorn killed the worker at sixty seconds, and the atomic block
+        rolled the request back.
+
+        There is no worker killer in a test runner, so the observable here
+        is time: before the fix this POST returned only after the hang, and
+        in production that wait was fatal.
+        """
+        import threading
+        import time
+
+        started = threading.Event()
+        release = threading.Event()
+
+        def hang(*args, **kwargs):
+            started.set()
+            release.wait(timeout=10)
+
+        self.client.force_login(self.worker)
+        began = time.monotonic()
+        try:
+            with patch("django.core.mail.EmailMessage.send", side_effect=hang):
+                response = self.client.post(
+                    reverse("hr-leave-create"),
+                    {
+                        "leave_type": self.annual.pk,
+                        "start_date": "2026-12-14",
+                        "end_date": "2026-12-16",
+                        "reason": "Travelling home for Christmas.",
+                    },
+                )
+            elapsed = time.monotonic() - began
+        finally:
+            release.set()
+
+        self.assertEqual(response.status_code, 302, "the person must not see an error")
+        self.assertTrue(
+            LeaveRequest.objects.filter(
+                employee=self.employee, start_date=date(2026, 12, 14)
+            ).exists(),
+            "their request must survive a mail server that never answers",
+        )
+        self.assertLess(
+            elapsed, 2.0,
+            "the response waited on the mail server — in production that wait "
+            "is what killed the worker and rolled the request back",
+        )
 
     def test_the_withdraw_url_does_not_break_on_a_plain_visit(self):
         """
