@@ -11,7 +11,7 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Role, UserRole
@@ -254,3 +254,124 @@ class ClockEventNotificationTests(TestCase):
 
         self.assertTrue(created)
         self.assertTrue(AttendanceEvent.objects.filter(pk=event.pk).exists())
+
+
+@override_settings(TESTING=False)
+class AMailServerThatHangsTests(TestCase):
+    """
+    The failure that reached production, and the one the original design
+    missed.
+
+    `send` caught every exception and claimed a notification could never
+    break the action that raised it. That was true of a refusal and false of
+    a hang: Railway drops outbound SMTP rather than refusing it, so the
+    connect blocked, gunicorn killed the worker after sixty seconds, and the
+    `transaction.atomic` the caller was inside rolled back — taking the leave
+    request the email was about with it. The person saw "Internal Server
+    Error" and their work was gone.
+
+    An `except Exception` cannot catch a hang. Only committing first, and
+    leaving the request thread, can.
+
+    TESTING is overridden off because that flag is what makes `send` deliver
+    inline for every other test in this file; these are the ones about what
+    happens when it does not.
+    """
+
+    def setUp(self):
+        mail.outbox = []
+
+    def _send(self):
+        from config import notifications
+
+        return notifications.send(
+            to="someone@test.local",
+            subject="Hello",
+            template="clock_event",
+            context={"employee_name": "Moses", "direction": "in"},
+            defer=True,
+        )
+
+    def test_nothing_is_attempted_until_the_transaction_commits(self):
+        """
+        The guarantee, stated as a test: nothing touches the network until
+        the work is durable.
+        """
+        sent = []
+        with patch(
+            "config.notifications._deliver_in_background",
+            side_effect=lambda *a: sent.append(a),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                self._send()
+                self.assertEqual(
+                    sent, [], "nothing may be attempted before the commit"
+                )
+            self.assertEqual(len(sent), 1, "and exactly once after it")
+
+    def test_a_rolled_back_action_announces_nothing(self):
+        """
+        The shape of the production failure: the send is queued, the work
+        then fails, and nothing is sent about a record that no longer
+        exists.
+        """
+        from django.db import transaction
+
+        sent = []
+        with patch(
+            "config.notifications._deliver_in_background",
+            side_effect=lambda *a: sent.append(a),
+        ):
+            with self.captureOnCommitCallbacks(execute=True) as callbacks:
+                with self.assertRaises(ValueError):
+                    with transaction.atomic():
+                        self._send()
+                        raise ValueError("the work failed after the mail was queued")
+
+        self.assertEqual(callbacks, [], "the hook should have been discarded")
+        self.assertEqual(sent, [], "a rolled-back action must not announce itself")
+
+    def test_a_send_that_never_returns_does_not_hold_the_caller(self):
+        """
+        A server that accepts the connection and then says nothing holds
+        whatever thread is talking to it. That thread must not be the one
+        rendering somebody's page.
+        """
+        import threading
+        import time
+
+        from config import notifications
+
+        started = threading.Event()
+        release = threading.Event()
+
+        def hang(*args, **kwargs):
+            started.set()
+            release.wait(timeout=10)
+
+        with patch("django.core.mail.EmailMessage.send", side_effect=hang):
+            began = time.monotonic()
+            notifications._deliver_in_background(
+                "A1 360 — Hello", "body", ["someone@test.local"], "clock_event"
+            )
+            elapsed = time.monotonic() - began
+
+            self.assertTrue(started.wait(timeout=5), "the attempt should have begun")
+            self.assertLess(
+                elapsed, 2.0,
+                "the caller returned only after the hanging send — that is the "
+                "bug this exists to prevent",
+            )
+            release.set()
+
+    def test_the_mail_timeout_cannot_outlast_the_worker_timeout(self):
+        """
+        gunicorn kills a worker at 60 seconds (see start.sh). A mail timeout
+        at or above that races it, and the worker loses.
+        """
+        from django.conf import settings as live
+
+        self.assertLessEqual(
+            live.EMAIL_TIMEOUT, 30,
+            "EMAIL_TIMEOUT must stay well under gunicorn's 60s worker timeout",
+        )

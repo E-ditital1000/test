@@ -314,7 +314,13 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 # configuration error Django will not catch until the first send fails.
 EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=EMAIL_PORT == 465)
 EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=EMAIL_PORT == 587)
-EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=20)
+# The backstop on a host that drops SMTP instead of refusing it. Railway
+# does exactly that below the Pro plan: the connect neither succeeds nor
+# fails, it simply hangs. Delivery now happens off the request thread, so
+# this no longer decides whether anybody sees an error — but it decides how
+# long a dead send sits holding a thread, so it stays well under gunicorn's
+# own 60-second worker timeout rather than racing it.
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 
 DEFAULT_FROM_EMAIL = env(
     "DEFAULT_FROM_EMAIL", default=f"A1 360 <{EMAIL_HOST_USER}>" if EMAIL_HOST_USER else ""

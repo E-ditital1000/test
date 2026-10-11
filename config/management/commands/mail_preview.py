@@ -49,8 +49,14 @@ class Command(BaseCommand):
                 for name, subject, context in self._samples():
                     if only and name != only:
                         continue
+                    # defer=False: these samples are built inside a
+                    # transaction that is deliberately rolled back, and an
+                    # on-commit hook in a transaction that never commits
+                    # would never fire. Nothing to send would look exactly
+                    # like everything sent.
                     ok = notifications.send(
-                        to=address, subject=subject, template=name, context=context
+                        to=address, subject=subject, template=name,
+                        context=context, defer=False,
                     )
                     sent.append((name, subject, ok))
                 raise _Rollback()
