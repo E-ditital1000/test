@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Request leave — HR — A1 360{% endblock %}
+
+{% block page_title %}{% if on_behalf %}Record leave{% else %}Request leave{% endif %}{% endblock %}
+{% block page_sub %}Rest days and public holidays are not counted{% endblock %}
+
+{% block content %}
+  {% if no_register_row %}
+    {% include "shell/_empty.html" with icon="hr" heading="You are not on the employee register" body="Leave is booked against an employee record, and there is not one for your account yet. Ask HR to add you from the employee register. Nothing is wrong with your sign-in — there is simply no record to book against." %}
+  {% else %}
+
+    <form method="post" enctype="multipart/form-data"
+          style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+      {% csrf_token %}
+
+      {% if on_behalf %}
+        <div class="msg msg-info">
+          You hold leave management, so you can raise this for anybody on the
+          register. The request stays theirs: they are told the outcome, not you.
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="stack">{% include "shell/_form_fields.html" %}</div>
+        <div class="note">
+          The days are counted for you. A span that falls entirely on rest
+          days or public holidays is refused, and a span that overlaps leave
+          you have already asked for is refused too — so a request cannot
+          quietly use the same days twice.
+        </div>
+      </div>
+
+      {% if balances %}
+        <div class="card compact">
+          <div class="hd"><b>What you have left</b><span class="meta">This leave year</span></div>
+          <div class="scroll-x">
+            <table style="min-width:520px">
+              <thead>
+                <tr>
+                  <th scope="col">Type</th>
+                  <th scope="col" class="num">Entitled</th>
+                  <th scope="col" class="num">Taken</th>
+                  <th scope="col" class="num">Waiting</th>
+                  <th scope="col" class="num">Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for balance in balances %}
+                  <tr>
+                    <td>{{ balance.leave_type.label }}</td>
+                    <td class="num mono">{% if balance.entitlement is None %}—{% else %}{{ balance.entitlement }}{% endif %}</td>
+                    <td class="num mono">{{ balance.taken }}</td>
+                    <td class="num mono dim">{{ balance.pending }}</td>
+                    <td class="num mono">
+                      {% if balance.needs_start_date %}
+                        <span class="dim">no start date</span>
+                      {% elif balance.remaining is None %}
+                        <span class="dim">not tracked</span>
+                      {% else %}<b>{{ balance.remaining }}</b>{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if holidays %}
+        <div class="card compact">
+          <div class="hd"><b>Public holidays coming up</b><span class="meta">Not counted against your leave</span></div>
+          <dl>
+            {% for holiday in holidays %}
+              <div class="kv">
+                <dt>{{ holiday.name }}</dt>
+                <dd class="mono">{{ holiday.date|a1date }}</dd>
+              </div>
+            {% endfor %}
+          </dl>
+        </div>
+      {% endif %}
+
+      <div class="form-actions">
+        <a class="btn btn-sec" href="{% url 'hr-leave-mine' %}">Cancel</a>
+        <button class="btn btn-pri" type="submit">
+          {% if on_behalf %}Record the request{% else %}Send to HR{% endif %}
+        </button>
+      </div>
+    </form>
+
+  {% endif %}
+{% endblock %}

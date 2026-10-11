@@ -261,6 +261,15 @@ def attendance_summary(user, year, month):
             "days_present": row["days_present"],
             "days_absent": row["days_absent"],
             "late_arrivals": row["late_arrivals"],
+            # Leave has to appear here or the month stops adding up. Without
+            # it, somebody away for a fortnight reads as neither present nor
+            # absent — two weeks simply missing from the row, with nothing
+            # on screen saying where they went.
+            #
+            # Combined, unlike the payroll CSV which splits paid from unpaid:
+            # this report is read on a screen by somebody asking who was in,
+            # and what a leave day is worth is payroll's question.
+            "days_on_leave": row["days_on_leave_paid"] + row["days_on_leave_unpaid"],
             "total_hours": round(row["total_minutes"] / 60, 2),
             "corrections": row["corrections"],
         }
@@ -357,19 +366,24 @@ REPORTS = OrderedDict(
         Report(
             key="attendance-summary",
             label="Attendance summary",
-            description="The month per employee, derived from the append-only attendance event log.",
+            description="The month per employee, derived from the append-only "
+                        "attendance event log and from approved leave.",
             permission="view_attendance_reports",
             columns=[
                 Column("employee", "Employee"),
                 Column("staff_id", "Staff ID"),
-                Column("days_present", "Days present", numeric=True),
+                Column("days_present", "Days worked", numeric=True),
                 Column("days_absent", "Days absent", numeric=True),
+                Column("days_on_leave", "On leave", numeric=True),
                 Column("late_arrivals", "Late", numeric=True),
                 Column("total_hours", "Total hours", numeric=True),
                 Column("corrections", "Corrections", numeric=True),
             ],
             build=attendance_summary,
-            totals=("days_present", "days_absent", "late_arrivals", "total_hours", "corrections"),
+            totals=(
+                "days_present", "days_absent", "days_on_leave",
+                "late_arrivals", "total_hours", "corrections",
+            ),
         ),
     ]
 )

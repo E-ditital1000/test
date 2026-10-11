@@ -35,6 +35,10 @@ ROLE_GRANTS = {
         ("view_attendance_records", SCOPE_ALL),
         ("view_attendance_reports", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
+        # Reads the whole company's leave; decides none of it.
+        ("view_leave", SCOPE_ALL),
+        ("view_leave_reports", SCOPE_ALL),
     ],
 
     # Invoices, payments, expenses, requisition approval, project cost,
@@ -54,10 +58,11 @@ ROLE_GRANTS = {
         ("view_reports", SCOPE_ALL),
         ("export_reports", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
     ],
 
     # Employee register, attendance records, corrections, attendance
-    # reports. No access to finance or customer data.
+    # reports, and leave. No access to finance or customer data.
     "HR": [
         ("view_dashboard", SCOPE_ALL),
         ("view_employees", SCOPE_ALL),
@@ -67,6 +72,15 @@ ROLE_GRANTS = {
         ("view_attendance_reports", SCOPE_ALL),
         ("manage_attendance_codes", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
+        # Leave decisions are HR's, by A-1's decision: one desk that knows
+        # the balance, rather than a supervisor approving days the
+        # entitlement does not cover.
+        ("request_leave", SCOPE_ALL),
+        ("view_leave", SCOPE_ALL),
+        ("approve_leave", SCOPE_ALL),
+        ("manage_leave", SCOPE_ALL),
+        ("manage_leave_types", SCOPE_ALL),
+        ("view_leave_reports", SCOPE_ALL),
     ],
 
     # Create customers and tickets, log calls, view ticket status. No
@@ -78,6 +92,7 @@ ROLE_GRANTS = {
         ("create_ticket", SCOPE_ALL),
         ("view_ticket_status", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
     ],
 
     # Assign jobs, review and approve assessments, daily roll-call,
@@ -102,6 +117,12 @@ ROLE_GRANTS = {
         ("view_attendance_records", SCOPE_OWN_TEAM),
         ("correct_attendance", SCOPE_OWN_TEAM),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
+        # Reads their own crew's leave, and decides none of it. A supervisor
+        # who cannot see that a technician is away next week will schedule
+        # them into it; a supervisor who could approve it would be approving
+        # days against a balance they cannot see.
+        ("view_leave", SCOPE_OWN_TEAM),
     ],
 
     # Own projects, tasks and crews; raise requisitions; view their
@@ -119,6 +140,7 @@ ROLE_GRANTS = {
         ("view_project_cost", SCOPE_OWN_PROJECTS),
         ("raise_requisition", SCOPE_OWN_PROJECTS),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
     ],
 
     # Own job list, GPS check-in, submit assessments, own attendance
@@ -140,13 +162,15 @@ ROLE_GRANTS = {
         # approval is still Finance's, above the threshold an Executive's.
         ("raise_requisition", SCOPE_OWN_PROJECTS),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
     ],
 
-    # Clock in and out, view own attendance history. The floor every
-    # staff account starts on.
+    # Clock in and out, view own attendance history, put in for leave. The
+    # floor every staff account starts on.
     "Employee": [
         ("view_dashboard", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
     ],
 }
 

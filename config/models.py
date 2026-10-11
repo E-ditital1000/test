@@ -172,6 +172,16 @@ class PolicySetting(TimeStampedModel):
     REQUISITION_THRESHOLD = "requisition_approval_threshold"
     WORKDAY_START = "attendance_workday_start"
     LATE_AFTER_MINUTES = "attendance_late_after_minutes"
+    # Which weekdays are rest days, as Python weekday numbers (Monday is 0,
+    # Sunday is 6). A-1 works Monday to Saturday, so this is "6". It is a
+    # setting and not a constant because it decides every leave figure in
+    # the system: a Thursday-to-Tuesday request is four days on a five-day
+    # week and five on a six-day one.
+    LEAVE_REST_DAYS = "leave_rest_days"
+    # The date leave started being tracked here. Days taken before it are
+    # outside the system, and the balance screens say so rather than
+    # implying everybody began the year with a full allowance.
+    LEAVE_TRACKED_FROM = "leave_tracked_from"
 
     key = models.SlugField(max_length=60, unique=True)
     value = models.CharField(max_length=120)

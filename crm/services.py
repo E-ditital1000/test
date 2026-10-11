@@ -94,3 +94,24 @@ def assign_ticket(ticket, *, to, actor, start_date=None, due_date=None):
         },
     )
     return ticket
+
+
+def leave_clash(ticket):
+    """
+    Approved leave covering the window this ticket is expected in, or None.
+
+    Returned rather than raised. Assigning work to somebody who is away is
+    sometimes exactly right — they are back before it is due, or they are
+    being recalled — so this tells the screen, and the screen tells the
+    person who decided. A refusal here would be worked around by not
+    recording the assignment at all, which is worse than a clash somebody
+    can see.
+    """
+    from hr import leave
+
+    if ticket.assigned_to_id is None:
+        return None
+    start = ticket.start_date or ticket.due_date
+    if start is None:
+        return None
+    return leave.conflict_for(ticket.assigned_to_id, start, ticket.due_date or start)

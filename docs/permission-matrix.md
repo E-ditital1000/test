@@ -24,6 +24,7 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `close_ticket` | crm | ✅ |  |  |  |  | ✅ |  |  |  |
 | `convert_ticket_to_project` | crm | ✅ |  |  |  |  |  | ✅ |  |  |
 | `view_projects` | projects | ✅ | ✅ | ✅ |  |  | ✅ | 📁 | 📁 |  |
+| `create_project` | projects | ✅ |  |  |  |  |  | ✅ |  |  |
 | `manage_project` | projects | ✅ |  |  |  |  |  | 📁 |  |  |
 | `view_project_cost` | projects | ✅ | ✅ | ✅ |  |  |  | 📁 |  |  |
 | `raise_requisition` | projects | ✅ |  |  |  |  |  | 📁 | 📁 |  |
@@ -51,6 +52,12 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `view_attendance_reports` | hr | ✅ | ✅ |  | ✅ |  |  |  |  |  |
 | `clock_in_out` | hr | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `manage_attendance_codes` | hr | ✅ |  |  | ✅ |  |  |  |  |  |
+| `request_leave` | hr | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `view_leave` | hr | ✅ | ✅ |  | ✅ |  | 👥 |  |  |  |
+| `approve_leave` | hr | ✅ |  |  | ✅ |  |  |  |  |  |
+| `manage_leave` | hr | ✅ |  |  | ✅ |  |  |  |  |  |
+| `manage_leave_types` | hr | ✅ |  |  | ✅ |  |  |  |  |  |
+| `view_leave_reports` | hr | ✅ | ✅ |  | ✅ |  |  |  |  |  |
 
 ## What each permission allows
 
@@ -78,6 +85,7 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 ### projects
 
 - `view_projects` — View project records
+- `create_project` — Start a project that did not come from a ticket
 - `manage_project` — Manage a project's tasks, crew and lifecycle stage
 - `view_project_cost` — View a project's running cost and revenue
 - `raise_requisition` — Raise a requisition against a project
@@ -115,3 +123,9 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 - `view_attendance_reports` — View the monthly attendance report
 - `clock_in_out` — Clock in and out, and view own attendance history
 - `manage_attendance_codes` — Create, print and revoke the attendance QR codes employees scan
+- `request_leave` — Put in for leave, and view own leave history and balance
+- `view_leave` — View leave requests and who is away
+- `approve_leave` — Approve or decline a leave request
+- `manage_leave` — Record or cancel leave on somebody's behalf, and adjust a balance
+- `manage_leave_types` — Manage leave types, entitlement rules and the public holiday list
+- `view_leave_reports` — View leave balances and entitlement across the company

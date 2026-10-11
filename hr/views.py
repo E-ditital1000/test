@@ -304,7 +304,7 @@ def roll_call(request):
     on_date = parse_date(request.GET.get("date") or "") or timezone.localdate()
     rows = services.roll_call(on_date=on_date, team=_team_for(request.user, "view_attendance_records"))
 
-    counts = {"present": 0, "late": 0, "absent": 0, "still_in": 0}
+    counts = {"present": 0, "late": 0, "absent": 0, "on_leave": 0, "still_in": 0}
     for row in rows:
         counts[row["state"]] = counts.get(row["state"], 0) + 1
         if row["day"] and row["day"].still_clocked_in:
@@ -439,6 +439,13 @@ def _monthly_csv(summary, year, month):
     The column contract a Phase Two payroll engine consumes unchanged.
     Changing a header here is a breaking change for that consumer, so the
     headers are written out literally rather than generated.
+
+    `days_on_leave_paid` and `days_on_leave_unpaid` were added with leave
+    management, deliberately breaking that contract: payroll has to be able
+    to tell a paid leave day from an absence, and before these columns
+    existed it could not. `days_present` narrowed at the same time to mean
+    days somebody actually worked — it used to mean "not absent", which
+    would have counted paid leave as attendance.
     """
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = (
@@ -454,6 +461,9 @@ def _monthly_csv(summary, year, month):
             "days_present",
             "days_absent",
             "late_arrivals",
+            "days_on_leave_paid",
+            "days_on_leave_unpaid",
+            "worked_while_on_leave",
             "total_hours",
             "corrections",
         ]
@@ -469,6 +479,9 @@ def _monthly_csv(summary, year, month):
                 row["days_present"],
                 row["days_absent"],
                 row["late_arrivals"],
+                row["days_on_leave_paid"],
+                row["days_on_leave_unpaid"],
+                row["worked_while_on_leave"],
                 round(row["total_minutes"] / 60, 2),
                 row["corrections"],
             ]

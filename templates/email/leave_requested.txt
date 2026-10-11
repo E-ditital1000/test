@@ -1,0 +1,23 @@
+{{ employee_name }} has put in for leave.
+
+  Type       {{ leave_type }}
+  Dates      {{ dates }}
+  Days       {{ days }} working day{{ days|pluralize }}{% if request.employee.department %}
+  Department {{ request.employee.department.name }}{% endif %}
+  Staff ID   {{ request.employee.staff_id }}{% if balance.remaining is not None %}
+  Remaining  {{ balance.remaining }} of {{ balance.entitlement }} day{{ balance.entitlement|pluralize }} this year{% elif balance.needs_start_date %}
+  Remaining  cannot be worked out — no start date on their record{% endif %}
+
+Why
+{{ reason }}{% if request.handover_note %}
+
+Handover
+{{ request.handover_note }}{% endif %}{% if request.contact_while_away %}
+
+Reachable on {{ request.contact_while_away }} while away.{% endif %}{% if request.document %}
+
+A supporting document is attached to the request.{% endif %}
+{% if url %}
+Decide it: {{ url }}
+{% endif %}
+Sent to everyone who may approve leave.

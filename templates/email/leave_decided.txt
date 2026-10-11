@@ -1,0 +1,16 @@
+{{ employee_name }},
+
+Your leave request was {{ outcome }}.
+
+  Type       {{ leave_type }}
+  Dates      {{ dates }}
+  Days       {{ days }} working day{{ days|pluralize }}
+  Decided by {{ decided_by }}
+{% if comment %}
+What they said
+{{ comment }}
+{% endif %}{% if was_approved %}
+Please make sure your handover is settled before you go.
+{% endif %}{% if url %}
+Your leave: {{ url }}
+{% endif %}

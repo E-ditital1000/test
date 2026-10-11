@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Leave balances — HR — A1 360{% endblock %}
+
+{% block page_title %}Leave balances — {{ year }}{% endblock %}
+{% block page_sub %}Entitlement from length of service · computed, never stored{% endblock %}
+{% block page_actions %}
+  <form method="get" style="display:flex;gap:8px;align-items:center">
+    <select name="year" aria-label="Leave year" style="min-height:40px">
+      {% for option in years %}
+        <option value="{{ option }}" {% if option == year %}selected{% endif %}>{{ option }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sec" type="submit">Show</button>
+  </form>
+  {% if can_manage %}
+    <a class="btn btn-pri" href="{% url 'hr-leave-adjustment-create' %}">Adjust a balance</a>
+  {% endif %}
+{% endblock %}
+
+{% comment %}
+Every figure here is worked out when the page is asked for: entitlement from
+the rules table and length of service, minus approved leave, plus whatever
+HR has corrected by hand. There is no stored balance column to drift out of
+step with the requests behind it.
+
+The column that matters most is the missing-start-date warning. Tenure-based
+entitlement cannot be computed without a start date, and this is where that
+gap is visible instead of silently rendering as zero.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="leave_balances" %}
+
+  {% if missing_start_date %}
+    <div class="msg msg-error">
+      {{ missing_start_date }} employee{{ missing_start_date|pluralize }} on this
+      list {{ missing_start_date|pluralize:"has,have" }} no start date on their
+      record, so no entitlement can be worked out for them. Add it on the
+      employee record — until then their row shows a dash rather than a figure
+      nobody can stand behind.
+    </div>
+  {% endif %}
+
+  {% if tracked_from %}
+    <div class="note">
+      Leave has been tracked here since {{ tracked_from|a1date }}. Days taken
+      before that date are not in these figures unless HR has recorded an
+      adjustment for them.
+    </div>
+  {% endif %}
+
+  {% if rows %}
+    <div class="card compact">
+      <div class="hd"><b>The register</b><span class="meta">Entitled · taken · left</span></div>
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col" class="num">Service</th>
+              {% for type in types %}
+                <th scope="col" class="num">{{ type.label }}</th>
+              {% endfor %}
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <b>{{ row.employee|a1register_name }}</b>
+                  {% if row.employee.department %}<br><span class="dim2">{{ row.employee.department.name }}</span>{% endif %}
+                </td>
+                <td class="num mono dim2">
+                  {% if row.months is None %}
+                    <span class="bad">no start date</span>
+                  {% else %}{{ row.months }} mo{% endif %}
+                </td>
+                {% for balance in row.balances %}
+                  <td class="num mono">
+                    {% if balance.needs_start_date %}
+                      <span class="dim2">—</span>
+                    {% elif not balance.is_tracked %}
+                      <span class="dim2">{{ balance.taken }} taken</span>
+                    {% else %}
+                      <b {% if balance.remaining <= 0 %}class="bad"{% endif %}>{{ balance.remaining }}</b>
+                      <span class="dim2">/ {{ balance.entitlement }}</span>
+                      {% if balance.pending %}<br><span class="dim2">{{ balance.pending }} waiting</span>{% endif %}
+                      {% if balance.adjustment %}<br><span class="dim2">adj {{ balance.adjustment|stringformat:"+d" }}</span>{% endif %}
+                    {% endif %}
+                  </td>
+                {% endfor %}
+                <td class="acts">
+                  {% if can_manage %}
+                    <a class="btn btn-sec btn-sm"
+                       href="{% url 'hr-leave-adjustment-create' %}?employee={{ row.employee.pk }}">Adjust</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "shell/_pager.html" with page=rows noun="employee" plural="employees" %}
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="hr" heading="Nobody on the register yet" body="Leave balances are worked out per employee from their start date and the entitlement bands in leave settings. Once there are people on the employee register, their figures appear here." %}
+  {% endif %}
+
+  {% if not types %}
+    {% url 'hr-leave-settings' as settings_url %}
+    <div class="card">
+      <div class="note">
+        No leave types are set up, so there is nothing to compute. Add them,
+        and the entitlement bands behind them, in leave settings.
+      </div>
+      <div class="form-actions">
+        <a class="btn btn-pri" href="{{ settings_url }}">Open leave settings</a>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

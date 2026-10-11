@@ -1,0 +1,21 @@
+{% comment %}
+One pill for a leave request's state, so eight screens cannot disagree about
+what "returned" looks like.
+
+Params: state (the approval decision string, or empty for a request with no
+trail at all — which should not happen, and reads as "not raised" rather
+than silently rendering nothing).
+{% endcomment %}
+{% if state == "approved" %}
+  <span class="pill p-appr"><i></i>Approved</span>
+{% elif state == "declined" %}
+  <span class="pill p-over"><i></i>Declined</span>
+{% elif state == "returned" %}
+  <span class="pill p-wait"><i></i>Sent back</span>
+{% elif state == "cancelled" %}
+  <span class="pill p-clos"><i></i>Withdrawn</span>
+{% elif state == "submitted" %}
+  <span class="pill p-wait"><i></i>Waiting on HR</span>
+{% else %}
+  <span class="pill p-clos"><i></i>Not raised</span>
+{% endif %}

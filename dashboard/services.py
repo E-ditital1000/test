@@ -88,6 +88,41 @@ def attention_queue(user, limit=12):
                 )
             )
 
+    # -- leave waiting on a decision ------------------------------------
+    if user_has_permission(user, "approve_leave"):
+        from hr import leave as leave_services
+        from hr.models import LeaveRequest
+
+        waiting = apply_scope(
+            LeaveRequest.objects.select_related(
+                "employee__user", "employee__department", "leave_type"
+            ),
+            user,
+            "approve_leave",
+            own_team_filter=Q(employee__supervisor__user=user),
+        )
+        today = timezone.localdate()
+        for request, state in leave_services.with_states(waiting):
+            if state not in ("submitted", "returned"):
+                continue
+            # Leave that starts sooner is more urgent than leave that was
+            # asked for earlier: somebody is waiting to know whether to make
+            # arrangements. Ageing the item from its start date is what moves
+            # it up a queue sorted by how long things have waited.
+            starts_in = (request.start_date - today).days
+            items.append(
+                Item(
+                    kind="Leave",
+                    label=f"{request.employee.full_name} — {request.leave_type.label}",
+                    detail=f"{a1date(request.start_date)} for "
+                    f"{request.working_days} working day"
+                    f"{'' if request.working_days == 1 else 's'}",
+                    waiting_since=request.created_at,
+                    url=reverse("hr-leave-detail", args=[request.pk]),
+                    tone="over" if starts_in <= 3 else "wait",
+                )
+            )
+
     # -- money waiting on a decision ------------------------------------
     if user_has_permission(user, "approve_requisition"):
         from finance.views import _pending_requisitions
@@ -203,6 +238,22 @@ def attention_count(user):
     badge sends people to a list that does not match it.
     """
     total = 0
+
+    if user_has_permission(user, "approve_leave"):
+        from hr import leave as leave_services
+        from hr.models import LeaveRequest
+
+        waiting = apply_scope(
+            LeaveRequest.objects.all(),
+            user,
+            "approve_leave",
+            own_team_filter=Q(employee__supervisor__user=user),
+        )
+        total += sum(
+            1
+            for _request, state in leave_services.with_states(waiting)
+            if state in ("submitted", "returned")
+        )
 
     if user_has_permission(user, "review_assessment"):
         from approvals.models import latest_decisions

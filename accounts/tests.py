@@ -80,6 +80,18 @@ ENDPOINTS = {
     # Attendance codes
     "hr-codes": "manage_attendance_codes",
     "hr-code-create": "manage_attendance_codes",
+    # Leave. Asking is the floor every account holds; deciding is HR's, and
+    # a supervisor reads their own crew's without holding the pen.
+    "hr-leave-mine": "request_leave",
+    "hr-leave-create": "request_leave",
+    "hr-leave-queue": "view_leave",
+    "hr-leave-calendar": "view_leave",
+    "hr-leave-balances": "view_leave_reports",
+    "hr-leave-adjustment-create": "manage_leave",
+    "hr-leave-settings": "manage_leave_types",
+    "hr-leave-type-create": "manage_leave_types",
+    "hr-leave-rule-create": "manage_leave_types",
+    "hr-leave-holiday-create": "manage_leave_types",
 }
 
 # Endpoints the matrix cannot GET meaningfully: they only accept POST, so a

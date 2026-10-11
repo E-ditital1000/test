@@ -75,7 +75,14 @@ class Command(BaseCommand):
         from config.models import ServiceType, StatusOption
         from crm.models import Customer, Site, Ticket
         from fieldjobs.models import Assessment, FieldJob
-        from hr.models import Department, Employee
+        from hr import leave as leave_services
+        from hr.models import (
+            Department,
+            Employee,
+            LeaveEntitlementRule,
+            LeaveRequest,
+            LeaveType,
+        )
         from projects.models import Project, Requisition, Task
 
         User = get_user_model()
@@ -116,6 +123,10 @@ class Command(BaseCommand):
         employee = Employee.objects.create(
             user=technician, staff_id="A1-0042",
             job_title="Senior Technician", department=department,
+            # Set, so the leave samples show a real balance rather than the
+            # "no start date on their record" branch. That branch is worth
+            # seeing too, and the balances screen is where it belongs.
+            start_date=today - timedelta(days=800),
         )
 
         ticket = Ticket.objects.create(
@@ -155,6 +166,24 @@ class Command(BaseCommand):
             description="Four 450 W panels and 30 m of 6 mm cable for the theatre run.",
             amount=1850, raised_by=technician,
             needed_by=today + timedelta(days=4),
+        )
+        annual = LeaveType.objects.filter(code="annual").first() or LeaveType.objects.create(
+            code="annual", label="Annual leave"
+        )
+        if not annual.entitlement_rules.exists():
+            LeaveEntitlementRule.objects.create(
+                leave_type=annual, after_months=0, days=12
+            )
+        leave_request = LeaveRequest.objects.create(
+            employee=employee, leave_type=annual,
+            start_date=today + timedelta(days=14),
+            end_date=today + timedelta(days=18),
+            working_days=5,
+            reason="My sister is getting married in Gbarnga and I am standing for her.",
+            handover_note="The Zwedru array is torqued; Sam has the calibrated wrench "
+                          "and the sign-off sheet.",
+            contact_while_away="0770 123 456",
+            submitted_by=technician,
         )
 
         return [
@@ -240,6 +269,59 @@ class Command(BaseCommand):
                     if hasattr(requisition.needed_by, "strftime") else "",
                     "threshold_note": "Finance can approve it.",
                     "url": link("finance-requisitions"),
+                },
+            ),
+            (
+                "leave_requested",
+                "Leave request from Moses Toe",
+                {
+                    "request": leave_request,
+                    "employee_name": "Moses Toe",
+                    "leave_type": annual.label,
+                    "dates": a1daterange(
+                        leave_request.start_date, leave_request.end_date
+                    ),
+                    "days": leave_request.working_days,
+                    "reason": leave_request.reason,
+                    "balance": leave_services.balance_for(employee, annual),
+                    "url": link("hr-leave-detail", leave_request.pk),
+                },
+            ),
+            (
+                "leave_decided",
+                "Your leave request was approved",
+                {
+                    "request": leave_request,
+                    "employee_name": "Moses",
+                    "leave_type": annual.label,
+                    "dates": a1daterange(
+                        leave_request.start_date, leave_request.end_date
+                    ),
+                    "days": leave_request.working_days,
+                    "reason": leave_request.reason,
+                    "outcome": "approved",
+                    "was_approved": True,
+                    "comment": "Enjoy it. Make sure Sam has the sign-off sheet.",
+                    "decided_by": "Grace Kollie",
+                    "url": link("hr-leave-mine"),
+                },
+            ),
+            (
+                "leave_cancelled",
+                "Your approved leave has been cancelled",
+                {
+                    "request": leave_request,
+                    "employee_name": "Moses",
+                    "leave_type": annual.label,
+                    "dates": a1daterange(
+                        leave_request.start_date, leave_request.end_date
+                    ),
+                    "days": leave_request.working_days,
+                    "reason": leave_request.reason,
+                    "by_the_employee": False,
+                    "cancelled_by": "Grace Kollie",
+                    "comment": "The CRS commissioning moved onto that week.",
+                    "url": link("hr-leave-mine"),
                 },
             ),
         ]

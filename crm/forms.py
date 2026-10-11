@@ -5,6 +5,24 @@ from config.models import ServiceType, StatusOption
 
 from .models import Contact, Customer, Site, Ticket
 
+
+def _mark_who_is_away(field):
+    """
+    Note approved leave beside a technician's name in an assignment picker.
+
+    Marked, never filtered. A technician can be recalled from leave, and a
+    scheduler who cannot see the person they need will assign the work
+    outside the system — see hr.leave.away_labels for the full reasoning.
+    Imported lazily because crm must not depend on hr at import time.
+    """
+    from accounts.templatetags.a1 import a1name
+    from hr import leave
+
+    away = leave.away_labels()
+    field.label_from_instance = lambda user: leave.mark_away(
+        a1name(user) or user.email, user.pk, away
+    )
+
 User = get_user_model()
 
 
@@ -209,6 +227,7 @@ class TicketForm(forms.ModelForm):
                 .distinct()
                 .order_by("first_name", "last_name")
             )
+            _mark_who_is_away(self.fields["assigned_to"])
         # Sites belong to a customer. Until one is chosen there is nothing
         # sensible to offer, and offering every site in the company invites
         # picking the wrong one. The page swaps the list in when a customer
@@ -352,6 +371,7 @@ class TicketAssignForm(forms.Form):
             .distinct()
             .order_by("first_name", "last_name")
         )
+        _mark_who_is_away(self.fields["assigned_to"])
 
 
 class TicketStatusForm(forms.ModelForm):

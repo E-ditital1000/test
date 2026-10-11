@@ -58,6 +58,10 @@ SCENARIOS = [
     ("JavaScript parses",
      "Every script this system ships, including the offline layer and the "
      "service worker, is parsed rather than trusted"),
+    ("Leave is counted on the working week",
+     "A six-day week and the public holiday list decide what a leave day "
+     "costs; approved leave stops reading as an absence, and payroll can "
+     "still tell a paid leave day from an unexplained one"),
 ]
 
 # Proven on a device, not in a test runner. Named here so a partial pass is

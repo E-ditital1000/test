@@ -5,6 +5,7 @@ from config.models import ServiceType
 from crm.forms import limit_sites_to_customer, site_picker_data
 from crm.models import Customer
 
+from hr import leave
 from hr.models import Employee
 
 from .models import FieldJob
@@ -102,28 +103,39 @@ class FieldJobForm(forms.ModelForm):
         )
         self.fields["assigned_to"].empty_label = "Choose a technician…"
 
+        # Who is away, marked on every picker rather than filtered out of it
+        # — see hr.leave.away_labels for why marking beats refusing. Without
+        # this, the most expensive scheduling mistake the office can make is
+        # invisible on the screen where it is made: sending somebody to
+        # Zwedru on a day their leave was already approved.
+        away = leave.away_labels()
+
+        # Mark the people already on this project too, rather than filtering
+        # the rest out. A supervisor sending an extra body to a site is
+        # ordinary, and a form that refuses it would be worked around by not
+        # using the form.
+        on_project = set()
         if project is not None:
-            # Mark the people already on this project, rather than filtering
-            # the rest out. A supervisor sending an extra body to a site is
-            # ordinary, and a form that refuses it would be worked around by
-            # not using the form.
-            on_project = set(
-                project.crew.values_list("employee__user_id", flat=True)
-            )
+            on_project = set(project.crew.values_list("employee__user_id", flat=True))
             if project.manager_id:
                 on_project.add(project.manager_id)
 
-            def mark_user(user):
-                name = user.get_full_name() or user.email
-                return f"{name} — on this project" if user.pk in on_project else name
+        def mark_user(user):
+            name = user.get_full_name() or user.email
+            if user.pk in on_project:
+                name = f"{name} — on this project"
+            return leave.mark_away(name, user.pk, away)
 
-            def mark_employee(employee):
-                label = f"{employee.staff_id} · {employee.full_name}"
-                return f"{label} — on this project" if employee.user_id in on_project else label
+        def mark_employee(employee):
+            label = f"{employee.staff_id} · {employee.full_name}"
+            if employee.user_id in on_project:
+                label = f"{label} — on this project"
+            return leave.mark_away(label, employee.user_id, away)
 
-            self.fields["assigned_to"].label_from_instance = mark_user
-            self.fields["crew"].label_from_instance = mark_employee
+        self.fields["assigned_to"].label_from_instance = mark_user
+        self.fields["crew"].label_from_instance = mark_employee
 
+        if project is not None:
             # Scheduled against a project: the customer, site and service type
             # come with it, so they are shown but not re-asked.
             for name in ("customer", "service_type"):

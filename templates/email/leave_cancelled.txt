@@ -1,0 +1,16 @@
+{% if by_the_employee %}{{ employee_name }} has withdrawn a leave request.{% else %}{{ employee_name }},
+
+Leave that had been approved for you has been cancelled.{% endif %}
+
+  Type       {{ leave_type }}
+  Dates      {{ dates }}
+  Days       {{ days }} working day{{ days|pluralize }}
+  Cancelled by {{ cancelled_by }}
+{% if comment %}
+What they said
+{{ comment }}
+{% endif %}{% if not by_the_employee %}
+If you were counting on those days, speak to HR before making other plans.
+{% endif %}{% if url %}
+The request: {{ url }}
+{% endif %}

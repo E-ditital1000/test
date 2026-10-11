@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit{% else %}Add{% endif %} public holiday — HR — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit public holiday{% else %}Add public holiday{% endif %}{% endblock %}
+{% block page_sub %}A day no leave request consumes{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">Holidays are entered per year rather than worked out from rules, because several of Liberia's move and any of them can be shifted by proclamation. A date already on the list is refused rather than duplicated.</div>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'hr-leave-settings' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

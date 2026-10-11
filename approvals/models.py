@@ -19,12 +19,25 @@ class Approval(TimeStampedModel):
     APPROVED = "approved"
     RETURNED = "returned"
     ESCALATED = "escalated"
+    # Added for leave, and meaningful for anything else approved here.
+    # "Returned" means fix it and send it back; "declined" is an answer, and
+    # the two cannot be collapsed without lying to the person waiting.
+    # "Cancelled" is the subject withdrawing their own request before it is
+    # decided, which is not a decision anybody made about them.
+    DECLINED = "declined"
+    CANCELLED = "cancelled"
     DECISIONS = [
         (SUBMITTED, "Submitted"),
         (APPROVED, "Approved"),
         (RETURNED, "Returned"),
         (ESCALATED, "Escalated"),
+        (DECLINED, "Declined"),
+        (CANCELLED, "Cancelled"),
     ]
+
+    # Saying no, or sending something back, has to say why. The person
+    # waiting gets this comment and nothing else.
+    MUST_EXPLAIN = (RETURNED, DECLINED)
 
     content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
     object_id = models.PositiveIntegerField()
@@ -99,8 +112,12 @@ class ApprovalTrailMixin:
         return self.approval_state == Approval.APPROVED
 
     def record_decision(self, *, decision, actor, comment=""):
-        if decision == Approval.RETURNED and not comment.strip():
-            raise ValueError("Returning requires a comment.")
+        if decision in Approval.MUST_EXPLAIN and not comment.strip():
+            raise ValueError(
+                "Returning requires a comment."
+                if decision == Approval.RETURNED
+                else "Declining requires a reason — the person waiting sees it."
+            )
         return Approval.objects.create(
             content_type=ContentType.objects.get_for_model(self.__class__),
             object_id=self.pk,

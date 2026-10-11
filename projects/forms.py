@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from accounts.templatetags.a1 import a1datetime, a1name
 from fieldjobs.models import FieldJob
+from hr import leave
 from hr.models import Employee
 
 from .models import Project, ProjectCrew, ProjectDocument, Requisition, RequisitionItem, Task
@@ -74,6 +75,15 @@ class TaskForm(forms.ModelForm):
                 )
 
         self.fields["assignee"].queryset = people.order_by("first_name", "last_name")
+
+        # Marked, not filtered: somebody on leave can still be given a task
+        # that starts after they are back, and a scheduler who cannot see the
+        # person they need will work outside the system. See
+        # hr.leave.away_labels.
+        away = leave.away_labels()
+        self.fields["assignee"].label_from_instance = lambda user: leave.mark_away(
+            a1name(user) or user.email, user.pk, away
+        )
 
         # Which visit this is part of, where it is part of one. Only this
         # project's visits: a checklist for somebody else's day on somebody

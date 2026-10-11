@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{% if instance %}Edit{% else %}Add{% endif %} leave type — HR — A1 360{% endblock %}
+
+{% block page_title %}{% if instance %}Edit leave type{% else %}Add leave type{% endif %}{% endblock %}
+{% block page_sub %}Leave types are retired, never deleted{% endblock %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:640px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">Retiring a type stops it being offered on new requests and leaves every request already recorded against it exactly where it is. How many days it carries is set separately, as entitlement bands.</div>
+    </div>
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'hr-leave-settings' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save</button>
+    </div>
+  </form>
+{% endblock %}

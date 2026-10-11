@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}My leave — HR — A1 360{% endblock %}
+
+{% block page_title %}My leave{% endblock %}
+{% block page_sub %}What you have left, and what you have asked for{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-pri" href="{% url 'hr-leave-create' %}">Request leave</a>
+{% endblock %}
+
+{% comment %}
+An employee sees their own balance for the same reason they see their own
+attendance: a figure nobody can check is a figure nobody trusts, and the
+first question anybody asks about leave is "how much have I got left".
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="my_leave" %}
+
+  {% if not employee %}
+    {% include "shell/_empty.html" with icon="hr" heading="You are not on the employee register" body="Leave is booked against an employee record, and there is not one for your account yet. HR can add you from the employee register — until then there is nothing here to show, and nothing is wrong with your account." %}
+  {% else %}
+
+    {% if balances %}
+      <div class="mrow">
+        {% for balance in balances %}
+          {% if balance.is_tracked %}
+            <div class="metric {% if balance.needs_start_date %}alert{% elif balance.remaining == 0 %}alert{% endif %}">
+              <span>{{ balance.leave_type.label }}</span>
+              {% if balance.needs_start_date %}
+                <b>—</b>
+                <em>needs a start date on your record</em>
+              {% else %}
+                <b>{{ balance.remaining }}</b>
+                <em>
+                  of {{ balance.entitlement }} day{{ balance.entitlement|pluralize }} ·
+                  {{ balance.taken }} taken{% if balance.pending %} · {{ balance.pending }} waiting{% endif %}
+                </em>
+              {% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if tracked_from %}
+        <div class="note">
+          Leave has been tracked in this system since {{ tracked_from|a1date }}.
+          Days taken before then are not counted here — if a figure looks
+          wrong, HR can correct it with a note on the record.
+        </div>
+      {% endif %}
+    {% endif %}
+
+    {% if requests %}
+      <div class="card compact">
+        <div class="hd"><b>Your requests</b><span class="meta">Newest first</span></div>
+        <div class="scroll-x">
+          <table style="min-width:760px">
+            <thead>
+              <tr>
+                <th scope="col">Dates</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="num">Days</th>
+                <th scope="col">State</th>
+                <th scope="col">What was said</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in requests %}
+                <tr>
+                  <td><b>{{ row.start_date|a1daterange:row.end_date }}</b></td>
+                  <td>{{ row.leave_type.label }}</td>
+                  <td class="num mono">{{ row.working_days }}</td>
+                  <td>{% include "hr/_leave_state.html" with state=row.current_state %}</td>
+                  <td class="dim">
+                    {% if row.current_decision.comment %}
+                      {{ row.current_decision.comment }}
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="acts">
+                    {% if row.current_state == "submitted" or row.current_state == "returned" %}
+                      <form method="post" action="{% url 'hr-leave-cancel' row.pk %}"
+                            onsubmit="return confirm('Withdraw this request?')">
+                        {% csrf_token %}
+                        <button class="btn btn-sec btn-sm" type="submit">Withdraw</button>
+                      </form>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      {% url 'hr-leave-create' as create_url %}
+      {% include "shell/_empty.html" with icon="hr" heading="You have not asked for any leave yet" body="A request goes to HR, who approve or decline it. You will get an email either way, with their reason if the answer is no. Rest days and public holidays are not counted, so you only use up the days you would otherwise have worked." primary_label="Request leave" primary_url=create_url %}
+    {% endif %}
+
+  {% endif %}
+{% endblock %}

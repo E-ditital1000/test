@@ -120,18 +120,76 @@ def _summarise(day_rows, workday_start, grace_minutes):
     }
 
 
+def approved_leave_days(employee=None, since=None, until=None, team=None, cap_at_today=True):
+    """
+    {(employee_id, date): LeaveType} for every day approved leave covers in
+    this slice.
+
+    **The single answer to "was this person on approved leave that day".**
+    Three callers share it, deliberately: the rebuild below writes it into
+    AttendanceDay so the export and payroll see it, and the roll-call and the
+    monthly report read it directly. They have to read it directly as well as
+    through the table, because somebody on leave generates no clock event, so
+    nothing triggers a rebuild for their day — and a derived table that is
+    only refreshed by activity cannot describe an absence.
+
+    `cap_at_today` is what keeps the stored table honest: AttendanceDay
+    describes days that have happened, and writing rows for leave granted for
+    next March would put months of fictional history in the table every
+    report reads. The screens pass False when they are showing a window that
+    runs into the future.
+    """
+    from .leave import only_approved, working_days
+    from .models import LeaveRequest
+
+    today = timezone.localdate()
+    first = timezone.localtime(since).date() if hasattr(since, "tzinfo") and since is not None else since
+    last = timezone.localtime(until).date() if hasattr(until, "tzinfo") and until is not None else until
+    if cap_at_today:
+        last = min(last, today) if last is not None else today
+
+    requests = LeaveRequest.objects.select_related("leave_type", "employee")
+    if employee is not None:
+        requests = requests.filter(employee=employee)
+    if team is not None:
+        requests = requests.filter(employee__in=team)
+    if last is not None:
+        requests = requests.filter(start_date__lte=last)
+    if first is not None:
+        requests = requests.filter(end_date__gte=first)
+
+    covered = {}
+    # Approval is read from the trail, not from a column, so this cannot
+    # drift from what the leave screens show — in one query, not one per
+    # request, because the roll-call calls this on every page load.
+    for request in only_approved(requests):
+        window_start = request.start_date if first is None else max(request.start_date, first)
+        window_end = request.end_date if last is None else min(request.end_date, last)
+        for day in working_days(window_start, window_end):
+            covered[(request.employee_id, day)] = request.leave_type
+    return covered
+
+
 @transaction.atomic
 def rebuild_attendance_days(employee=None, since=None, until=None):
     """
     Recompute the derived rows for the given slice and return how many were
-    written. Safe to run at any time: it is a pure function of the event
-    log, so running it twice produces the same table.
+    written. Safe to run at any time: it is a pure function of the event log
+    and of approved leave, so running it twice produces the same table.
+
+    A day with clock events is summarised from them. A day with no events
+    that approved leave covers becomes an `on_leave` row, so it stops
+    reading as an absence. A day with both keeps what the events say and
+    carries `on_leave` as well — somebody recalled from leave worked, and
+    the record says so.
     """
     workday_start, grace_minutes = _late_policy()
 
     grouped = defaultdict(list)
     for row in effective_events(employee=employee, since=since, until=until):
         grouped[(row[0], row[1])].append(row)
+
+    on_leave = approved_leave_days(employee=employee, since=since, until=until)
 
     scope = AttendanceDay.objects.all()
     if employee is not None:
@@ -142,14 +200,40 @@ def rebuild_attendance_days(employee=None, since=None, until=None):
         scope = scope.filter(date__lte=timezone.localtime(until).date())
     scope.delete()
 
-    days = [
-        AttendanceDay(
-            employee_id=employee_id,
-            date=date,
-            **_summarise(rows, workday_start, grace_minutes),
+    days = []
+    for (employee_id, date), rows in grouped.items():
+        leave_type = on_leave.get((employee_id, date))
+        days.append(
+            AttendanceDay(
+                employee_id=employee_id,
+                date=date,
+                on_leave=leave_type is not None,
+                leave_type=leave_type,
+                **_summarise(rows, workday_start, grace_minutes),
+            )
         )
-        for (employee_id, date), rows in grouped.items()
-    ]
+
+    # Leave days nobody clocked on. These have no events at all, so they
+    # would otherwise have no row — which is exactly how an approved absence
+    # used to read as an unexplained one.
+    for (employee_id, date), leave_type in on_leave.items():
+        if (employee_id, date) in grouped:
+            continue
+        days.append(
+            AttendanceDay(
+                employee_id=employee_id,
+                date=date,
+                state=AttendanceDay.ON_LEAVE,
+                on_leave=True,
+                leave_type=leave_type,
+                first_in=None,
+                last_out=None,
+                total_minutes=0,
+                still_clocked_in=False,
+                correction_count=0,
+            )
+        )
+
     AttendanceDay.objects.bulk_create(days)
     return len(days)
 
@@ -394,22 +478,59 @@ def roll_call(supervisor_employee=None, on_date=None, team=None):
 
     days = {
         day.employee_id: day
-        for day in AttendanceDay.objects.filter(employee__in=people, date=on_date)
+        for day in AttendanceDay.objects.filter(
+            employee__in=people, date=on_date
+        ).select_related("leave_type")
     }
+    # Read directly rather than trusting a row to exist. Somebody on leave
+    # files no clock event, so nothing triggers a rebuild for their day.
+    #
+    # Uncapped, because this screen takes a date: a supervisor looking at
+    # next Tuesday has to see who is already away on it. The cap exists to
+    # keep *stored* rows free of fictional history, which is not this.
+    on_leave = approved_leave_days(
+        team=people, since=on_date, until=on_date, cap_at_today=False
+    )
 
-    # Exceptions sort to the top: absent, then still clocked in, then late,
-    # then everyone who simply turned up.
+    # Exceptions sort to the top: an unexplained absence first, then somebody
+    # who never clocked out, then somebody who worked a day they were granted
+    # off, then lateness. People who simply turned up, and people who are
+    # away with permission, are not exceptions and sort last.
     priority = {
         AttendanceDay.ABSENT: 0,
-        AttendanceDay.LATE: 2,
-        AttendanceDay.PRESENT: 3,
+        AttendanceDay.LATE: 3,
+        AttendanceDay.PRESENT: 4,
+        AttendanceDay.ON_LEAVE: 5,
     }
     rows = []
     for person in people:
         day = days.get(person.pk)
+        leave_type = on_leave.get((person.pk, on_date))
         state = day.state if day else AttendanceDay.ABSENT
-        order = 1 if (day and day.still_clocked_in) else priority.get(state, 3)
-        rows.append({"employee": person, "day": day, "state": state, "order": order})
+
+        worked = state in AttendanceDay.WORKED
+        # Granted the day off and no sign of them: expected, not an exception.
+        if leave_type is not None and not worked:
+            state = AttendanceDay.ON_LEAVE
+        worked_while_on_leave = leave_type is not None and worked
+
+        if day and day.still_clocked_in:
+            order = 1
+        elif worked_while_on_leave:
+            order = 2
+        else:
+            order = priority.get(state, 4)
+
+        rows.append(
+            {
+                "employee": person,
+                "day": day,
+                "state": state,
+                "order": order,
+                "leave_type": leave_type,
+                "worked_while_on_leave": worked_while_on_leave,
+            }
+        )
 
     rows.sort(key=lambda row: (row["order"], row["employee"].staff_id))
     return rows
@@ -430,21 +551,56 @@ def monthly_summary(year, month, team=None):
     people = team if team is not None else Employee.objects.filter(is_active=True)
     people = people.select_related("user")
 
-    days = AttendanceDay.objects.filter(employee__in=people, date__gte=first, date__lte=last)
+    days = AttendanceDay.objects.filter(
+        employee__in=people, date__gte=first, date__lte=last
+    ).select_related("leave_type")
     by_employee = defaultdict(list)
     for day in days:
         by_employee[day.employee_id].append(day)
 
+    # The same single answer the roll-call and the rebuild use. Read here
+    # too rather than trusting rows to exist: a month somebody spent on
+    # leave produced no clock events, so nothing refreshed their rows.
+    on_leave = approved_leave_days(team=people, since=first, until=last)
+
     rows = []
     for person in people:
         person_days = by_employee.get(person.pk, [])
-        present = [d for d in person_days if d.state != AttendanceDay.ABSENT]
+        # Days somebody worked, named explicitly. This used to be "not
+        # absent", which was right with three states and would silently have
+        # counted paid leave as attendance the moment there were four.
+        worked_dates = {d.date for d in person_days if d.state in AttendanceDay.WORKED}
+        leave_dates = {
+            day: leave_type
+            for (employee_id, day), leave_type in on_leave.items()
+            if employee_id == person.pk
+        }
+        # Worked a day they were granted off: paid as worked, and surfaced as
+        # an exception rather than quietly counted as both.
+        both = worked_dates & set(leave_dates)
+        away = {day: lt for day, lt in leave_dates.items() if day not in worked_dates}
+
         rows.append(
             {
                 "employee": person,
-                "days_present": len(present),
-                "days_absent": sum(1 for d in person_days if d.state == AttendanceDay.ABSENT),
+                "days_present": len(worked_dates),
+                # An absence explained by approved leave is not an absence.
+                "days_absent": sum(
+                    1
+                    for d in person_days
+                    if d.state == AttendanceDay.ABSENT and d.date not in leave_dates
+                ),
                 "late_arrivals": sum(1 for d in person_days if d.state == AttendanceDay.LATE),
+                # Split, because payroll pays one and not the other. A day
+                # whose type has somehow gone missing counts as paid — the
+                # error that costs the employee nothing.
+                "days_on_leave_paid": sum(
+                    1 for lt in away.values() if lt is None or lt.is_paid
+                ),
+                "days_on_leave_unpaid": sum(
+                    1 for lt in away.values() if lt is not None and not lt.is_paid
+                ),
+                "worked_while_on_leave": len(both),
                 "total_minutes": sum(d.total_minutes for d in person_days),
                 "corrections": sum(d.correction_count for d in person_days),
             }

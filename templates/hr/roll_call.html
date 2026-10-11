@@ -27,7 +27,8 @@
   <div class="mrow">
     <div class="metric ok"><span>In on time</span><b>{{ counts.present }}</b><em>clocked in within the grace period</em></div>
     <div class="metric {% if counts.late %}alert{% endif %}"><span>Late</span><b>{{ counts.late }}</b><em>after the grace period</em></div>
-    <div class="metric {% if counts.absent %}alert{% endif %}"><span>Absent</span><b>{{ counts.absent }}</b><em>no clock event</em></div>
+    <div class="metric {% if counts.absent %}alert{% endif %}"><span>Absent</span><b>{{ counts.absent }}</b><em>no clock event, no leave</em></div>
+    <div class="metric"><span>On leave</span><b>{{ counts.on_leave }}</b><em>approved and accounted for</em></div>
     <div class="metric {% if counts.still_in %}alert{% endif %}"><span>Still clocked in</span><b>{{ counts.still_in }}</b><em>never clocked out</em></div>
   </div>
 
@@ -64,6 +65,16 @@
                 <td>
                   {% if row.day and row.day.still_clocked_in %}
                     <span class="pill p-prog"><i></i>Still clocked in</span>
+                  {% elif row.worked_while_on_leave %}
+                    {% comment %}
+                    An exception worth seeing: they were granted the day off
+                    and worked it anyway. Whether the day goes back on their
+                    balance is HR's call, not a silent default.
+                    {% endcomment %}
+                    <span class="pill p-wait"><i></i>Worked while on leave</span>
+                  {% elif row.state == "on_leave" %}
+                    <span class="pill p-clos"><i></i>On leave</span>
+                    {% if row.leave_type %}<br><span class="dim2 t-small">{{ row.leave_type.label }}</span>{% endif %}
                   {% elif row.state == "present" %}
                     <span class="pill p-appr"><i></i>Present</span>
                   {% elif row.state == "late" %}

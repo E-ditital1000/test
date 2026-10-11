@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Adjust a leave balance — HR — A1 360{% endblock %}
+
+{% block page_title %}Adjust a leave balance{% endblock %}
+{% block page_sub %}A stated figure, with a reason, on the record{% endblock %}
+
+{% comment %}
+This is how go-live works. A-1's leave records before this system are not
+reconstructable, so rather than invent approved requests for history nobody
+can vouch for, HR states the correction here and it stays visible as a
+correction on the balance screen — nobody mistakes a judgement for a
+calculation.
+{% endcomment %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+    {% csrf_token %}
+
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Negative days take leave away, positive days give it. Recording
+        <b>-4</b> against somebody's annual leave says four days were already
+        taken before the system started counting. The reason is shown beside
+        the figure, so whoever reads the balance in a year's time can see
+        where it came from.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'hr-leave-balances' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Record the adjustment</button>
+    </div>
+  </form>
+
+  {% if recent %}
+    <div class="card compact" style="max-width:760px">
+      <div class="hd"><b>Recent adjustments</b><span class="meta">The last {{ recent|length }}</span></div>
+      <div class="scroll-x">
+        <table style="min-width:620px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Year</th>
+              <th scope="col" class="num">Days</th>
+              <th scope="col">Why</th>
+              <th scope="col">Recorded by</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in recent %}
+              <tr>
+                <td>{{ row.employee|a1register_name }}</td>
+                <td class="dim">{{ row.leave_type.label }}</td>
+                <td class="num mono dim2">{{ row.leave_year }}</td>
+                <td class="num mono"><b>{{ row.days|stringformat:"+d" }}</b></td>
+                <td class="dim">{{ row.reason|truncatechars:60 }}</td>
+                <td class="dim2">{{ row.recorded_by|a1name }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

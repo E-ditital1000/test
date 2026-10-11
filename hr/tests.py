@@ -351,7 +351,10 @@ class ClockScreenTests(TestCase):
         self.assertEqual(
             header,
             "staff_id,surname,first_name,department,days_present,days_absent,"
-            "late_arrivals,total_hours,corrections",
+            "late_arrivals,days_on_leave_paid,days_on_leave_unpaid,"
+            "worked_while_on_leave,total_hours,corrections",
+            "changing this is a breaking change for payroll — the leave "
+            "columns were added deliberately, with docs/attendance-columns.md",
         )
         # No pay, rate or salary column exists anywhere in it.
         for banned in ("salary", "rate", "pay", "wage"):

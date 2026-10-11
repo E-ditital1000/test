@@ -33,7 +33,7 @@ from .forms import (
     TicketStatusForm,
 )
 from .models import Contact, Customer, Site, Ticket
-from .services import assign_ticket, ensure_main_site
+from .services import assign_ticket, ensure_main_site, leave_clash
 
 
 # --------------------------------------------------------------------------
@@ -295,11 +295,34 @@ def ticket_create(request):
                 f"Ticket {ticket.reference} created and assigned to "
                 f"{technician.get_full_name() or technician.email}.",
             )
+            _warn_about_leave(request, ticket)
         else:
             messages.success(request, f"Ticket {ticket.reference} created.")
         return redirect("crm-ticket-detail", pk=ticket.pk)
 
     return render(request, "crm/ticket_form.html", {"form": form})
+
+
+def _warn_about_leave(request, ticket):
+    """
+    Say so when work has just been given to somebody who is away.
+
+    A warning and not a refusal, and after the fact rather than before it:
+    the assignment is recorded either way, because a supervisor recalling a
+    technician from leave is doing something legitimate and a form that
+    blocked it would be bypassed. What the system owes them is to not let it
+    happen silently.
+    """
+    clash = leave_clash(ticket)
+    if clash is None:
+        return
+    messages.warning(
+        request,
+        f"{ticket.assigned_to.get_full_name() or ticket.assigned_to.email} has "
+        f"approved {clash.leave_type.label.lower()} from "
+        f"{clash.start_date:%d %b} to {clash.end_date:%d %b}. The assignment "
+        "stands - check they are back, or hand it to somebody else.",
+    )
 
 
 @require_permission("assign_ticket")
@@ -323,6 +346,7 @@ def ticket_assign(request, pk):
     )
 
     messages.success(request, f"{ticket.reference} assigned to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}.")
+    _warn_about_leave(request, ticket)
     return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))
 
 

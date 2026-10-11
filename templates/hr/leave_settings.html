@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Leave settings — HR — A1 360{% endblock %}
+
+{% block page_title %}Leave settings{% endblock %}
+{% block page_sub %}The three lists every leave figure is computed from{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-leave-type-create' %}">Add leave type</a>
+  <a class="btn btn-sec" href="{% url 'hr-leave-rule-create' %}">Add entitlement band</a>
+  <a class="btn btn-pri" href="{% url 'hr-leave-holiday-create' %}">Add public holiday</a>
+{% endblock %}
+
+{% comment %}
+Policy as data. The statutory annual entitlement is four bands of length of
+service, and A-1 can be more generous than the law but not less — so the
+bands are rows here rather than constants in code, and raising them is a
+Settings edit instead of a release.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="leave_settings" %}
+
+  <div class="card compact">
+    <div class="hd"><b>The working week</b><span class="meta">What a leave day costs</span></div>
+    <dl>
+      <div class="kv">
+        <dt>Rest days</dt>
+        <dd>
+          {% for name in rest_day_names %}{{ name }}{% if not forloop.last %}, {% endif %}{% empty %}none set{% endfor %}
+        </dd>
+      </div>
+      <div class="kv">
+        <dt>Leave tracked from</dt>
+        <dd>{% if tracked_from %}{{ tracked_from|a1date }}{% else %}<span class="dim2">not set</span>{% endif %}</dd>
+      </div>
+    </dl>
+    <div class="note">
+      A-1 works Monday to Saturday, so a statutory week of leave is six
+      working days. These two values live in Settings → Policy, because they
+      decide every leave figure in the system: a Thursday-to-Tuesday request
+      is four days on a five-day week and five on a six-day one.
+    </div>
+  </div>
+
+  <div class="card compact">
+    <div class="hd"><b>Leave types</b><span class="meta">What staff can ask for</span></div>
+    {% if types %}
+      <div class="scroll-x">
+        <table style="min-width:760px">
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col">Paid</th>
+              <th scope="col">Document needed after</th>
+              <th scope="col">Entitlement bands</th>
+              <th scope="col">Offered</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for type in types %}
+              <tr>
+                <td><b>{{ type.label }}</b><br><span class="dim2 mono">{{ type.code }}</span></td>
+                <td>{% if type.is_paid %}Yes{% else %}<span class="dim">No</span>{% endif %}</td>
+                <td class="mono">
+                  {% if type.document_required_after_days is None %}
+                    <span class="dim2">never</span>
+                  {% else %}{{ type.document_required_after_days }} day{{ type.document_required_after_days|pluralize }}{% endif %}
+                </td>
+                <td>
+                  {% for rule in type.entitlement_rules.all %}
+                    <span class="dim">{{ rule.days }}d after {{ rule.after_months }}mo</span>{% if not forloop.last %} · {% endif %}
+                  {% empty %}
+                    <span class="dim2">no allowance — untracked</span>
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if type.is_active %}
+                    <span class="pill p-appr"><i></i>Offered</span>
+                  {% else %}
+                    <span class="pill p-clos"><i></i>Retired</span>
+                  {% endif %}
+                </td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-leave-type-edit' type.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="note">
+        No leave types yet, so nobody can put in for leave. Annual, sick and
+        maternity are the statutory minimum in Liberia; add those first.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card compact">
+    <div class="hd">
+      <b>Entitlement bands</b>
+      <span class="meta">After this long in service, this many days a year</span>
+    </div>
+    {% if rules %}
+      <div class="scroll-x">
+        <table style="min-width:560px">
+          <thead>
+            <tr>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">After</th>
+              <th scope="col" class="num">Days a year</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for rule in rules %}
+              <tr>
+                <td>{{ rule.leave_type.label }}</td>
+                <td class="num mono">{{ rule.after_months }} mo</td>
+                <td class="num mono"><b>{{ rule.days }}</b></td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-leave-rule-edit' rule.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        A type with no band carries no allowance and is untracked rather than
+        zero — which is right for unpaid leave, and wrong for annual.
+      </div>
+    {% else %}
+      <div class="note">
+        No bands set, so no entitlement can be worked out for anybody. The
+        Decent Work Act's floor is one week in the first year, two after
+        twelve months, three after thirty-six and four after sixty — six, 12,
+        18 and 24 days on a six-day week.
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card compact">
+    <div class="hd">
+      <b>Public holidays</b>
+      <span class="meta">{{ this_year }} and nearby · no leave is consumed on these</span>
+    </div>
+    {% if holidays %}
+      <div class="scroll-x">
+        <table style="min-width:460px">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">What it is</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for holiday in holidays %}
+              <tr>
+                <td class="mono">{{ holiday.date|a1date }}</td>
+                <td>{{ holiday.name }}</td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-leave-holiday-edit' holiday.pk %}">Edit</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        Entered per year rather than worked out from rules: Decoration Day is
+        the second Wednesday of March and Fast and Prayer Day the second
+        Friday of April, and any holiday can be moved or added by
+        proclamation. Confirm next year's list each December.
+      </div>
+    {% else %}
+      <div class="note">
+        No public holidays on the list, so every weekday counts as a working
+        day and leave requests spanning one will consume it. Liberia has
+        eleven under the Patriotic Observances Law.
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

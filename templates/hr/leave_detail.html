@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}{{ employee.full_name }} — leave — A1 360{% endblock %}
+
+{% block page_title %}{{ employee.full_name }} — {{ request_row.leave_type.label }}{% endblock %}
+{% block page_sub %}{{ request_row.start_date|a1daterange:request_row.end_date }} · {{ request_row.working_days }} working day{{ request_row.working_days|pluralize }}{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-leave-queue' %}">Back to requests</a>
+{% endblock %}
+
+{% comment %}
+Everything needed to decide, on one screen: the dates, the days they
+actually consume, the reason, the handover, the balance it comes out of, and
+who else from the same department is already away. Deciding without the
+balance in front of you is how leave gets approved that the entitlement does
+not cover.
+{% endcomment %}
+
+{% block content %}
+  <div class="cols">
+    <div style="flex:2;display:flex;flex-direction:column;gap:20px">
+
+      <div class="card">
+        <div class="hd">
+          <b>The request</b>
+          {% include "hr/_leave_state.html" with state=state %}
+        </div>
+        <dl>
+          <div class="kv"><dt>Employee</dt><dd>{{ employee.full_name }}</dd></div>
+          <div class="kv"><dt>Staff ID</dt><dd class="mono">{{ employee.staff_id }}</dd></div>
+          <div class="kv"><dt>Department</dt><dd>{{ employee.department|default:"—" }}</dd></div>
+          <div class="kv"><dt>Supervisor</dt><dd>{% if employee.supervisor %}{{ employee.supervisor.full_name }}{% else %}—{% endif %}</dd></div>
+          <div class="kv"><dt>Type</dt><dd>{{ request_row.leave_type.label }}{% if not request_row.leave_type.is_paid %} <span class="dim2">(unpaid)</span>{% endif %}</dd></div>
+          <div class="kv"><dt>Dates</dt><dd>{{ request_row.start_date|a1daterange:request_row.end_date }}</dd></div>
+          <div class="kv"><dt>Working days</dt><dd class="mono"><b>{{ request_row.working_days }}</b></dd></div>
+          <div class="kv"><dt>Raised</dt><dd>{{ request_row.created_at|a1datetime }}{% if request_row.submitted_by and request_row.submitted_by != employee.user %} <span class="dim2">by {{ request_row.submitted_by|a1name }}</span>{% endif %}</dd></div>
+          {% if request_row.contact_while_away %}
+            <div class="kv"><dt>Reachable on</dt><dd class="mono">{{ request_row.contact_while_away }}</dd></div>
+          {% endif %}
+        </dl>
+      </div>
+
+      <div class="card">
+        <div class="hd"><b>Why the time is needed</b></div>
+        <div class="stack"><p class="t-body">{{ request_row.reason|linebreaksbr }}</p></div>
+      </div>
+
+      {% if request_row.handover_note %}
+        <div class="card">
+          <div class="hd"><b>Handover</b><span class="meta">What is outstanding while they are away</span></div>
+          <div class="stack"><p class="t-body">{{ request_row.handover_note|linebreaksbr }}</p></div>
+        </div>
+      {% endif %}
+
+      {% if request_row.document %}
+        <div class="card">
+          <div class="hd"><b>Supporting document</b></div>
+          <div class="stack">
+            <a class="btn btn-sec" href="{{ request_row.document.url }}" target="_blank" rel="noopener">Open the document</a>
+          </div>
+        </div>
+      {% endif %}
+
+      <div class="card compact">
+        <div class="hd"><b>The days this uses</b><span class="meta">Rest days and public holidays excluded</span></div>
+        <div class="stack">
+          <p class="t-body dim">
+            {% for day in days %}{{ day|date:"D j M" }}{% if not forloop.last %} · {% endif %}{% endfor %}
+          </p>
+        </div>
+      </div>
+
+      {% if trail %}
+        <div class="card compact">
+          <div class="hd"><b>What happened to it</b><span class="meta">Append-only</span></div>
+          <div class="scroll-x">
+            <table style="min-width:560px">
+              <thead>
+                <tr>
+                  <th scope="col">When</th>
+                  <th scope="col">What</th>
+                  <th scope="col">Who</th>
+                  <th scope="col">Said</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in trail %}
+                  <tr>
+                    <td class="mono dim2">{{ entry.created_at|a1datetime }}</td>
+                    <td>{{ entry.get_decision_display }}</td>
+                    <td>{{ entry.actor|a1name }}</td>
+                    <td class="dim">{{ entry.comment|default:"—" }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <aside style="flex:1;display:flex;flex-direction:column;gap:20px">
+
+      <div class="card">
+        <div class="hd"><b>{{ request_row.leave_type.label }} balance</b><span class="meta">{{ balance.year }}</span></div>
+        {% if balance.needs_start_date %}
+          <div class="msg msg-error">
+            This employee has no start date on their record, so their
+            entitlement cannot be worked out. Add it on the employee record
+            before approving, or the figure below stays unknown.
+          </div>
+        {% elif not balance.is_tracked %}
+          <div class="note">
+            {{ request_row.leave_type.label }} carries no annual allowance, so
+            there is no balance to run down. It still has to be approved and
+            recorded.
+          </div>
+        {% else %}
+          <dl>
+            <div class="kv"><dt>Entitled</dt><dd class="mono">{{ balance.entitlement }}</dd></div>
+            {% if balance.adjustment %}
+              <div class="kv"><dt>Adjusted by HR</dt><dd class="mono">{{ balance.adjustment|stringformat:"+d" }}</dd></div>
+            {% endif %}
+            <div class="kv"><dt>Already taken</dt><dd class="mono">{{ balance.taken }}</dd></div>
+            <div class="kv"><dt>Waiting, incl. this</dt><dd class="mono">{{ balance.pending }}</dd></div>
+            <div class="kv">
+              <dt>Would be left</dt>
+              <dd class="mono">
+                {% if balance.remaining < request_row.working_days %}
+                  <b class="bad">{{ balance.remaining }} before this</b>
+                {% else %}
+                  <b>{{ balance.remaining }}</b>
+                {% endif %}
+              </dd>
+            </div>
+          </dl>
+          {% if balance.remaining < request_row.working_days %}
+            <div class="msg msg-error">
+              This request is for {{ request_row.working_days }} day{{ request_row.working_days|pluralize }}
+              and only {{ balance.remaining }} remain{{ balance.remaining|pluralize:"s," }}.
+              Approving it takes them over their entitlement. That is yours to
+              decide — the system records it either way.
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      {% if clashes %}
+        <div class="card">
+          <div class="hd"><b>Also away then</b><span class="meta">Same department</span></div>
+          <div class="stack">
+            {% for clash in clashes %}
+              <div class="dim">
+                <b>{{ clash.employee.full_name }}</b> ·
+                {{ clash.start_date|a1daterange:clash.end_date }}
+              </div>
+            {% endfor %}
+          </div>
+          <div class="note">Approving this leaves the department shorter still.</div>
+        </div>
+      {% endif %}
+
+      {% if can_decide and not request_row.is_settled %}
+        <div class="card">
+          <div class="hd"><b>Decide</b></div>
+          <form method="post" action="{% url 'hr-leave-decide' request_row.pk %}">
+            {% csrf_token %}
+            <div class="stack">
+              <div class="fld wide">
+                <label for="comment">What you want them to know</label>
+                <textarea id="comment" name="comment" rows="3"
+                          placeholder="Required if you decline or send it back."></textarea>
+                <span class="help">
+                  Whatever you write here is emailed to them, and it is the
+                  only thing they see. Declining without a reason is refused.
+                </span>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-sec" type="submit" name="decision" value="returned">Send back</button>
+              <button class="btn btn-sec" type="submit" name="decision" value="declined">Decline</button>
+              <button class="btn btn-pri" type="submit" name="decision" value="approved">Approve</button>
+            </div>
+          </form>
+        </div>
+      {% elif request_row.is_settled %}
+        <div class="card">
+          <div class="hd"><b>Settled</b>{% include "hr/_leave_state.html" with state=state %}</div>
+          <div class="note">
+            The trail on the left carries who decided it and when. A settled
+            request is not re-decided — if something has changed, cancel it and
+            raise the replacement, so the record shows what actually happened.
+          </div>
+          {% if can_manage and request_row.is_approved %}
+            <form method="post" action="{% url 'hr-leave-cancel' request_row.pk %}"
+                  onsubmit="return confirm('Cancel this approved leave? {{ employee.full_name }} will be emailed.')">
+              {% csrf_token %}
+              <div class="stack">
+                <div class="fld wide">
+                  <label for="cancel_comment">Why it is being cancelled</label>
+                  <textarea id="cancel_comment" name="comment" rows="2"></textarea>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn btn-sec" type="submit">Cancel this leave</button>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      {% endif %}
+
+    </aside>
+  </div>
+{% endblock %}

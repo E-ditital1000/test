@@ -2,8 +2,13 @@
 
 The columns a Phase Two payroll engine consumes **unchanged**. Everything
 here is derived from the append-only `hr.AttendanceEvent` log plus its
-corrections — nothing is stored by hand, and re-running the derivation
-reproduces every figure exactly.
+corrections **and from approved leave** — nothing is stored by hand, and
+re-running the derivation reproduces every figure exactly.
+
+> **Changed with leave management.** Three columns were added and
+> `days_present` narrowed. This is a breaking change for the consumer, taken
+> deliberately: before it, payroll could not tell a paid leave day from an
+> unexplained absence. See [leave-management-plan.md](leave-management-plan.md).
 
 Produced by `/hr/report/?export=csv`, implemented in `hr.views._monthly_csv`.
 A test asserts the header line verbatim, so **changing a name here breaks a
@@ -17,9 +22,12 @@ build, deliberately** — it is a breaking change for the consumer.
 | `surname` | text | Register form, sorted on. |
 | `first_name` | text | |
 | `department` | text | Free text from the register; may be blank. |
-| `days_present` | integer | Days with at least one clock-in, late days included. |
-| `days_absent` | integer | Days in the period with a derived row and no clock-in. |
+| `days_present` | integer | Days somebody **worked**: state `present` or `late`. **Narrowed** — this used to mean "not absent", which would have counted paid leave as attendance once a fourth state existed. |
+| `days_absent` | integer | Days with a derived row, no clock-in, **and no approved leave**. An absence explained by approved leave is not an absence. |
 | `late_arrivals` | integer | Days whose first clock-in falls after the workday start plus the grace period. |
+| `days_on_leave_paid` | integer | **New.** Days covered by approved leave of a type marked paid, where nobody clocked. |
+| `days_on_leave_unpaid` | integer | **New.** The same for a leave type marked unpaid. |
+| `worked_while_on_leave` | integer | **New.** Days approved leave covered *and* somebody clocked. Paid as worked, counted in `days_present`, and **not** in either leave column — surfaced so HR can decide whether the leave day goes back on the balance. |
 | `total_hours` | decimal, 2dp | Paired clock-in/clock-out durations, summed. An unpaired clock-in contributes nothing. |
 | `corrections` | integer | Corrections applied to the events behind this month. |
 
@@ -34,15 +42,22 @@ If the workday start is unset or unparsable, lateness is **not judged** and
 every attended day is `present`. That is deliberate: a missing policy should
 not silently mark a workforce late.
 
-## What is deliberately absent
+## Leave, and what is still deliberately absent
 
-No pay rate, salary, wage, bank detail or leave balance exists anywhere in
-the HR module — not in the export, not in the model, not as a nullable field
-"for later". Phase One is attendance only. Payroll in Phase Two reads these
-columns and holds its own money data.
+Leave is now tracked, so these columns carry it. **No leave balance is
+stored anywhere**: entitlement comes from the bands in `hr.LeaveType` and
+length of service, days taken come from approved requests, and the
+subtraction happens when somebody asks. `AttendanceDay.leave_type` is a
+derived cache like every other column here — it exists so this export can
+tell paid from unpaid without joining back to the request.
+
+No pay rate, salary, wage or bank detail exists anywhere in the HR module —
+not in the export, not in the model, not as a nullable field "for later".
+Payroll in Phase Two reads these columns and holds its own money data; what
+a leave day is *worth* is its problem, not this one.
 
 `hr.tests` asserts the header contains none of `salary`, `rate`, `pay` or
-`wage`.
+`wage`, and asserts the full header line verbatim.
 
 ## Edge cases the consumer should expect
 
@@ -56,3 +71,14 @@ columns and holds its own money data.
 - **A deactivated employee** keeps every historical row. They fall out of the
   current month's report because the register filters to active staff; their
   past months still reconstruct in full.
+- **Approved leave needs no clock event to appear.** Somebody away for a
+  month files nothing, so nothing triggers a rebuild for their days. The
+  roll-call and this report therefore read approved leave *directly* through
+  `hr.services.approved_leave_days` as well as through the stored rows — one
+  function, three callers, so the table and the screens cannot disagree.
+- **Future leave is never in this table.** `AttendanceDay` describes days
+  that have happened. Leave approved for next March lives on the leave
+  calendar until the day arrives.
+- **Cancelled leave restates the days.** Cancelling approved leave rebuilds
+  the affected rows, so days that had been accounted for go back to being
+  absences unless something else explains them.

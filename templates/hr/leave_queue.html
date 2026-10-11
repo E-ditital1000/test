@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Leave requests — HR — A1 360{% endblock %}
+
+{% block page_title %}Leave requests{% endblock %}
+{% block page_sub %}{{ waiting_count }} waiting · soonest first{% endblock %}
+{% block page_actions %}
+  {% if perms_held.view_leave %}
+    <a class="btn btn-sec" href="{% url 'hr-leave-calendar' %}">Who is away</a>
+  {% endif %}
+  {% if perms_held.view_leave_reports %}
+    <a class="btn btn-sec" href="{% url 'hr-leave-balances' %}">Balances</a>
+  {% endif %}
+  {% if can_manage %}
+    <a class="btn btn-pri" href="{% url 'hr-leave-create' %}">Record leave</a>
+  {% endif %}
+{% endblock %}
+
+{% comment %}
+Soonest start at the top, not oldest raised. A request for next Monday has
+to be answered before one for next quarter, whoever asked first — somebody
+needs to know whether to make arrangements.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="leave_queue" %}
+
+  {% if away_today %}
+    <div class="msg msg-info">
+      Away today: {% for request in away_today.values %}{{ request.employee.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+    </div>
+  {% endif %}
+
+  {% if waiting %}
+    <div class="card compact">
+      <div class="hd"><b>Waiting on a decision</b><span class="meta">Soonest first</span></div>
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col">Dates</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Days</th>
+              <th scope="col">Why</th>
+              <th scope="col">Raised</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in waiting %}
+              <tr>
+                <td>
+                  <b>{{ row.employee|a1register_name }}</b>
+                  {% if row.employee.department %}<span class="dim2"> · {{ row.employee.department.name }}</span>{% endif %}
+                </td>
+                <td><b>{{ row.start_date|a1daterange:row.end_date }}</b></td>
+                <td>{{ row.leave_type.label }}</td>
+                <td class="num mono">{{ row.working_days }}</td>
+                <td class="dim">{{ row.reason|truncatechars:70 }}</td>
+                <td class="dim2">{{ row.created_at|a1waited }}</td>
+                <td class="acts">
+                  <a class="btn {% if can_decide %}btn-pri{% else %}btn-sec{% endif %} btn-sm"
+                     href="{% url 'hr-leave-detail' row.pk %}">
+                    {% if can_decide %}Decide{% else %}Open{% endif %}
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% include "shell/_pager.html" with page=waiting noun="request" plural="requests" %}
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="hr" heading="Nothing waiting on a decision" body="Leave requests land here as soon as somebody puts one in, soonest start at the top. Everyone who can approve leave is emailed when one arrives, so this screen is not something anybody has to keep checking." %}
+  {% endif %}
+
+  {% if settled %}
+    <div class="card compact">
+      <div class="hd">
+        <b>Recently settled</b>
+        <span class="meta">The last {{ settled|length }} · a glance, not a list to work through</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:760px">
+          <thead>
+            <tr>
+              <th scope="col">Employee</th>
+              <th scope="col">Dates</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Days</th>
+              <th scope="col">Outcome</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in settled %}
+              <tr>
+                <td>{{ row.employee|a1register_name }}</td>
+                <td>{{ row.start_date|a1daterange:row.end_date }}</td>
+                <td class="dim">{{ row.leave_type.label }}</td>
+                <td class="num mono dim">{{ row.working_days }}</td>
+                <td>{% include "hr/_leave_state.html" with state=row.current_state %}</td>
+                <td class="acts">
+                  <a class="btn btn-sec btn-sm" href="{% url 'hr-leave-detail' row.pk %}">Open</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

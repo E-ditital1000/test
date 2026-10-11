@@ -1,18 +1,26 @@
 """
-HR — attendance tracking only. Payroll, leave, appraisals, contracts,
-biometrics and rostering are Phase Two and no field here anticipates them:
-there are deliberately no salary, rate or pay fields, not even "for later".
+HR — attendance and leave. Payroll, appraisals, contracts, biometrics and
+rostering remain Phase Two and no field here anticipates them: there are
+deliberately no salary, rate or pay fields, not even "for later".
 
 Attendance is an append-only event log. Every displayed figure — the day
 row, the roll-call, the monthly report — is derived from those events by
 `hr.services.rebuild_attendance_days`, and a correction is a new row that
 supersedes an event rather than overwriting it.
+
+Leave follows the same discipline. A request's state is the latest
+append-only decision on it from `approvals.Approval`, never a mutable status
+field; and a balance is computed from entitlement rules, approved requests
+and recorded adjustments at the moment it is asked for, never stored as a
+number that can drift. See docs/leave-management-plan.md for the policy
+decisions behind the figures.
 """
 import uuid
 
 from django.conf import settings
 from django.db import models
 
+from approvals.models import ApprovalTrailMixin
 from config.mixins import (
     MobileOriginatedModel,
     SoftDeleteModel,
@@ -294,20 +302,41 @@ class AttendanceCorrection(TimeStampedModel):
 class AttendanceDay(models.Model):
     """
     DERIVED — never written by hand and safe to wipe. Every row here is
-    reconstructed from AttendanceEvent plus AttendanceCorrection by
-    `hr.services.rebuild_attendance_days`; a test proves a wiped table
-    rebuilds identically. Reports read this table only as a cache of that
-    computation.
+    reconstructed by `hr.services.rebuild_attendance_days` from
+    AttendanceEvent plus AttendanceCorrection, **and from approved leave**;
+    a test proves a wiped table rebuilds identically. Reports read this table
+    only as a cache of that computation.
+
+    Leave widened that promise deliberately. The alternative was to overlay
+    leave at display time in the roll-call and the monthly report separately,
+    which reintroduces the bug this codebase keeps finding: the same rule
+    living on one screen only, so the second screen disagrees with the first.
+    One derivation, two inputs.
+
+    Rows exist for days that have happened. Approved leave in the future is
+    not written here — it belongs on the leave calendar, which is the screen
+    that exists to show it.
     """
 
     PRESENT = "present"
     LATE = "late"
     ABSENT = "absent"
+    # Approved leave, and no clock event. Without this a person on approved
+    # annual leave sat in the supervisor's exceptions list next to the person
+    # who simply did not turn up, because a day with no events has no row and
+    # the roll-call reads a missing row as absent.
+    ON_LEAVE = "on_leave"
     STATES = [
         (PRESENT, "Present"),
         (LATE, "Late"),
         (ABSENT, "Absent"),
+        (ON_LEAVE, "On leave"),
     ]
+    # The states that mean somebody worked. Payroll must not read a paid
+    # leave day as an attended one, so this is named rather than expressed
+    # as "not absent" — which is what it used to be, and what quietly broke
+    # the moment a fourth state existed.
+    WORKED = (PRESENT, LATE)
 
     employee = models.ForeignKey(
         Employee, on_delete=models.CASCADE, related_name="attendance_days"
@@ -320,6 +349,21 @@ class AttendanceDay(models.Model):
     still_clocked_in = models.BooleanField(default=False)
     correction_count = models.PositiveIntegerField(default=0)
     rebuilt_at = models.DateTimeField(auto_now=True)
+    # Approved leave covered this day. Separate from `state` because the two
+    # answer different questions: this says the day was granted, `state` says
+    # what actually happened on it. Both true at once is a real case —
+    # somebody recalled from leave, or who came in anyway — and the roll-call
+    # shows it as an exception rather than discarding either fact.
+    on_leave = models.BooleanField(default=False)
+    leave_type = models.ForeignKey(
+        "LeaveType",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attendance_days",
+        help_text="Which leave covered the day, so the export can tell paid "
+                  "leave from unpaid without joining back to the request.",
+    )
 
     class Meta:
         ordering = ["-date", "employee__staff_id"]
@@ -332,3 +376,255 @@ class AttendanceDay(models.Model):
 
     def __str__(self):
         return f"{self.employee} {self.date} ({self.get_state_display()})"
+
+
+# --------------------------------------------------------------------------
+# Leave
+# --------------------------------------------------------------------------
+
+class LeaveType(SoftDeleteModel, TimeStampedModel):
+    """
+    The kinds of leave A-1 grants, owned by HR in Settings rather than by
+    this file. Annual, sick, maternity and the rest are policy, and policy
+    changes without a release.
+
+    How many days each kind carries is not here: it is in
+    `LeaveEntitlementRule`, because the statutory annual entitlement is a
+    function of how long somebody has worked and not a single number. A type
+    with no rules at all is untracked rather than zero — unpaid leave has no
+    allowance to run down.
+    """
+
+    code = models.SlugField(max_length=40, unique=True)
+    label = models.CharField(max_length=60)
+    description = models.CharField(max_length=200, blank=True)
+    is_paid = models.BooleanField(
+        default=True,
+        help_text="Unpaid leave still has to be approved and recorded; it "
+                  "just does not count as a paid day downstream.",
+    )
+    # Sick leave is the case this exists for: the Decent Work Act allows
+    # three undocumented sick days in a rolling twelve months and requires
+    # medical documentation beyond that. Null means a document is never
+    # asked for; 0 means it is always required.
+    document_required_after_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Days allowed in a year before a supporting document is "
+                  "asked for. Leave empty if one is never needed.",
+    )
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["order", "label"]
+
+    def __str__(self):
+        return self.label
+
+    def entitlement_after(self, months):
+        """
+        The allowance for somebody with this much service, or None when this
+        type carries no allowance at all.
+
+        Reads `.all()` and picks in Python rather than filtering in SQL, so
+        that a caller who has prefetched the bands pays nothing: `.filter()`
+        on a related manager ignores the prefetch cache and issues a fresh
+        query every time. The register screen asks this once per employee
+        per type, which is where that mattered. There are never more than a
+        handful of bands.
+        """
+        rules = [
+            rule
+            for rule in self.entitlement_rules.all()
+            if rule.after_months <= months
+        ]
+        if not rules:
+            return None
+        return max(rules, key=lambda rule: rule.after_months).days
+
+    @property
+    def is_tracked(self):
+        # Same reasoning: `.exists()` always hits the database, `.all()`
+        # reuses a prefetch when there is one.
+        return bool(self.entitlement_rules.all())
+
+
+class LeaveEntitlementRule(TimeStampedModel):
+    """
+    One band of a leave type's allowance: "after this many months of
+    service, this many days a year".
+
+    The Decent Work Act's annual leave is four such bands — one week in the
+    first year, rising to four weeks after five years — so the law lives
+    here as data that HR can raise when A-1 becomes more generous. A flat
+    allowance for everybody is the same thing with a single band at zero
+    months, which is why there is no separate "flat days" field to keep in
+    step with this one.
+
+    Days, not weeks: A-1 works a six-day week, so a statutory "week" is six
+    working days here. Storing the figure already converted means no screen
+    has to know the working week to show an allowance.
+    """
+
+    leave_type = models.ForeignKey(
+        LeaveType, on_delete=models.CASCADE, related_name="entitlement_rules"
+    )
+    after_months = models.PositiveIntegerField(
+        default=0,
+        help_text="Months of continuous service. 0 applies from the first day.",
+    )
+    days = models.PositiveIntegerField(help_text="Working days a year at this band.")
+
+    class Meta:
+        ordering = ["leave_type__order", "after_months"]
+        unique_together = ("leave_type", "after_months")
+
+    def __str__(self):
+        return f"{self.leave_type.label}: {self.days} days after {self.after_months} months"
+
+
+class PublicHoliday(TimeStampedModel):
+    """
+    A day nobody is expected at work, and that no leave request consumes.
+
+    Entered per year rather than derived from rules, deliberately. Several of
+    Liberia's eleven move — Decoration Day is the second Wednesday of March,
+    Fast and Prayer Day the second Friday of April — and any of them can be
+    shifted or added by proclamation. A list HR confirms each December is
+    right every year; a clever rule is right until the first proclamation.
+    """
+
+    date = models.DateField(unique=True)
+    name = models.CharField(max_length=80)
+
+    class Meta:
+        ordering = ["date"]
+        indexes = [models.Index(fields=["date"])]
+
+    def __str__(self):
+        return f"{self.name} ({self.date:%d %b %Y})"
+
+
+class LeaveRequest(TimeStampedModel, ApprovalTrailMixin):
+    """
+    Somebody asking to be away, and the answer.
+
+    The state is not a field on this row. It is the latest append-only
+    decision from `approvals.Approval`, the same mechanism assessments and
+    requisitions use, so the trail carries who decided, when, and what they
+    said — and a declined request cannot be saved without a reason the
+    person will read.
+
+    `working_days` is the one derived figure that is stored. The public
+    holiday list can change after a request is decided, and the number HR
+    approved is the number that was agreed: recomputing it later would
+    quietly restate a settled decision. Balances recompute; this does not.
+    """
+
+    employee = models.ForeignKey(
+        Employee, on_delete=models.PROTECT, related_name="leave_requests"
+    )
+    leave_type = models.ForeignKey(
+        LeaveType, on_delete=models.PROTECT, related_name="requests"
+    )
+    start_date = models.DateField()
+    end_date = models.DateField()
+    working_days = models.PositiveIntegerField(
+        default=0,
+        help_text="Working days consumed, as counted when this was raised.",
+    )
+    reason = models.TextField(
+        help_text="Why the time is needed. HR reads this when deciding."
+    )
+    document = models.FileField(upload_to="leave/", blank=True, null=True)
+    handover_note = models.TextField(
+        blank=True, help_text="What is outstanding, and who is picking it up."
+    )
+    contact_while_away = models.CharField(max_length=80, blank=True)
+    # Who typed it. HR can put a request in for somebody who has no account
+    # reachable from site, the same way a supervisor records a clock event on
+    # a crew member's behalf; the request is still the employee's.
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="leave_requests_submitted",
+    )
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["employee", "start_date"]),
+            models.Index(fields=["start_date", "end_date"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.employee} {self.leave_type.label} "
+            f"{self.start_date:%d %b} to {self.end_date:%d %b %Y}"
+        )
+
+    @property
+    def is_declined(self):
+        return self.approval_state == "declined"
+
+    @property
+    def is_cancelled(self):
+        return self.approval_state == "cancelled"
+
+    @property
+    def is_waiting(self):
+        """Raised and not yet answered — including one sent back for more."""
+        return self.approval_state in ("submitted", "returned")
+
+    @property
+    def is_settled(self):
+        return self.approval_state in ("approved", "declined", "cancelled")
+
+    def covers(self, day):
+        return self.start_date <= day <= self.end_date
+
+
+class LeaveAdjustment(TimeStampedModel):
+    """
+    A correction to somebody's balance, with a reason and an actor.
+
+    This exists because A-1's leave records before go-live are not
+    reconstructable. Rather than invent approved requests for history nobody
+    can vouch for, HR states the correction directly and it is visible as a
+    correction: the balance screen shows it as an entered figure beside the
+    computed ones, so nobody mistakes a judgement for a calculation.
+
+    It also covers the honest exceptions afterwards — a day credited back
+    after somebody was recalled from leave, or a day granted outside the
+    normal allowance. Negative days take leave away, positive days give it.
+    """
+
+    employee = models.ForeignKey(
+        Employee, on_delete=models.PROTECT, related_name="leave_adjustments"
+    )
+    leave_type = models.ForeignKey(
+        LeaveType, on_delete=models.PROTECT, related_name="adjustments"
+    )
+    leave_year = models.PositiveIntegerField()
+    days = models.IntegerField(
+        help_text="Positive adds days to the balance, negative takes them away."
+    )
+    reason = models.TextField(help_text="Why. This is the audit trail for the figure.")
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="leave_adjustments_recorded",
+    )
+
+    class Meta:
+        ordering = ["-leave_year", "-created_at"]
+        indexes = [models.Index(fields=["employee", "leave_year"])]
+
+    def __str__(self):
+        sign = "+" if self.days >= 0 else ""
+        return (
+            f"{self.employee} {self.leave_type.label} "
+            f"{self.leave_year}: {sign}{self.days}"
+        )

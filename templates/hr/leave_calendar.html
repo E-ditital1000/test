@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Who is away — HR — A1 360{% endblock %}
+
+{% block page_title %}Who is away — {{ anchor|date:"F Y" }}{% endblock %}
+{% block page_sub %}Approved leave only · one row per person away this month{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="?month={{ previous_month|date:'Y-m-d' }}">← {{ previous_month|date:"M" }}</a>
+  <a class="btn btn-sec" href="?month={{ next_month|date:'Y-m-d' }}">{{ next_month|date:"M" }} →</a>
+  {% if perms_held.view_leave %}
+    <a class="btn btn-sec" href="{% url 'hr-leave-queue' %}">Requests</a>
+  {% endif %}
+{% endblock %}
+
+{% comment %}
+The screen that stops two people from the same crew being off the same week.
+Only approved leave appears: a request still waiting is not a fact about the
+month, and showing it here would have supervisors planning around days that
+may never be granted.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="leave_calendar" %}
+
+  {% if away_today %}
+    <div class="msg msg-info">
+      Away today: {% for request in away_today.values %}{{ request.employee.full_name }} <span class="dim2">({{ request.leave_type.label }})</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+    </div>
+  {% endif %}
+
+  {% if rows %}
+    <div class="card compact">
+      <div class="hd">
+        <b>{{ rows|length }} {% if rows|length == 1 %}person{% else %}people{% endif %} away this month</b>
+        <span class="meta">Shaded columns are rest days and public holidays</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:900px">
+          <thead>
+            <tr>
+              <th scope="col" style="position:sticky;left:0;background:var(--card)">Employee</th>
+              {% for day in days %}
+                <th scope="col" class="num" style="padding:4px 2px;font-size:11px">
+                  {{ day|date:"j" }}<br><span class="dim2">{{ day|date:"D"|slice:":1" }}</span>
+                </th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td style="position:sticky;left:0;background:var(--card);white-space:nowrap">
+                  <b>{{ row.employee|a1register_name }}</b>
+                  <br>
+                  {% comment %}
+                  The staff ID earns its place here: this grid sorts by it,
+                  and two technicians called Moses are not a hypothetical.
+                  {% endcomment %}
+                  <span class="dim2 mono">{{ row.employee.staff_id }}</span>
+                  {% if row.employee.department %}<span class="dim2"> · {{ row.employee.department.name }}</span>{% endif %}
+                </td>
+                {% for cell in row.cells %}
+                  <td class="num" style="padding:4px 2px;{% if cell.is_rest %}background:var(--sunken);{% endif %}{% if cell.is_today %}outline:1px solid var(--gold);{% endif %}"
+                      {% if cell.request %}title="{{ cell.request.leave_type.label }} — {{ cell.request.start_date|a1daterange:cell.request.end_date }}"{% endif %}>
+                    {% if cell.request and not cell.is_rest %}
+                      <span class="pill p-appr" style="padding:2px 4px"><i></i></span>
+                    {% elif cell.request %}
+                      <span class="dim2">·</span>
+                    {% else %}
+                      <span class="dim2"></span>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% else %}
+    {% include "shell/_empty.html" with icon="hr" heading="Nobody is away this month" body="Approved leave appears here as a row per person, so you can see at a glance whether a week is already short-handed before booking work into it. Requests still waiting on a decision are deliberately not shown — they are not facts about the month yet." %}
+  {% endif %}
+
+  {% if holidays %}
+    <div class="card compact">
+      <div class="hd"><b>Public holidays this month</b><span class="meta">No leave is consumed on these</span></div>
+      <dl>
+        {% for holiday in holidays %}
+          <div class="kv"><dt>{{ holiday.name }}</dt><dd class="mono">{{ holiday.date|a1date }}</dd></div>
+        {% endfor %}
+      </dl>
+    </div>
+  {% endif %}
+{% endblock %}

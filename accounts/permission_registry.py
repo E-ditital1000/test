@@ -80,6 +80,17 @@ PERMISSIONS = [
     ("view_attendance_reports", "hr", "View the monthly attendance report"),
     ("clock_in_out", "hr", "Clock in and out, and view own attendance history"),
     ("manage_attendance_codes", "hr", "Create, print and revoke the attendance QR codes employees scan"),
+
+    # Leave. Asking is a floor every staff account holds, like clocking;
+    # deciding is HR's, by A-1's decision, so a supervisor sees who is off
+    # without holding the pen. `view_leave` is that read: it is what stops
+    # work being scheduled onto a week somebody is already away for.
+    ("request_leave", "hr", "Put in for leave, and view own leave history and balance"),
+    ("view_leave", "hr", "View leave requests and who is away"),
+    ("approve_leave", "hr", "Approve or decline a leave request"),
+    ("manage_leave", "hr", "Record or cancel leave on somebody's behalf, and adjust a balance"),
+    ("manage_leave_types", "hr", "Manage leave types, entitlement rules and the public holiday list"),
+    ("view_leave_reports", "hr", "View leave balances and entitlement across the company"),
 ]
 
 PERMISSION_CODES = {code for code, _module, _description in PERMISSIONS}

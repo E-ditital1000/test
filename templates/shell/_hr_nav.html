@@ -25,7 +25,20 @@ absent, not disabled, because no condition would make it usable for them.
   {% if perms_held.manage_attendance_codes %}
     <a class="chip {% if active == 'codes' %}on{% endif %}" href="{% url 'hr-codes' %}">Attendance codes</a>
   {% endif %}
+  {% if perms_held.view_leave %}
+    <a class="chip {% if active == 'leave_queue' %}on{% endif %}" href="{% url 'hr-leave-queue' %}">Leave requests</a>
+    <a class="chip {% if active == 'leave_calendar' %}on{% endif %}" href="{% url 'hr-leave-calendar' %}">Who is away</a>
+  {% endif %}
+  {% if perms_held.view_leave_reports %}
+    <a class="chip {% if active == 'leave_balances' %}on{% endif %}" href="{% url 'hr-leave-balances' %}">Leave balances</a>
+  {% endif %}
+  {% if perms_held.manage_leave_types %}
+    <a class="chip {% if active == 'leave_settings' %}on{% endif %}" href="{% url 'hr-leave-settings' %}">Leave settings</a>
+  {% endif %}
   {% if perms_held.clock_in_out %}
     <a class="chip {% if active == 'clock' %}on{% endif %}" href="{% url 'hr-clock' %}">My clock</a>
+  {% endif %}
+  {% if perms_held.request_leave %}
+    <a class="chip {% if active == 'my_leave' %}on{% endif %}" href="{% url 'hr-leave-mine' %}">My leave</a>
   {% endif %}
 </nav>
