@@ -1,4 +1,9 @@
+# Every .env variant, not just the one Django reads. A file called
+# .env.production or .env.local holds exactly the same secrets and was one
+# `git add -A` away from being published.
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.pyc
