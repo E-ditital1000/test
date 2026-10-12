@@ -182,6 +182,23 @@ class Ticket(JobLineageModel, TimeStampedModel):
     def is_ageing(self):
         return self.is_open and self.age_days >= 1
 
+    @property
+    def is_overdue(self):
+        """
+        Past the day it was due and still open.
+
+        Distinct from `is_ageing`, which only says how long the ticket has
+        existed. A ticket raised three weeks ago and due next Friday is old
+        and perfectly on time; one raised yesterday and due yesterday is
+        not. The list needs to tell those apart, because only the second is
+        somebody's problem today.
+        """
+        from django.utils import timezone
+
+        if not self.is_open or self.due_date is None:
+            return False
+        return self.due_date < timezone.localdate()
+
     def log(self, actor, action, detail=""):
         """Append-only ticket history. Never updates an existing row."""
         return TicketEvent.objects.create(

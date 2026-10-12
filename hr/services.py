@@ -251,15 +251,46 @@ def open_clock_in(employee, on_date=None):
     The employee's unmatched clock-in, if they are currently on the clock.
     Read from the event log rather than a status field, so it stays true
     even after a correction rewrites history.
+
+    `on_date` limits the question to one local day, and exists because the
+    two callers are asking different things. "Is there a shift to close?"
+    means the last one, whenever it started — somebody who clocked in at
+    23:00 and out at 03:00 worked a night, and must be able to close it.
+    "Am I already clocked in?" means *today*, because an unclosed shift from
+    last Friday is not a reason to stop somebody starting work on Monday.
+
+    That difference was the bug: this scanned every event ever recorded, so
+    one forgotten clock-out locked the employee out of the clock
+    permanently. Four people on the live system had been unable to clock in
+    for three days.
     """
     rows = [row for row in effective_events(employee=employee) if row[0] == employee.pk]
     open_in = None
-    for _emp, _date, kind, stamp, _corrected in rows:
+    for _emp, local_date, kind, stamp, _corrected in rows:
+        if on_date is not None and local_date != on_date:
+            continue
         if kind == AttendanceEvent.CLOCK_IN:
             open_in = stamp
         else:
             open_in = None
     return open_in
+
+
+def stale_clock_in(employee, on_date=None):
+    """
+    An unclosed shift from a day before this one, if there is one.
+
+    Surfaced rather than silently ignored: the employee is not blocked by
+    it, but somebody has a day on record with no end to it, and only a
+    supervisor correction can settle what hours it was.
+    """
+    on_date = on_date or timezone.localdate()
+    open_any = open_clock_in(employee)
+    if open_any is None:
+        return None
+    if timezone.localtime(open_any).date() >= on_date:
+        return None
+    return open_any
 
 
 def resolve_code(raw):
@@ -343,16 +374,23 @@ def record_clock_event(
                 "for the current one at your location."
             )
 
+    # Closing a shift looks at the last open one whenever it began, so a
+    # night that runs past midnight can still be clocked out of.
     if kind == AttendanceEvent.CLOCK_OUT and open_clock_in(employee) is None:
         raise ClockError(
             "You are not clocked in, so there is nothing to clock out of. "
             "If you forgot to clock in, ask your supervisor for a correction."
         )
-    if kind == AttendanceEvent.CLOCK_IN and open_clock_in(employee) is not None:
-        raise ClockError(
-            "You are already clocked in. Clock out first, or ask your "
-            "supervisor for a correction."
-        )
+    # Starting one looks only at today. A shift somebody forgot to close on
+    # Friday is a record to correct, not a reason to keep them off the clock
+    # on Monday — which is exactly what it used to be.
+    if kind == AttendanceEvent.CLOCK_IN:
+        today = timezone.localtime(when).date()
+        if open_clock_in(employee, on_date=today) is not None:
+            raise ClockError(
+                "You are already clocked in today. Clock out first, or ask "
+                "your supervisor for a correction."
+            )
 
     event = AttendanceEvent.objects.create(
         employee=employee,

@@ -1,20 +1,74 @@
 {% extends "base.html" %}
 {% load a1 %}
-{% block title %}My tasks — A1 360{% endblock %}
+{% block title %}My work — A1 360{% endblock %}
 
-{% block page_title %}My tasks{% endblock %}
+{% block page_title %}My work{% endblock %}
 {% block page_sub %}
-  {{ open_tasks|length }} open{% if overdue_count %} · {{ overdue_count }} overdue{% endif %}
-  · across every project you are on
+  {{ open_tasks|length }} task{{ open_tasks|length|pluralize }}{% if my_tickets %} · {{ my_tickets|length }} ticket{{ my_tickets|length|pluralize }}{% endif %}{% if overdue_count %} · {{ overdue_count }} overdue{% endif %}
+  · everything handed to you
 {% endblock %}
 
 {% comment %}
 Everything assigned to this person, wherever it came from. A task that only
 appears on the project page it was created on is a note to whoever created
 it, not work anyone will do.
+
+Tickets belong here for a sharper reason: before this they appeared nowhere
+at all for the person they were given to. Assignment moved the status, wrote
+the trail and sent an email, and the technician had no screen on which to
+find the job.
 {% endcomment %}
 
 {% block content %}
+  {% if my_tickets %}
+    <div class="card">
+      <div class="hd">
+        <b>Tickets assigned to you</b>
+        <span class="meta">Open · soonest due first</span>
+      </div>
+      <div class="scroll-x">
+        <table style="min-width:680px">
+          <thead>
+            <tr>
+              <th scope="col">Ticket</th>
+              <th scope="col">Customer &amp; site</th>
+              <th scope="col">Expected</th>
+              <th scope="col">Waiting</th>
+              <th scope="col">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ticket in my_tickets %}
+              <tr>
+                <td>
+                  <a href="{% url 'crm-ticket-detail' ticket.pk %}" class="two" style="text-decoration:none">
+                    <b class="mono">{{ ticket.reference }}</b>
+                    <span>{{ ticket.description|truncatechars:48 }}</span>
+                  </a>
+                </td>
+                <td>
+                  <div class="two">
+                    <b>{{ ticket.customer.name }}</b>
+                    <span>{{ ticket.site.name|default:"No site" }}</span>
+                  </div>
+                </td>
+                <td class="t-small {% if ticket.due_date %}dim{% else %}dim2{% endif %}">
+                  {% if ticket.start_date or ticket.due_date %}
+                    {{ ticket.start_date|a1daterange:ticket.due_date }}
+                  {% else %}Not set{% endif %}
+                </td>
+                <td class="mono t-small {% if ticket.is_ageing %}warn{% else %}dim{% endif %}">
+                  {{ ticket.created_at|a1waited }}
+                </td>
+                <td><span class="pill p-prog"><i></i>{{ ticket.status.label }}</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
   {% if open_tasks %}
     <div class="card">
       <div class="hd">
@@ -54,8 +108,8 @@ it, not work anyone will do.
         </a>
       {% endfor %}
     </div>
-  {% else %}
-    {% include "shell/_empty.html" with icon="projects" heading="Nothing assigned to you" body="Work given to you on any project appears here, and lands in your attention queue once it is overdue. Nothing is waiting on you right now." %}
+  {% elif not my_tickets %}
+    {% include "shell/_empty.html" with icon="projects" heading="Nothing assigned to you" body="Tasks and tickets given to you appear here, wherever they came from, and land in your attention queue once they are overdue. Nothing is waiting on you right now." %}
   {% endif %}
 
   {% if done_tasks %}

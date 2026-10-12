@@ -30,6 +30,20 @@ row that already exists instead of creating a second one.
       <i></i><span id="queue-text">Saved on this device</span>
     </div>
 
+    {% if stale_since %}
+      {% comment %}
+      An unclosed shift from an earlier day. It used to block the clock
+      entirely — one forgotten clock-out and the person could never clock in
+      again. It is now an open record to settle, shown here so they know to
+      ask, and so nobody is surprised by the hours it eventually shows.
+      {% endcomment %}
+      <div class="msg msg-error">
+        You never clocked out on {{ stale_since|a1date }}. You can still clock
+        in today — but ask your supervisor to correct that day, or it stays on
+        your record with no end to it.
+      </div>
+    {% endif %}
+
     <div class="fgrid">
       <div class="fmain">
       {% comment %}

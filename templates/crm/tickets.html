@@ -12,11 +12,20 @@
 {% endblock %}
 
 {% block content %}
+  {% comment %}
+  One box, two destinations. Searching here has always matched customer
+  names, but it answers with tickets — so somebody looking for the customer
+  had to leave, find the register, and type it again. The second button
+  sends the same term there instead, via formaction, which needs no script.
+  {% endcomment %}
   <form method="get" class="filters">
     <input type="search" name="q" value="{{ query }}" style="max-width:300px"
-           placeholder="Search tickets, customers, sites…" aria-label="Search tickets">
+           placeholder="Search tickets, customers, sites…"
+           aria-label="Search tickets and customers">
     <input type="hidden" name="filter" value="{{ active_filter }}">
-    <button class="btn btn-sec" type="submit">Search</button>
+    <button class="btn btn-sec" type="submit">Search tickets</button>
+    <button class="btn btn-sec" type="submit" formaction="{% url 'crm-customers' %}"
+            formnovalidate>Search customers</button>
   </form>
 
   <nav class="filters" aria-label="Ticket filters">
@@ -30,14 +39,15 @@
   {% if tickets %}
     <div class="card">
       <div class="scroll-x">
-        <table style="min-width:860px">
+        <table style="min-width:980px">
           <thead>
             <tr>
               <th scope="col">Ticket</th>
               <th scope="col">Customer &amp; site</th>
               <th scope="col">Service type</th>
               <th scope="col">Assigned</th>
-              <th scope="col">Age</th>
+              <th scope="col">Expected</th>
+              <th scope="col">Waiting</th>
               <th scope="col">Status</th>
             </tr>
           </thead>
@@ -66,11 +76,18 @@
                           style="display:flex;gap:6px;align-items:center">
                       {% csrf_token %}
                       <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      {% comment %}
+                      Iterating .choices rather than .queryset, so this list
+                      shows the same labels the full form does — including
+                      who is away on approved leave. Walking the queryset
+                      rebuilt the labels by hand here and quietly dropped
+                      that marking.
+                      {% endcomment %}
                       <select name="assigned_to" aria-label="Assign {{ ticket.reference }}"
-                              style="min-height:36px;max-width:132px;font-size:13px">
+                              style="min-height:36px;max-width:150px;font-size:13px">
                         <option value="">Assign to…</option>
-                        {% for choice in assign_form.assigned_to.field.queryset %}
-                          <option value="{{ choice.pk }}">{{ choice.get_full_name|default:choice.email }}</option>
+                        {% for value, label in assign_form.assigned_to.field.choices %}
+                          {% if value %}<option value="{{ value }}">{{ label }}</option>{% endif %}
                         {% endfor %}
                       </select>
                       <button class="btn btn-sec btn-sm" type="submit">Assign</button>
@@ -78,8 +95,25 @@
                   {% else %}
                     <span class="bad">Unassigned</span>
                   {% endif %}
+                  {% if assign_form and ticket.is_open and not assign_form.assigned_to.field.queryset %}
+                    <span class="help">
+                      Nobody holds a role that can be sent to a job yet — the
+                      Technician role grants it, in Settings → Users.
+                    </span>
+                  {% endif %}
                 </td>
-                <td class="mono {% if ticket.is_ageing %}warn{% else %}dim{% endif %}">{{ ticket.age_label }}</td>
+                <td class="t-small">
+                  {% if ticket.start_date or ticket.due_date %}
+                    <span class="{% if ticket.is_overdue %}bad{% else %}dim{% endif %}">
+                      {{ ticket.start_date|a1daterange:ticket.due_date }}
+                    </span>
+                  {% else %}
+                    <span class="dim2">Not set</span>
+                  {% endif %}
+                </td>
+                <td class="mono {% if ticket.is_ageing %}warn{% else %}dim{% endif %}">
+                  {{ ticket.created_at|a1waited }}
+                </td>
                 <td>
                   {% if not ticket.is_open %}
                     <span class="pill p-clos"><i></i>{{ ticket.status.label }}</span>

@@ -181,10 +181,16 @@ def clock(request):
     }
 
     if employee is not None:
-        open_in = services.open_clock_in(employee)
+        today = timezone.localdate()
+        # Today's shift decides what the button offers. A shift left open on
+        # an earlier day is shown separately as something to get corrected,
+        # and never stands between somebody and the clock.
+        open_in = services.open_clock_in(employee, on_date=today)
+        stale = services.stale_clock_in(employee, on_date=today)
         context.update(
             {
                 "open_since": open_in,
+                "stale_since": stale,
                 "elapsed_minutes": (
                     int((timezone.now() - open_in).total_seconds() // 60) if open_in else 0
                 ),

@@ -10,6 +10,7 @@ Every mutation writes an append-only TicketEvent, so the activity log is a
 read of history rather than a summary somebody has to remember to update.
 """
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -20,7 +21,11 @@ from config import notifications
 from projects.services import notify_project_manager
 from config.pagination import paginate
 from accounts.templatetags.a1 import a1daterange
-from accounts.decorators import require_permission, user_has_permission
+from accounts.decorators import (
+    require_any_permission,
+    require_permission,
+    user_has_permission,
+)
 from config.models import StatusOption
 from config.references import next_reference
 
@@ -229,14 +234,30 @@ def tickets(request):
     )
 
 
-@require_permission("view_ticket_status")
+@require_any_permission("view_ticket_status", "view_own_job_list")
 def ticket_detail(request, pk):
+    """
+    The office reads any ticket; a technician reads the ones given to them.
+
+    The same shape as a field job, and for the same reason. Before this, a
+    ticket assigned to a technician was invisible to them: assignment moved
+    the status, wrote the trail and sent an email, and left the person it
+    was given to with no screen on which to see it. The client reported it
+    as "assigned task to a specific person is not displaying from their
+    end", which is exactly what it was.
+    """
     ticket = get_object_or_404(
         Ticket.objects.select_related(
             "customer", "site", "service_type", "status", "assigned_to", "raised_by"
         ),
         pk=pk,
     )
+    # Holding view_ticket_status reads the whole register. Without it, the
+    # only ticket anybody reaches is one that was handed to them.
+    if not user_has_permission(request.user, "view_ticket_status"):
+        if ticket.assigned_to_id != request.user.pk:
+            raise PermissionDenied("not your ticket")
+
     project = getattr(ticket, "project", None)
 
     return render(

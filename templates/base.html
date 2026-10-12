@@ -20,9 +20,16 @@ Blocks a page fills in:
 
 {% block body %}
 <a class="skip" href="#main">Skip to content</a>
+{% comment %}
+The scrim behind the mobile navigation drawer. A button rather than a div so
+it is reachable from the keyboard and announces itself; it is invisible and
+inert above 900px, where the sidebar is a sidebar again.
+{% endcomment %}
+<button class="nav-scrim" type="button" id="nav-scrim" tabindex="-1" aria-hidden="true"></button>
 <div class="a1-app">
 
-  <aside class="a1-side">
+  {# tabindex so the drawer can take focus when it opens; it is not a tab stop. #}
+  <aside class="a1-side" id="a1-side" tabindex="-1">
     <a class="a1-brand" href="{% url 'dashboard-index' %}">
       <img class="mark" src="{% static 'img/a1-mark.png' %}" alt="">
       <span class="wordmark">
@@ -175,25 +182,86 @@ Blocks a page fills in:
 (function () {
   "use strict";
 
-  // -- collapsing the sidebar -------------------------------------------
+  // -- the sidebar, which is two different things ------------------------
+  //
+  // On a wide screen it is a column the burger collapses to icons. Below
+  // 900px it is hidden entirely and the burger has to OPEN it as a drawer.
+  // That second case did not exist: the burger toggled `nav-collapsed`,
+  // which narrows a sidebar that is already `display: none`, so on a phone
+  // it did nothing whatsoever and Projects, Tickets and Finance could not
+  // be reached at all. The bottom tab bar carries a technician's two
+  // screens and was never a substitute for the menu.
   var toggle = document.getElementById("nav-toggle");
+  var scrim = document.getElementById("nav-scrim");
+  var side = document.getElementById("a1-side");
   var KEY = "a1.nav.collapsed";
+  var DRAWER = window.matchMedia("(max-width: 900px)");
 
-  function apply(collapsed) {
+  function isDrawer() { return DRAWER.matches; }
+
+  function describe() {
+    var open = isDrawer()
+      ? document.body.classList.contains("nav-open")
+      : !document.body.classList.contains("nav-collapsed");
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    toggle.setAttribute(
+      "aria-label",
+      isDrawer()
+        ? (open ? "Close the menu" : "Open the menu")
+        : (open ? "Collapse the sidebar" : "Expand the sidebar")
+    );
+    scrim.setAttribute("aria-hidden", open && isDrawer() ? "false" : "true");
+    scrim.tabIndex = open && isDrawer() ? 0 : -1;
+  }
+
+  function setCollapsed(collapsed) {
     document.body.classList.toggle("nav-collapsed", collapsed);
-    toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    toggle.setAttribute("aria-label", collapsed ? "Expand the sidebar" : "Collapse the sidebar");
+    try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch (e) {}
+    describe();
+  }
+
+  function setDrawer(open) {
+    document.body.classList.toggle("nav-open", open);
+    describe();
+    // Focus follows the drawer, or a keyboard user is left behind the scrim.
+    if (open) { side.focus({ preventScroll: true }); } else { toggle.focus(); }
   }
 
   var stored = null;
   try { stored = localStorage.getItem(KEY); } catch (e) {}
-  apply(stored === "1");
+  document.body.classList.toggle("nav-collapsed", stored === "1");
+  describe();
 
   toggle.addEventListener("click", function () {
-    var collapsed = !document.body.classList.contains("nav-collapsed");
-    apply(collapsed);
-    try { localStorage.setItem(KEY, collapsed ? "1" : "0"); } catch (e) {}
+    if (isDrawer()) {
+      setDrawer(!document.body.classList.contains("nav-open"));
+    } else {
+      setCollapsed(!document.body.classList.contains("nav-collapsed"));
+    }
   });
+
+  scrim.addEventListener("click", function () { setDrawer(false); });
+
+  // Following a link closes it. Without this the drawer is still sitting
+  // over the page you just navigated to.
+  side.addEventListener("click", function (event) {
+    if (isDrawer() && event.target.closest("a")) { setDrawer(false); }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && document.body.classList.contains("nav-open")) {
+      setDrawer(false);
+    }
+  });
+
+  // Rotating a phone, or dragging a desktop window narrow, must not leave
+  // the drawer open over a layout that no longer has one.
+  var onChange = function () {
+    if (!isDrawer()) { document.body.classList.remove("nav-open"); }
+    describe();
+  };
+  if (DRAWER.addEventListener) { DRAWER.addEventListener("change", onChange); }
+  else if (DRAWER.addListener) { DRAWER.addListener(onChange); }
 
   // -- the account menu --------------------------------------------------
   // Opened with a pointer, it grows out of the avatar that opened it, so the

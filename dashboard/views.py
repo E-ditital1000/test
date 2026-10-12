@@ -240,6 +240,18 @@ def my_tasks(request):
     mine = Task.objects.for_person(request.user).select_related(
         "project__customer", "assigned_by"
     )
+    # Tickets handed to this person, which had no screen of their own at
+    # all. A ticket assigned to a technician moved its status, wrote its
+    # trail and emailed them, and then appeared nowhere they could reach —
+    # reported by the client as work "not displaying from their end". This
+    # screen already claims to be everything assigned to you, so it is where
+    # they belong.
+    my_tickets = (
+        Ticket.objects.filter(assigned_to=request.user)
+        .open()
+        .select_related("customer", "site", "service_type", "status")
+        .order_by("due_date", "-created_at")
+    )
     return render(
         request,
         "dashboard/my_tasks.html",
@@ -247,5 +259,6 @@ def my_tasks(request):
             "open_tasks": mine.open(),
             "overdue_count": mine.overdue().count(),
             "done_tasks": mine.filter(completed_at__isnull=False)[:10],
+            "my_tickets": my_tickets,
         },
     )

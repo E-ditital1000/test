@@ -26,6 +26,47 @@ def _mark_who_is_away(field):
 User = get_user_model()
 
 
+def who_can_be_sent_to_a_job():
+    """
+    The people a ticket can be handed to: whoever holds `view_own_job_list`.
+
+    A permission, not a job title — but the consequence has to be visible.
+    A-1 reported that their technicians' names were missing from this
+    dropdown, and they were: the field staff held only the Employee role,
+    which carries clocking and leave and nothing else, so every one of them
+    was filtered out and the list silently offered office accounts instead.
+
+    An empty or short dropdown looks like a dropdown. `explain_the_list`
+    below says what is being filtered and where to change it, which is the
+    same lesson projects.TaskForm learned when its own list came back empty.
+    """
+    return (
+        User.objects.filter(
+            is_active=True,
+            user_roles__role__permissions__code="view_own_job_list",
+        )
+        .distinct()
+        .order_by("first_name", "last_name")
+    )
+
+
+def explain_the_list(field):
+    """Say who is offered, and what to do when somebody is missing."""
+    count = field.queryset.count()
+    if count:
+        field.help_text = (
+            f"{count} {'person' if count == 1 else 'people'} can be sent to a "
+            "job. Somebody missing holds no role granting “view own job "
+            "list” — give them the Technician role in Settings → Users."
+        )
+    else:
+        field.help_text = (
+            "Nobody can be sent to a job yet. Assignment needs a role granting "
+            "“view own job list” — the Technician role has it. "
+            "Set that in Settings → Users and the list fills."
+        )
+
+
 class CustomerForm(forms.ModelForm):
     """
     Two customers in one register: a person, and an organisation reached
@@ -219,14 +260,8 @@ class TicketForm(forms.ModelForm):
         else:
             # Who can be sent to a job is a permission, not a job title —
             # the same list the ticket list offers.
-            self.fields["assigned_to"].queryset = (
-                User.objects.filter(
-                    is_active=True,
-                    user_roles__role__permissions__code="view_own_job_list",
-                )
-                .distinct()
-                .order_by("first_name", "last_name")
-            )
+            self.fields["assigned_to"].queryset = who_can_be_sent_to_a_job()
+            explain_the_list(self.fields["assigned_to"])
             _mark_who_is_away(self.fields["assigned_to"])
         # Sites belong to a customer. Until one is chosen there is nothing
         # sensible to offer, and offering every site in the company invites
@@ -363,14 +398,8 @@ class TicketAssignForm(forms.Form):
         # and not by whether HR has caught up: a technician is someone who
         # holds their own job list. Filtering on the employee register instead
         # left the dropdown silently empty for a new starter.
-        self.fields["assigned_to"].queryset = (
-            User.objects.filter(
-                is_active=True,
-                user_roles__role__permissions__code="view_own_job_list",
-            )
-            .distinct()
-            .order_by("first_name", "last_name")
-        )
+        self.fields["assigned_to"].queryset = who_can_be_sent_to_a_job()
+        explain_the_list(self.fields["assigned_to"])
         _mark_who_is_away(self.fields["assigned_to"])
 
 
