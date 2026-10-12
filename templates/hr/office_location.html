@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Where people clock — HR — A1 360{% endblock %}
+
+{% block page_title %}Where people clock{% endblock %}
+{% block page_sub %}The office location a clock event is measured against{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'hr-codes' %}">Attendance codes</a>
+  <a class="btn btn-sec" href="{% url 'hr-roll-call' %}">Daily roll-call</a>
+{% endblock %}
+
+{% comment %}
+Attendance has captured a GPS fix since the first day and compared it to
+nothing, because there was nowhere to say what "here" meant. Somebody could
+clock in from home and the record would faithfully store the coordinates of
+their living room.
+
+The codes carry no coordinates of their own — one office, set here, and a
+code stays a code.
+{% endcomment %}
+
+{% block content %}
+  {% include "shell/_hr_nav.html" with active="office_location" %}
+
+  {% if not current %}
+    <div class="msg msg-error">
+      No office location is set, so <b>nothing is being checked</b>. Clock
+      events still record where the phone said it was, and nobody is refused
+      — including somebody clocking in from home.
+    </div>
+  {% else %}
+    <div class="msg msg-info">
+      Staff may clock within <b>{{ current.2 }} m</b> of
+      <span class="mono">{{ current.0 }}, {{ current.1 }}</span>, plus whatever
+      margin of error their own phone reports.
+    </div>
+  {% endif %}
+
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:720px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        <b>How to find the numbers.</b> Open a map on a phone standing at the
+        office, press and hold on the building, and copy the two numbers it
+        shows. Latitude first.
+      </div>
+    </div>
+
+    <div class="card compact">
+      <div class="hd"><b>What this changes</b></div>
+      <dl>
+        <div class="kv">
+          <dt>Clocking with a location</dt>
+          <dd>
+            Inside the radius, it just works. Outside it but within the
+            phone's own margin of error, it is recorded and flagged on the
+            roll-call. Beyond both, it is refused — the phone is confident,
+            and confident that it is somewhere else.
+          </dd>
+        </div>
+        <div class="kv">
+          <dt>Clocking with no location</dt>
+          <dd>
+            Allowed only with a scanned attendance code. Without that, turning
+            location off would simply be how somebody clocks in from home.
+          </dd>
+        </div>
+        <div class="kv">
+          <dt>A supervisor recording for somebody</dt>
+          <dd>
+            Never judged. They are at a desk entering an event for a person
+            who was on a site, so measuring the supervisor's phone would
+            refuse the very thing that exemption exists for.
+          </dd>
+        </div>
+        <div class="kv">
+          <dt>The attendance codes</dt>
+          <dd>
+            Unchanged, and carrying no coordinates. A code proves somebody had
+            it in front of them; this proves they were here. A photograph of a
+            code works from a sofa — together they do not.
+          </dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'hr-codes' %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save the location</button>
+    </div>
+  </form>
+{% endblock %}

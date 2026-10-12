@@ -59,6 +59,47 @@ a leave day is *worth* is its problem, not this one.
 `hr.tests` asserts the header contains none of `salary`, `rate`, `pay` or
 `wage`, and asserts the full header line verbatim.
 
+## Where a clock event was taken
+
+Every clock event has always carried a GPS fix. Until now it was compared to
+nothing: there was nowhere in the system to say what "here" meant, so
+somebody could clock in from home and the record would faithfully store the
+coordinates of their living room.
+
+HR or an Admin now sets one office location and a radius in
+**HR → Where people clock**. Attendance codes carry no coordinates of their
+own — a code stays a code.
+
+| Situation | What happens |
+| --- | --- |
+| Inside the radius | Recorded, `location_check = at_the_place` |
+| Outside it, but within the phone's own stated accuracy | Recorded, `location_check = near_enough`, flagged on the roll-call |
+| Outside both | **Refused.** No event is written |
+| No fix, attendance code scanned | Recorded, `location_check = not_checked` |
+| No fix, no code | **Refused** |
+| No office location set | Recorded, nothing judged |
+| A supervisor recording on somebody's behalf | Never judged |
+
+Two of those are the whole design rather than details.
+
+**A scanned code does not excuse a bad position.** `AttendanceCode` says of
+itself that a printed code is a shared secret and a photograph works as well
+as the paper. The code proves possession; the fix is what proves presence.
+
+**No fix without a code is refused.** Otherwise denying the browser's
+location permission is simply how somebody clocks in from home, and the
+whole check is theatre. With a code, possession stands in for position —
+which is what keeps a phone that cannot see satellites inside a concrete
+building from stopping a real employee working.
+
+`distance_m` is stored on the event, not recomputed. The office location is
+a setting somebody can change, and recomputing would silently restate where
+people were on days nobody revisited — the same reason a leave request
+stores its own day count.
+
+Neither field is exported. Payroll is owed hours, not positions; the
+columns above are unchanged by this.
+
 ## Edge cases the consumer should expect
 
 - **Never clocked out.** An employee who went home without clocking out has a

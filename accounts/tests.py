@@ -80,6 +80,8 @@ ENDPOINTS = {
     # Attendance codes
     "hr-codes": "manage_attendance_codes",
     "hr-code-create": "manage_attendance_codes",
+    # Where a clock event is measured against. HR's, beside the codes.
+    "hr-office-location": "manage_attendance_codes",
     # Leave. Asking is the floor every account holds; deciding is HR's, and
     # a supervisor reads their own crew's without holding the pen.
     "hr-leave-mine": "request_leave",
@@ -202,6 +204,54 @@ class SeededAccessControlTests(TestCase):
                             f"{role_name} does not hold {code} but reached {url_name}",
                         )
             self.client.logout()
+
+    @tag("acceptance")
+    def test_whoever_takes_people_on_can_grant_the_role_they_take_them_on_into(self):
+        """
+        A role may only be granted by somebody who already holds every
+        permission in it — the guard that stops anyone handing out Admin and
+        inheriting it back. It has a consequence that is easy to miss:
+        anything added to a role must also be held by whoever assigns it.
+
+        Adding the technician floor to Employee without adding it to HR left
+        HR unable to create an Employee, which is HR's entire job, and the
+        symptom was an onboarding form that silently refused to submit. The
+        invariant is this, not the broader "every role carries the floor" —
+        Finance has no business submitting assessments and does not need to.
+        """
+        from .services import can_grant_role
+
+        onboarding = [
+            name for name, grants in ROLE_GRANTS.items()
+            if {"manage_employees", "manage_users"} & {code for code, _s in grants}
+        ]
+        self.assertTrue(onboarding, "somebody must be able to take people on")
+
+        for name in onboarding:
+            user = make_user(f"{name.lower().replace(' ', '.')}.grants@test.local", [name])
+            for target in ("Employee", "Technician"):
+                with self.subTest(onboarder=name, role=target):
+                    self.assertTrue(
+                        can_grant_role(user, Role.objects.get(name=target)),
+                        f"{name} takes people on but cannot grant {target} — "
+                        "check what was added to that role",
+                    )
+
+    @tag("acceptance")
+    def test_the_floor_role_is_a_technicians_role(self):
+        """
+        A-1's rule: there is no technician who is not an employee. The two
+        pre-built roles therefore carry the same rights, and Technician is
+        the name the office uses rather than a different level of access.
+        """
+        floor = {(code, scope) for code, scope in ROLE_GRANTS["Employee"]}
+        technician = {(code, scope) for code, scope in ROLE_GRANTS["Technician"]}
+        self.assertEqual(
+            floor,
+            technician,
+            "Employee and Technician must grant the same thing, or the field "
+            "staff on one of them cannot do the work the other does",
+        )
 
     def test_custom_role_created_at_runtime_reaches_exactly_its_grants(self):
         """

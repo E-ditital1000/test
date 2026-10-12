@@ -226,8 +226,30 @@ class OfficeRequisitionTests(RequisitionTestCase):
         self.assertContains(response, "That date has passed")
         self.assertFalse(Requisition.objects.exists())
 
-    def test_somebody_without_the_permission_is_refused(self):
-        nobody = make_user("clerk@t.local", ["Employee"])
+    def test_somebody_not_on_the_project_cannot_raise_against_it(self):
+        """
+        The floor role can raise requisitions — every technician is an
+        employee at A-1 — but only against projects they are crewed on. The
+        scope filters the project out of their queryset entirely, so it is
+        not found rather than forbidden: the same answer somebody gets for a
+        project that does not exist, which is the right one to give about a
+        project that is none of their business.
+        """
+        outsider = make_user("clerk@t.local", ["Employee"])
+        self.client.force_login(outsider)
+        self.assertEqual(self.client.get(self.url()).status_code, 404)
+        self.assertFalse(Requisition.objects.exists())
+
+    def test_somebody_without_the_permission_at_all_is_refused(self):
+        from accounts.models import Permission, Role, RolePermission
+
+        bare = Role.objects.create(name="Front Desk Only")
+        RolePermission.objects.create(
+            role=bare,
+            permission=Permission.objects.get(code="view_dashboard"),
+            scope="all",
+        )
+        nobody = make_user("nobody@t.local", ["Front Desk Only"])
         self.client.force_login(nobody)
         self.assertEqual(self.client.get(self.url()).status_code, 403)
 

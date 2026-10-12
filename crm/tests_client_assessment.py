@@ -134,14 +134,71 @@ class TheAssignmentPickerExplainsItself(TestCase):
     def setUpTestData(cls):
         call_command("seed_permissions", verbosity=0, reset_system_roles=True)
 
-    def test_a_person_on_the_employee_role_is_not_offered(self):
+    @tag("acceptance")
+    def test_somebody_on_the_employee_role_can_be_given_a_ticket(self):
+        """
+        The item as A-1 reported it. Their nine field staff were all on the
+        Employee role, which could not be sent to a job, so the picker
+        filtered every one of them out and offered office accounts instead.
+
+        Being assignable is part of the floor now — chosen over moving them
+        all to Technician, which also carries GPS check-in, assessments and
+        raising requisitions.
+        """
         from crm.forms import who_can_be_sent_to_a_job
 
-        make_user("floor.ca@test.local", ["Employee"], first_name="Peterson")
-        self.assertEqual(
-            list(who_can_be_sent_to_a_job()), [],
-            "the Employee role carries no job list, so nobody is sendable",
+        floor = make_user("floor.ca@test.local", ["Employee"], first_name="Peterson")
+        self.assertIn(
+            floor, who_can_be_sent_to_a_job(),
+            "the people doing the work must be offerable in the picker",
         )
+
+    @tag("acceptance")
+    def test_the_floor_role_can_do_a_technicians_work(self):
+        """
+        A-1's rule: there is no technician who is not an employee. So the
+        floor role carries the job list, GPS check-in, assessments and
+        requisitions — I had held these apart, which was my distinction and
+        not the company's, and it left the people who do the work unable to
+        be given any.
+        """
+        from accounts.decorators import user_has_permission
+
+        floor = make_user("floor2.ca@test.local", ["Employee"])
+        for code in (
+            "view_own_job_list", "gps_check_in", "submit_assessment",
+            "view_projects", "raise_requisition",
+        ):
+            self.assertTrue(
+                user_has_permission(floor, code),
+                f"somebody on the floor role must hold {code}",
+            )
+
+    def test_the_floor_reaches_only_its_own_projects(self):
+        """
+        What keeps requisitions safe on a role every account starts with:
+        the right is held at own-projects scope, so a person crewed on
+        nothing reaches nothing.
+        """
+        from accounts.scoping import user_scopes_for
+
+        floor = make_user("floor3.ca@test.local", ["Employee"])
+        self.assertEqual(user_scopes_for(floor, "raise_requisition"), {"own_projects"})
+        self.assertEqual(user_scopes_for(floor, "view_projects"), {"own_projects"})
+
+    def test_the_floor_still_holds_nothing_the_office_holds(self):
+        """It does a technician's work, not a supervisor's or finance's."""
+        from accounts.decorators import user_has_permission
+
+        floor = make_user("floor4.ca@test.local", ["Employee"])
+        for withheld in (
+            "approve_requisition", "assign_ticket", "manage_users",
+            "approve_leave", "view_project_cost", "issue_invoice",
+        ):
+            self.assertFalse(
+                user_has_permission(floor, withheld),
+                f"the floor must not carry {withheld}",
+            )
 
     def test_a_technician_is_offered(self):
         from crm.forms import who_can_be_sent_to_a_job
@@ -150,11 +207,14 @@ class TheAssignmentPickerExplainsItself(TestCase):
         self.assertIn(tech, who_can_be_sent_to_a_job())
 
     def test_an_empty_picker_says_what_to_do_about_it(self):
+        """
+        Still reachable on a system where nobody holds the permission at
+        all — a fresh deployment, or roles edited in Settings. An empty
+        dropdown looks like a dropdown, so it has to explain itself.
+        """
         from crm.forms import TicketAssignForm
 
-        make_user("floor2.ca@test.local", ["Employee"])
-        form = TicketAssignForm()
-        help_text = form.fields["assigned_to"].help_text
+        help_text = TicketAssignForm().fields["assigned_to"].help_text
         self.assertIn("Technician", help_text)
         self.assertIn("Settings", help_text)
 

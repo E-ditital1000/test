@@ -166,8 +166,23 @@ class AttentionQueueTests(TestCase):
         )
 
     def test_a_user_with_no_module_permissions_is_told_so(self):
-        """Distinct from an empty system: they hold nothing, not nothing exists."""
-        bare = make_user("bare@test.local", ["Employee"])
+        """
+        Distinct from an empty system: they hold nothing, not nothing exists.
+
+        Built from a role granting only the dashboard rather than from
+        Employee. Employee is the floor every staff account starts on and the
+        floor now reaches a module — somebody on it has their own job list —
+        so it stopped being an example of holding nothing.
+        """
+        from accounts.models import Permission, RolePermission
+
+        only_the_dashboard = Role.objects.create(name="Nothing At All")
+        RolePermission.objects.create(
+            role=only_the_dashboard,
+            permission=Permission.objects.get(code="view_dashboard"),
+            scope="all",
+        )
+        bare = make_user("bare@test.local", ["Nothing At All"])
         self.client.force_login(bare)
         body = self.client.get(reverse("dashboard-index")).content.decode()
         self.assertIn("Nothing is assigned to your account yet", body)

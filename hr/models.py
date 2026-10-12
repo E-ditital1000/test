@@ -239,6 +239,34 @@ class AttendanceEvent(MobileOriginatedModel):
         related_name="events",
     )
 
+    # What the location was judged to be when the event was written, and how
+    # far away it was. Stored rather than derived, for the same reason a
+    # leave request stores its own day count: the office location is a
+    # setting somebody can change, and recomputing later would silently
+    # restate where people were on days nobody revisited.
+    AT_THE_PLACE = "at_the_place"
+    NEAR_ENOUGH = "near_enough"
+    NOT_CHECKED = "not_checked"
+    LOCATION_CHECKS = [
+        (AT_THE_PLACE, "At the place"),
+        # Outside the boundary, but inside the phone's own margin of error.
+        # Recorded and flagged rather than refused: a cheap handset in a
+        # concrete yard can be honestly wrong by a hundred metres, and
+        # turning that into a locked-out employee is the worse mistake.
+        (NEAR_ENOUGH, "Within the margin of error"),
+        # No office set, or no fix to judge. Not a verdict, an absence of one.
+        (NOT_CHECKED, "Not checked"),
+    ]
+
+    distance_m = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Metres from the office when this was recorded.",
+    )
+    location_check = models.CharField(
+        max_length=20, choices=LOCATION_CHECKS, default=NOT_CHECKED
+    )
+
     class Meta:
         ordering = ["device_timestamp"]
         indexes = [models.Index(fields=["employee", "device_timestamp"])]

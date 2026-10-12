@@ -39,6 +39,7 @@ ROLE_GRANTS = {
         # Reads the whole company's leave; decides none of it.
         ("view_leave", SCOPE_ALL),
         ("view_leave_reports", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
     ],
 
     # Invoices, payments, expenses, requisition approval, project cost,
@@ -59,6 +60,7 @@ ROLE_GRANTS = {
         ("export_reports", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
         ("request_leave", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
     ],
 
     # Employee register, attendance records, corrections, attendance
@@ -81,6 +83,17 @@ ROLE_GRANTS = {
         ("manage_leave", SCOPE_ALL),
         ("manage_leave_types", SCOPE_ALL),
         ("view_leave_reports", SCOPE_ALL),
+        # The floor, because HR takes people on and a role can only be
+        # granted by somebody holding every permission in it. Without these
+        # four, HR cannot create an Employee at all — which is how this was
+        # discovered, as an onboarding form that silently refused to submit.
+        # Scoped to own projects, they reach nothing for a person who is not
+        # crewed on one.
+        ("view_own_job_list", SCOPE_ALL),
+        ("gps_check_in", SCOPE_ALL),
+        ("submit_assessment", SCOPE_ALL),
+        ("view_projects", SCOPE_OWN_PROJECTS),
+        ("raise_requisition", SCOPE_OWN_PROJECTS),
     ],
 
     # Create customers and tickets, log calls, view ticket status. No
@@ -93,6 +106,7 @@ ROLE_GRANTS = {
         ("view_ticket_status", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
         ("request_leave", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
     ],
 
     # Assign jobs, review and approve assessments, daily roll-call,
@@ -123,6 +137,7 @@ ROLE_GRANTS = {
         # them into it; a supervisor who could approve it would be approving
         # days against a balance they cannot see.
         ("view_leave", SCOPE_OWN_TEAM),
+        ("view_own_job_list", SCOPE_ALL),
     ],
 
     # Own projects, tasks and crews; raise requisitions; view their
@@ -141,6 +156,7 @@ ROLE_GRANTS = {
         ("raise_requisition", SCOPE_OWN_PROJECTS),
         ("clock_in_out", SCOPE_ALL),
         ("request_leave", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
     ],
 
     # Own job list, GPS check-in, submit assessments, own attendance
@@ -165,12 +181,28 @@ ROLE_GRANTS = {
         ("request_leave", SCOPE_ALL),
     ],
 
-    # Clock in and out, view own attendance history, put in for leave. The
-    # floor every staff account starts on.
+    # The floor every staff account starts on — and at A-1 that floor does
+    # the work.
+    #
+    # "There is no way we have a technician who is not an employee." So this
+    # role carries everything a technician needs, and Technician below is
+    # the same set under a name the office recognises. Keeping them apart
+    # was my distinction, not the company's: it left nine people who do
+    # field work unable to be assigned a ticket, because the picker offers
+    # whoever can be sent to a job and this role could not.
+    #
+    # Requisitions and project visibility are scoped to own projects, so
+    # somebody not crewed on anything holds the right and reaches nothing.
+    # That is what makes it safe to put on the floor.
     "Employee": [
         ("view_dashboard", SCOPE_ALL),
         ("clock_in_out", SCOPE_ALL),
         ("request_leave", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
+        ("gps_check_in", SCOPE_ALL),
+        ("submit_assessment", SCOPE_ALL),
+        ("view_projects", SCOPE_OWN_PROJECTS),
+        ("raise_requisition", SCOPE_OWN_PROJECTS),
     ],
 }
 

@@ -4,6 +4,7 @@ source: this module is the single routine that rebuilds it from the
 append-only event log plus corrections, and `hr.tests` proves that wiping
 the table and rebuilding reconstructs it identically.
 """
+import logging
 import uuid
 from collections import defaultdict
 from datetime import datetime, time, timedelta
@@ -12,9 +13,12 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.utils import timezone
 
+from config.geo import metres_between
 from config.models import PolicySetting
 
 from .models import AttendanceCode, AttendanceCorrection, AttendanceDay, AttendanceEvent
+
+logger = logging.getLogger("a1360.attendance")
 
 
 def _late_policy():
@@ -245,6 +249,97 @@ def rebuild_attendance_days(employee=None, since=None, until=None):
 class ClockError(Exception):
     """A clock event the log will not accept, with a message for the phone."""
 
+# --------------------------------------------------------------------------
+# Being where you say you are
+# --------------------------------------------------------------------------
+
+def office_location():
+    """
+    (latitude, longitude, radius_m) for the place people clock, or None when
+    nobody has set one.
+
+    None means the boundary has not been drawn, and nothing is enforced. A
+    half-configured geofence that refuses people is worse than none, so an
+    unset or unparsable value fails open and the screens say it is not set.
+    """
+    latitude = PolicySetting.get_value(PolicySetting.OFFICE_LATITUDE)
+    longitude = PolicySetting.get_value(PolicySetting.OFFICE_LONGITUDE)
+    if not latitude or not longitude:
+        return None
+    try:
+        latitude, longitude = float(latitude), float(longitude)
+        radius = int(float(PolicySetting.get_value(PolicySetting.GEOFENCE_RADIUS_M, "200")))
+    except (TypeError, ValueError):
+        logger.warning("the office location is not a usable coordinate")
+        return None
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180) or radius <= 0:
+        logger.warning("the office location is out of range: %s, %s", latitude, longitude)
+        return None
+    return latitude, longitude, radius
+
+
+def judge_location(*, latitude, longitude, accuracy_m, has_code):
+    """
+    Decide whether a clock event was taken at the place.
+
+    Returns (verdict, distance_m). Raising is the caller's job, so the rule
+    can be read in one piece:
+
+    **No office set** — nothing to measure against, so nothing is judged.
+
+    **No fix** — allowed if they scanned the code, refused otherwise. That
+    asymmetry is the whole design: without it, denying the browser location
+    permission is simply how you clock in from home, and the check is
+    theatre. With a code, possession stands in for position.
+
+    **A fix** — distance from the office. Inside the radius is clean.
+    Outside the radius but inside the radius plus the phone's own stated
+    accuracy is recorded and flagged, because a cheap handset in a concrete
+    yard is honestly wrong by that much and refusing it strands somebody who
+    is standing right there. Beyond both, the phone is confident and it is
+    confidently somewhere else.
+
+    Scanning alone does not exempt a fix from being judged. A printed code
+    is a shared secret — AttendanceCode says so itself — and a photograph of
+    it works from a sofa. The code proves possession; the fix is what
+    proves presence.
+    """
+    from .models import AttendanceEvent
+
+    place = office_location()
+    if place is None:
+        return AttendanceEvent.NOT_CHECKED, None
+
+    if latitude is None or longitude is None:
+        if has_code:
+            return AttendanceEvent.NOT_CHECKED, None
+        raise ClockError(
+            "Your phone did not give a location, so the clock cannot tell "
+            "where you are. Turn location on and try again, or scan the "
+            "attendance code posted at your location."
+        )
+
+    office_lat, office_lon, radius = place
+    distance = metres_between(office_lat, office_lon, latitude, longitude)
+    if distance is None:
+        return AttendanceEvent.NOT_CHECKED, None
+
+    if distance <= radius:
+        return AttendanceEvent.AT_THE_PLACE, distance
+
+    # The phone's own error is given the benefit of the doubt before anybody
+    # is turned away. A fix claiming 150m accuracy cannot refute being 200m
+    # out of a 100m circle.
+    margin = int(accuracy_m or 0)
+    if distance <= radius + margin:
+        return AttendanceEvent.NEAR_ENOUGH, distance
+
+    raise ClockError(
+        f"You appear to be about {distance} m from the office, which is too "
+        f"far to clock in or out. If you are actually here, your phone has "
+        f"the wrong position — ask your supervisor to record it for you."
+    )
+
 
 def open_clock_in(employee, on_date=None):
     """
@@ -416,6 +511,21 @@ def record_clock_event(
                 "your supervisor for a correction."
             )
 
+    # Where they were, decided before anything is written. A supervisor
+    # recording on somebody's behalf is exempt: they are standing in an
+    # office entering a correction for a person who was on a site, and
+    # judging the supervisor's phone would refuse the very thing the
+    # exemption exists for.
+    if recorded_by is None:
+        verdict, distance = judge_location(
+            latitude=latitude,
+            longitude=longitude,
+            accuracy_m=accuracy_m,
+            has_code=attendance_code is not None,
+        )
+    else:
+        verdict, distance = AttendanceEvent.NOT_CHECKED, None
+
     event = AttendanceEvent.objects.create(
         employee=employee,
         kind=kind,
@@ -427,6 +537,8 @@ def record_clock_event(
         location_unavailable=location_unavailable or latitude is None,
         recorded_by=recorded_by,
         attendance_code=attendance_code,
+        distance_m=distance,
+        location_check=verdict,
     )
     rebuild_attendance_days(
         employee=employee,
@@ -564,6 +676,24 @@ def roll_call(supervisor_employee=None, on_date=None, team=None):
         AttendanceDay.PRESENT: 4,
         AttendanceDay.ON_LEAVE: 5,
     }
+    # Where each person's clock events for the day were judged to be. One
+    # query for the whole roll-call; the verdict lives on the event, and the
+    # derived day row deliberately does not carry it.
+    from .models import AttendanceEvent
+
+    flags = {}
+    for employee_id, check in (
+        AttendanceEvent.objects.filter(
+            employee__in=people, device_timestamp__date=on_date
+        )
+        .exclude(location_check=AttendanceEvent.NOT_CHECKED)
+        .values_list("employee_id", "location_check")
+    ):
+        # A flagged event outranks a clean one: the exception is the thing
+        # worth seeing.
+        if check == AttendanceEvent.NEAR_ENOUGH or employee_id not in flags:
+            flags[employee_id] = check
+
     rows = []
     for person in people:
         day = days.get(person.pk)
@@ -591,6 +721,7 @@ def roll_call(supervisor_employee=None, on_date=None, team=None):
                 "order": order,
                 "leave_type": leave_type,
                 "worked_while_on_leave": worked_while_on_leave,
+                "location_check": flags.get(person.pk),
             }
         )
 

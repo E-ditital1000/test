@@ -45,13 +45,14 @@
     <div class="card compact">
       <div class="hd"><b>Today&rsquo;s team</b><span class="meta">Exceptions sorted to the top</span></div>
       <div class="scroll-x">
-        <table style="min-width:820px">
+        <table style="min-width:900px">
           <thead>
             <tr>
               <th scope="col">Employee</th>
               <th scope="col">Staff ID</th>
               <th scope="col">Clock in</th>
               <th scope="col">Clock out</th>
+              <th scope="col">Hours</th>
               <th scope="col">Location</th>
               <th scope="col">State</th>
               <th scope="col"><span class="sr-only">Actions</span></th>
@@ -70,6 +71,19 @@
                 </td>
                 <td class="t-small dim">
                   {% if row.day and row.day.total_minutes %}{{ row.day.total_minutes|a1hours }} recorded{% else %}—{% endif %}
+                </td>
+                <td class="t-small">
+                  {% comment %}
+                  This column was headed Location and showed hours worked.
+                  It now shows where the clock event was judged to be.
+                  {% endcomment %}
+                  {% if row.location_check == "near_enough" %}
+                    <span class="pill p-wait"><i></i>Edge of the area</span>
+                  {% elif row.location_check == "at_the_place" %}
+                    <span class="dim2">At the office</span>
+                  {% else %}
+                    <span class="dim2">—</span>
+                  {% endif %}
                 </td>
                 <td>
                   {% if row.day and row.day.still_clocked_in %}

@@ -23,16 +23,16 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `view_ticket_status` | crm | ✅ | ✅ |  |  | ✅ | ✅ | ✅ |  |  |
 | `close_ticket` | crm | ✅ |  |  |  |  | ✅ |  |  |  |
 | `convert_ticket_to_project` | crm | ✅ |  |  |  |  |  | ✅ |  |  |
-| `view_projects` | projects | ✅ | ✅ | ✅ |  |  | ✅ | 📁 | 📁 |  |
+| `view_projects` | projects | ✅ | ✅ | ✅ | 📁 |  | ✅ | 📁 | 📁 | 📁 |
 | `create_project` | projects | ✅ |  |  |  |  |  | ✅ |  |  |
 | `manage_project` | projects | ✅ |  |  |  |  |  | 📁 |  |  |
 | `view_project_cost` | projects | ✅ | ✅ | ✅ |  |  |  | 📁 |  |  |
-| `raise_requisition` | projects | ✅ |  |  |  |  |  | 📁 | 📁 |  |
+| `raise_requisition` | projects | ✅ |  |  | 📁 |  |  | 📁 | 📁 | 📁 |
 | `schedule_field_job` | fieldjobs | ✅ |  |  |  |  | ✅ | ✅ |  |  |
 | `view_field_jobs` | fieldjobs | ✅ | ✅ |  |  |  | ✅ | ✅ |  |  |
-| `view_own_job_list` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
-| `gps_check_in` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
-| `submit_assessment` | fieldjobs | ✅ |  |  |  |  |  |  | ✅ |  |
+| `view_own_job_list` | fieldjobs | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `gps_check_in` | fieldjobs | ✅ |  |  | ✅ |  |  |  | ✅ | ✅ |
+| `submit_assessment` | fieldjobs | ✅ |  |  | ✅ |  |  |  | ✅ | ✅ |
 | `review_assessment` | approvals | ✅ | ✅ |  |  |  | 👥 |  |  |  |
 | `approve_assessment` | approvals | ✅ |  |  |  |  | 👥 |  |  |  |
 | `view_quotations` | finance | ✅ | ✅ | ✅ |  |  |  |  |  |  |

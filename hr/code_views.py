@@ -26,6 +26,7 @@ from accounts import audit
 from config.pagination import paginate
 from accounts.decorators import require_permission
 
+from . import services
 from .forms import AttendanceCodeForm
 from .models import AttendanceCode
 
@@ -162,3 +163,67 @@ def code_revoke(request, pk):
         f"{code.events.count()} event(s) already recorded from it are unaffected.",
     )
     return redirect("hr-codes")
+
+
+@require_permission("manage_attendance_codes")
+def office_location(request):
+    """
+    Setting the place people clock. HR's, because HR already owns the codes
+    posted at that place; an Admin holds it too.
+
+    Until this is set, every clock event records a position and is judged
+    against nothing — somebody can clock in from home and the record stores
+    the coordinates of their living room.
+    """
+    from config.models import PolicySetting
+
+    from .forms import OfficeLocationForm
+
+    current = services.office_location()
+    form = OfficeLocationForm(
+        request.POST or None,
+        initial={
+            "latitude": current[0] if current else None,
+            "longitude": current[1] if current else None,
+            "radius_m": current[2] if current else 200,
+        },
+    )
+
+    if request.method == "POST" and form.is_valid():
+        values = {
+            PolicySetting.OFFICE_LATITUDE: form.cleaned_data["latitude"],
+            PolicySetting.OFFICE_LONGITUDE: form.cleaned_data["longitude"],
+            PolicySetting.GEOFENCE_RADIUS_M: form.cleaned_data["radius_m"],
+        }
+        for key, value in values.items():
+            PolicySetting.objects.update_or_create(
+                key=key, defaults={"value": "" if value is None else str(value)}
+            )
+        audit.record_change(
+            actor=request.user,
+            action="attendance.office_location_set",
+            target=PolicySetting.objects.get(key=PolicySetting.OFFICE_LATITUDE),
+            before=None,
+            after={str(k): str(v) for k, v in values.items()},
+            reason="Where staff may clock in and out from.",
+        )
+        if form.cleaned_data["latitude"] is None:
+            messages.success(
+                request,
+                "Office location cleared. Clock events record a position "
+                "again but are not judged against anywhere.",
+            )
+        else:
+            messages.success(
+                request,
+                f"Office location saved. Staff may clock within "
+                f"{form.cleaned_data['radius_m']} m of it, plus their phone's "
+                "own margin of error.",
+            )
+        return redirect("hr-office-location")
+
+    return render(
+        request,
+        "hr/office_location.html",
+        {"form": form, "current": current, "tab_active": "office_location"},
+    )

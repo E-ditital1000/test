@@ -177,6 +177,24 @@ class PolicySetting(TimeStampedModel):
     # setting and not a constant because it decides every leave figure in
     # the system: a Thursday-to-Tuesday request is four days on a five-day
     # week and five on a six-day one.
+    # Where the office is, and how far out still counts as being at it.
+    #
+    # Attendance captured a GPS fix from the first day and compared it to
+    # nothing, because there was nowhere to say what "here" meant. Somebody
+    # could clock in from home and the record would faithfully store the
+    # coordinates of their living room. These three give the clock something
+    # to measure against.
+    #
+    # Set by HR or an Admin in HR -> Where people clock. Unset, the clock
+    # behaves as it always did and the screen says so, rather than enforcing
+    # a boundary nobody has drawn.
+    OFFICE_LATITUDE = "attendance_office_latitude"
+    OFFICE_LONGITUDE = "attendance_office_longitude"
+    # Generous on purpose: it has to cover the yard and the parking without
+    # reaching the next street, and a phone's own error is added on top
+    # before anybody is refused.
+    GEOFENCE_RADIUS_M = "attendance_geofence_radius_m"
+
     LEAVE_REST_DAYS = "leave_rest_days"
     # The date leave started being tracked here. Days taken before it are
     # outside the system, and the balance screens say so rather than

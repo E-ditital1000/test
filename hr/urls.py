@@ -44,6 +44,8 @@ urlpatterns = [
     path("hr/leave/settings/holidays/<int:pk>/edit/", leave_views.leave_holiday_edit, name="hr-leave-holiday-edit"),
 
     # The codes HR prints and posts where crews clock.
+    # Where people may clock from. HR's, beside the codes posted there.
+    path("hr/where-people-clock/", code_views.office_location, name="hr-office-location"),
     path("hr/codes/", code_views.codes, name="hr-codes"),
     path("hr/codes/new/", code_views.code_create, name="hr-code-create"),
     path("hr/codes/<int:pk>/print/", code_views.code_print, name="hr-code-print"),

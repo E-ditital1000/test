@@ -268,3 +268,50 @@ class EmployeeOnboardingForm(forms.Form):
         if Employee.objects.filter(staff_id__iexact=staff_id).exists():
             raise forms.ValidationError("That staff ID is already on the register.")
         return staff_id
+
+
+class OfficeLocationForm(forms.Form):
+    """
+    Where people clock, and how far out still counts.
+
+    Three Settings values rather than a model: the attendance policy figures
+    behind "late" already live there, and this is the same kind of thing —
+    a number the business owns, changed without a release.
+
+    Left blank, nothing is enforced. That is deliberate and the screen says
+    so: a half-drawn boundary that refuses people is worse than no boundary
+    at all.
+    """
+
+    latitude = forms.DecimalField(
+        max_digits=9, decimal_places=6, required=False,
+        min_value=-90, max_value=90,
+        label="Office latitude",
+        help_text="From a phone map: hold the office, copy the first number.",
+    )
+    longitude = forms.DecimalField(
+        max_digits=9, decimal_places=6, required=False,
+        min_value=-180, max_value=180,
+        label="Office longitude",
+        help_text="The second number from the same place.",
+    )
+    radius_m = forms.IntegerField(
+        required=False, min_value=20, max_value=5000, initial=200,
+        label="How far out still counts",
+        help_text="Metres. Enough for the yard and the parking, not the next "
+                  "street. 150-200 is usually right; a phone's own margin of "
+                  "error is allowed on top of this before anybody is refused.",
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        latitude = cleaned.get("latitude")
+        longitude = cleaned.get("longitude")
+        if (latitude is None) != (longitude is None):
+            raise forms.ValidationError(
+                "A location needs both numbers, or neither. One on its own "
+                "cannot be measured against."
+            )
+        if latitude is not None and not cleaned.get("radius_m"):
+            cleaned["radius_m"] = 200
+        return cleaned

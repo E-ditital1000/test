@@ -24,6 +24,7 @@ absent, not disabled, because no condition would make it usable for them.
   {% endif %}
   {% if perms_held.manage_attendance_codes %}
     <a class="chip {% if active == 'codes' %}on{% endif %}" href="{% url 'hr-codes' %}">Attendance codes</a>
+    <a class="chip {% if active == 'office_location' %}on{% endif %}" href="{% url 'hr-office-location' %}">Where people clock</a>
   {% endif %}
   {% if perms_held.view_leave %}
     <a class="chip {% if active == 'leave_queue' %}on{% endif %}" href="{% url 'hr-leave-queue' %}">Leave requests</a>
