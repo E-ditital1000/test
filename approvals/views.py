@@ -132,6 +132,6 @@ def assessment_decide(request, pk):
         messages.success(
             request,
             f"Returned to {assessment.technician.get_full_name() or assessment.technician.email}. "
-            "They see your comment on the job.",
+            "Your comment is on the job for them to read.",
         )
     return redirect("approvals-queue")

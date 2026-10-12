@@ -154,7 +154,8 @@ def leave_request_create(request):
                 request,
                 f"Leave requested for {leave_request.working_days} working "
                 f"day{'' if leave_request.working_days == 1 else 's'}. "
-                "HR has been told and will decide it.",
+                "It is with HR now, and shows on their queue. An email has "
+                "been queued to them as well.",
             )
             if on_behalf and leave_request.employee != own:
                 return redirect("hr-leave-detail", pk=leave_request.pk)
@@ -331,10 +332,15 @@ def leave_decide(request, pk):
     if decision == Approval.APPROVED:
         messages.success(
             request,
-            f"Approved. {name} has been told, and the days are off their balance.",
+            f"Approved. The days are off {name}'s balance and it shows on "
+            "their own leave screen. An email has been queued to them too.",
         )
     elif decision == Approval.DECLINED:
-        messages.success(request, f"Declined. {name} has been told, with your reason.")
+        messages.success(
+            request,
+            f"Declined. {name} sees your reason on their own leave screen, "
+            "and an email has been queued to them.",
+        )
     else:
         messages.success(request, f"Sent back to {name} with your note.")
     return redirect("hr-leave-queue")

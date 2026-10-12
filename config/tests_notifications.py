@@ -6,12 +6,13 @@ raised it, nobody is told about work they could not act on anyway, and no
 message carries a password or a sign-in link — staff here sign in with work
 addresses that are not all read, and that decision is not reopened by this.
 """
+import pathlib
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import Role, UserRole
@@ -374,4 +375,68 @@ class AMailServerThatHangsTests(TestCase):
         self.assertLessEqual(
             live.EMAIL_TIMEOUT, 30,
             "EMAIL_TIMEOUT must stay well under gunicorn's 60s worker timeout",
+        )
+
+
+class NoScreenPromisesDeliveryTests(SimpleTestCase):
+    """
+    A screen may say a message was sent. It may not say it arrived.
+
+    An administrator approved leave on production and was told "A-1 Tech has
+    been told". They had not been: outbound SMTP was blocked, and the
+    attempt failed on a background thread ten seconds later. The approval
+    was correct, the balance was correct, and the one sentence on screen was
+    false — which is worse than silence, because it stops anybody checking.
+
+    Delivery is asynchronous and can fail after the response has been
+    rendered, so no screen is in a position to promise it. The reliable
+    thing to say is what the system did: recorded the decision, moved the
+    balance, queued a message.
+    """
+
+    # Phrases that assert somebody received something.
+    FORBIDDEN = (
+        "has been told",
+        "have been told",
+        "they see your comment",
+        # Not "they have seen" — too broad. The pager legitimately discusses
+        # whether a reader has seen a list, which is nothing to do with mail.
+        "has received",
+        "will receive an email",
+    )
+    SKIP_PARTS = (
+        ".venv", "staticfiles", "node_modules", "__pycache__", "migrations",
+        "docs", ".git",
+    )
+
+    def _sources(self):
+        from django.conf import settings
+
+        root = pathlib.Path(settings.BASE_DIR)
+        for pattern in ("**/*.py", "**/*.html"):
+            for path in root.glob(pattern):
+                parts = set(path.parts)
+                if parts & set(self.SKIP_PARTS):
+                    continue
+                name = path.name
+                if name.startswith("test") or "tests" in name:
+                    continue
+                yield path
+
+    def test_no_screen_claims_a_message_was_received(self):
+        offenders = []
+        for path in self._sources():
+            try:
+                text = path.read_text(encoding="utf-8").lower()
+            except (UnicodeDecodeError, OSError):
+                continue
+            for phrase in self.FORBIDDEN:
+                if phrase in text:
+                    offenders.append(f"{path.name}: '{phrase}'")
+        self.assertEqual(
+            offenders,
+            [],
+            "These say a message arrived, which cannot be known when the "
+            "screen renders — delivery happens after the commit, on another "
+            "thread, and can fail silently: " + "; ".join(offenders),
         )

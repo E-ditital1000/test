@@ -172,8 +172,9 @@ not cover.
                 <textarea id="comment" name="comment" rows="3"
                           placeholder="Required if you decline or send it back."></textarea>
                 <span class="help">
-                  Whatever you write here is emailed to them, and it is the
-                  only thing they see. Declining without a reason is refused.
+                  Whatever you write here goes on the request for them to
+                  read, and is emailed to them as well. It is the only
+                  explanation they get, so declining without one is refused.
                 </span>
               </div>
             </div>
@@ -194,7 +195,7 @@ not cover.
           </div>
           {% if can_manage and request_row.is_approved %}
             <form method="post" action="{% url 'hr-leave-cancel' request_row.pk %}"
-                  onsubmit="return confirm('Cancel this approved leave? {{ employee.full_name }} will be emailed.')">
+                  onsubmit="return confirm('Cancel this approved leave? The days go back on {{ employee.full_name }}&#39;s balance.')">
               {% csrf_token %}
               <div class="stack">
                 <div class="fld wide">

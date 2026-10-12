@@ -73,7 +73,7 @@ needs to know whether to make arrangements.
       {% include "shell/_pager.html" with page=waiting noun="request" plural="requests" %}
     </div>
   {% else %}
-    {% include "shell/_empty.html" with icon="hr" heading="Nothing waiting on a decision" body="Leave requests land here as soon as somebody puts one in, soonest start at the top. Everyone who can approve leave is emailed when one arrives, so this screen is not something anybody has to keep checking." %}
+    {% include "shell/_empty.html" with icon="hr" heading="Nothing waiting on a decision" body="Leave requests land here as soon as somebody puts one in, soonest start at the top. Everyone who can approve leave is emailed as well — but a request appears here whether or not that message arrives, so this screen is the one to trust." %}
   {% endif %}
 
   {% if settled %}
