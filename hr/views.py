@@ -323,6 +323,11 @@ def roll_call(request):
             "rows": rows,
             "on_date": on_date,
             "counts": counts,
+            # "Still clocked in" is only true of today. On a day already
+            # closed it means they never clocked out, and the hours are not
+            # recoverable — saying they are still on the clock three days
+            # later invites somebody to wait for a clock-out that cannot come.
+            "viewing_today": on_date == timezone.localdate(),
         },
     )
 

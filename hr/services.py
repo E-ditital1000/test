@@ -252,17 +252,25 @@ def open_clock_in(employee, on_date=None):
     Read from the event log rather than a status field, so it stays true
     even after a correction rewrites history.
 
-    `on_date` limits the question to one local day, and exists because the
-    two callers are asking different things. "Is there a shift to close?"
-    means the last one, whenever it started — somebody who clocked in at
-    23:00 and out at 03:00 worked a night, and must be able to close it.
-    "Am I already clocked in?" means *today*, because an unclosed shift from
-    last Friday is not a reason to stop somebody starting work on Monday.
+    `on_date` limits the question to one local day, which is the rule A-1
+    set: a day closes with the day. Both directions are bounded by it.
 
-    That difference was the bug: this scanned every event ever recorded, so
-    one forgotten clock-out locked the employee out of the clock
-    permanently. Four people on the live system had been unable to clock in
-    for three days.
+    Starting a shift asks only about today, so a shift somebody forgot to
+    close on Friday does not stop them working on Monday. That was the bug —
+    this scanned every event ever recorded, and one forgotten clock-out
+    locked the employee out of the clock permanently. Four people on the
+    live system had been unable to clock in for three days.
+
+    Closing one asks only about today as well, so nobody can clock out
+    against a day the system never saw them leave. The honest consequence is
+    that such a day carries a start, no end, and no hours; a supervisor
+    correction is what settles it, because that carries an actor and a
+    reason where a late clock-out would carry neither.
+
+    The cost, stated rather than hidden: a shift that runs past midnight
+    cannot be clocked out of the next morning. On a six-day week that ends
+    in the evening this is the right trade, and it is A-1's to revisit if
+    night work ever becomes normal.
     """
     rows = [row for row in effective_events(employee=employee) if row[0] == employee.pk]
     open_in = None
@@ -374,13 +382,29 @@ def record_clock_event(
                 "for the current one at your location."
             )
 
-    # Closing a shift looks at the last open one whenever it began, so a
-    # night that runs past midnight can still be clocked out of.
-    if kind == AttendanceEvent.CLOCK_OUT and open_clock_in(employee) is None:
-        raise ClockError(
-            "You are not clocked in, so there is nothing to clock out of. "
-            "If you forgot to clock in, ask your supervisor for a correction."
-        )
+    # A day closes with the day. An employee who went home without clocking
+    # out cannot come back and clock out against it later: the system never
+    # saw them leave, so any end it accepted would be a time somebody chose
+    # rather than a time anybody worked, and the hours it produced would be
+    # fiction presented as a record. A-1's rule, and the right one.
+    #
+    # The day keeps its clock-in and shows no end and no duration. Settling
+    # what was actually worked is a supervisor correction, which carries an
+    # actor and a reason — unlike a late clock-out, which would carry
+    # neither.
+    if kind == AttendanceEvent.CLOCK_OUT:
+        today = timezone.localtime(when).date()
+        if open_clock_in(employee, on_date=today) is None:
+            if stale_clock_in(employee, on_date=today) is not None:
+                raise ClockError(
+                    "You did not clock out that day, and it has already been "
+                    "closed. The system cannot say what hours you worked, so "
+                    "it records none. Ask your supervisor to correct that day."
+                )
+            raise ClockError(
+                "You are not clocked in, so there is nothing to clock out of. "
+                "If you forgot to clock in, ask your supervisor for a correction."
+            )
     # Starting one looks only at today. A shift somebody forgot to close on
     # Friday is a record to correct, not a reason to keep them off the clock
     # on Monday — which is exactly what it used to be.

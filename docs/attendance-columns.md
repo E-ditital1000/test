@@ -61,10 +61,21 @@ a leave day is *worth* is its problem, not this one.
 
 ## Edge cases the consumer should expect
 
-- **Still clocked in.** An employee who never clocked out has a day row with
-  `still_clocked_in` true and no paired duration, so it adds `0` to
-  `total_hours` while still counting as present. The roll-call surfaces this
-  as an exception for a supervisor to correct.
+- **Never clocked out.** An employee who went home without clocking out has a
+  day row with `still_clocked_in` true, no `last_out`, and no paired
+  duration, so it adds `0` to `total_hours` while still counting as present.
+
+  **The day closes with the day and cannot be reopened.** They may not come
+  back and clock out against it later: the system never saw them leave, so
+  any end it accepted would be a time somebody chose rather than a time
+  anybody worked, and those hours would reach payroll as fact. Settling what
+  was actually worked is a supervisor correction, which carries an actor and
+  a mandatory reason — a late clock-out would carry neither.
+
+  The consequence, stated rather than hidden: a shift running past midnight
+  cannot be clocked out of the next morning. On A-1's six-day week ending in
+  the evening that is the right trade, and it is theirs to revisit if night
+  work becomes normal.
 - **A corrected event** keeps its original row. The export uses the
   *effective* time — the correction's value — and counts the correction.
 - **A voided event** drops out of every figure but stays on the record.

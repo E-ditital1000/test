@@ -92,6 +92,16 @@ inert above 900px, where the sidebar is a sidebar again.
         {% if attention_count %}<span class="dot">{{ attention_count }}</span>{% endif %}
       </a>
 
+      {% comment %}
+      Only for somebody signed in. This block used to render unconditionally,
+      and `{{ user.get_full_name|default:user.email }}` raises on an
+      AnonymousUser — a filter ARGUMENT that fails to resolve is not silently
+      swallowed the way a plain variable is. So every anonymous render of
+      this shell died, which meant the 404 and 403 pages (both of which
+      extend it) answered 500. Any mistyped URL on the live site returned
+      "Internal Server Error" instead of "Not found".
+      {% endcomment %}
+      {% if user.is_authenticated %}
       <div class="a1-usermenu">
         <button class="a1-user" type="button" id="user-toggle"
                 aria-haspopup="true" aria-expanded="false" aria-controls="user-sheet">
@@ -131,6 +141,9 @@ inert above 900px, where the sidebar is a sidebar again.
           </form>
         </div>
       </div>
+      {% else %}
+        <a class="btn btn-sec" href="{% url 'login' %}">Sign in</a>
+      {% endif %}
     </header>
 
     <header class="a1-bar">
@@ -272,6 +285,12 @@ inert above 900px, where the sidebar is a sidebar again.
   var sheet = document.getElementById("user-sheet");
   var EXIT_MS = 100;   // matches --dur-pop-exit
   var leaving = null;
+
+  // Signed out there is no account menu to wire up — the error pages are
+  // the one place this shell renders for a stranger. Without this guard
+  // `userToggle.addEventListener` throws on null and everything registered
+  // after it, including Ctrl+K, never happens.
+  if (!userToggle || !sheet) { return; }
 
   function finishLeaving() {
     clearTimeout(leaving);

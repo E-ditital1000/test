@@ -9,10 +9,12 @@ refusal said "You are already clocked in. Clock out first", and clocking out
 wrote a clock-out against a shift that had ended days ago. Four people on
 the live system had been stuck like that for three days.
 
-The rule now differs by direction, because the two questions are different:
-closing a shift looks at the last open one whenever it began, so a night
-that runs past midnight can still be closed; starting one looks only at
-today.
+A-1's rule, stated after seeing the first fix: a day closes with the day.
+Nobody may come back and clock out against a day the system never saw them
+leave, because any end it accepted would be a time somebody chose rather
+than a time anybody worked. Such a day keeps its clock-in, shows no end and
+no duration, and only a supervisor correction — which carries an actor and a
+reason — can settle what was worked.
 """
 import uuid
 from datetime import datetime, time, timedelta
@@ -86,17 +88,65 @@ class ForgettingToClockOutTests(TestCase):
             self._clock(AttendanceEvent.CLOCK_IN, self._at(today, 9))
         self.assertIn("already clocked in today", str(caught.exception))
 
-    def test_a_night_shift_can_still_be_clocked_out_of(self):
+    @tag("acceptance")
+    def test_you_cannot_clock_out_against_a_day_you_did_not_close(self):
         """
-        Closing a shift looks at the last open one whenever it started. Day-
-        bounding both directions would have broken work that runs past
-        midnight.
+        A-1's rule. The system never saw them leave, so it has no end to
+        record; accepting one later would turn a time somebody picked into
+        hours on a payroll export.
         """
         today = timezone.localdate()
         yesterday = today - timedelta(days=1)
-        self._clock(AttendanceEvent.CLOCK_IN, self._at(yesterday, 23))
-        event, created = self._clock(AttendanceEvent.CLOCK_OUT, self._at(today, 3))
-        self.assertTrue(created)
+        self._clock(AttendanceEvent.CLOCK_IN, self._at(yesterday, 8))
+
+        with self.assertRaises(services.ClockError) as caught:
+            self._clock(AttendanceEvent.CLOCK_OUT, self._at(today, 9))
+        message = str(caught.exception)
+        self.assertIn("did not clock out that day", message)
+        self.assertIn("supervisor", message, "it must say what to do instead")
+
+        self.assertFalse(
+            AttendanceEvent.objects.filter(
+                employee=self.employee, kind=AttendanceEvent.CLOCK_OUT
+            ).exists(),
+            "no clock-out may be written against a closed day",
+        )
+
+    def test_the_unclosed_day_records_a_start_and_no_hours(self):
+        """
+        What the day is left showing: they arrived, and nothing else is
+        known. Not zero hours worked — no hours recorded.
+        """
+        from hr.models import AttendanceDay
+
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        self._clock(AttendanceEvent.CLOCK_IN, self._at(yesterday, 8))
+        services.rebuild_attendance_days()
+
+        day = AttendanceDay.objects.get(employee=self.employee, date=yesterday)
+        self.assertIsNotNone(day.first_in, "the arrival is on the record")
+        self.assertIsNone(day.last_out, "and nothing is invented for the end")
+        self.assertEqual(day.total_minutes, 0)
+        self.assertTrue(day.still_clocked_in, "flagged for a supervisor to settle")
+
+    def test_a_closed_day_is_not_shown_as_still_on_the_clock(self):
+        """
+        "Still clocked in" is only true of today. Three days later it reads
+        as somebody at work, and invites waiting for a clock-out that cannot
+        come.
+        """
+        today = timezone.localdate()
+        yesterday = today - timedelta(days=1)
+        self._clock(AttendanceEvent.CLOCK_IN, self._at(yesterday, 8))
+        services.rebuild_attendance_days()
+
+        supervisor = make_user("rollcall.sup@test.local", ["Admin"])
+        self.client.force_login(supervisor)
+        response = self.client.get("/hr/roll-call/", {"date": yesterday.isoformat()})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No clock-out")
+        self.assertNotContains(response, "Still clocked in")
 
     def test_clocking_out_with_nothing_open_is_still_refused(self):
         with self.assertRaises(services.ClockError) as caught:

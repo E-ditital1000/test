@@ -29,7 +29,16 @@
     <div class="metric {% if counts.late %}alert{% endif %}"><span>Late</span><b>{{ counts.late }}</b><em>after the grace period</em></div>
     <div class="metric {% if counts.absent %}alert{% endif %}"><span>Absent</span><b>{{ counts.absent }}</b><em>no clock event, no leave</em></div>
     <div class="metric"><span>On leave</span><b>{{ counts.on_leave }}</b><em>approved and accounted for</em></div>
-    <div class="metric {% if counts.still_in %}alert{% endif %}"><span>Still clocked in</span><b>{{ counts.still_in }}</b><em>never clocked out</em></div>
+    {% comment %}
+    Today it means somebody is at work. On a day already closed it means
+    they never clocked out and no hours were recorded for them — a thing to
+    correct, not a thing still running.
+    {% endcomment %}
+    <div class="metric {% if counts.still_in %}alert{% endif %}">
+      <span>{% if viewing_today %}Still clocked in{% else %}No clock-out{% endif %}</span>
+      <b>{{ counts.still_in }}</b>
+      <em>{% if viewing_today %}on the clock now{% else %}no hours recorded for the day{% endif %}</em>
+    </div>
   </div>
 
   {% if rows %}
@@ -64,7 +73,17 @@
                 </td>
                 <td>
                   {% if row.day and row.day.still_clocked_in %}
-                    <span class="pill p-prog"><i></i>Still clocked in</span>
+                    {% if viewing_today %}
+                      <span class="pill p-prog"><i></i>Still clocked in</span>
+                    {% else %}
+                      {% comment %}
+                      The day is closed. They never clocked out, so no hours
+                      were recorded for it and none can be — only a
+                      correction can settle what was worked.
+                      {% endcomment %}
+                      <span class="pill p-over"><i></i>No clock-out</span>
+                      <br><span class="dim2 t-small">no hours recorded</span>
+                    {% endif %}
                   {% elif row.worked_while_on_leave %}
                     {% comment %}
                     An exception worth seeing: they were granted the day off
