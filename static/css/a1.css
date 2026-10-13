@@ -192,9 +192,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; }
 .brand-lockup img { width: 44px; height: 44px; display: block; }
 .brand-lockup b { font-size: 24px; font-weight: 700; color: #fff; }
-/* The full logo, for light grounds only: its ring text is navy and would
-   disappear on the navy panel. Sized to sit above the form as an identity
-   line, not as a hero — the sign-in is the job of this screen. */
+/* The full lockup, for light grounds only — now because it carries its own
+   navy ground, which would vanish against the navy sign-in panel. (It used
+   to be the opposite reason: the old artwork had navy ring text.) Sized to
+   sit above the form as an identity line, not as a hero — signing in is the
+   job of this screen. */
 .logo-full {
   width: 72px; height: 72px; display: block; margin: 0 auto;
   object-fit: contain;

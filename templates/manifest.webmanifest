@@ -9,6 +9,7 @@
   "background_color": "#F7F8FB",
   "theme_color": "#11043A",
   "icons": [
-    { "src": "{% static 'img/a1-mark.png' %}", "sizes": "256x256", "type": "image/png", "purpose": "any" }
+    { "src": "{% static 'img/a1-app-icon.png' %}", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "{% static 'img/a1-mark.png' %}", "sizes": "256x256", "type": "image/png", "purpose": "maskable" }
   ]
 }
