@@ -458,12 +458,26 @@ class TaskVisibilityTests(TestCase):
             "open work must lead, on either database",
         )
 
-    def test_a_task_reaches_the_assignees_dashboard(self):
+    def test_a_task_reaches_the_assignee(self):
+        """
+        The guarantee is that work given to somebody reaches them, not that
+        it reaches one particular screen. The dashboard now shows the shape
+        of the work rather than a list of it, so the overdue task is counted
+        there and named on the two screens that list work.
+        """
         self.client.force_login(self.tech)
-        body = self.client.get(reverse("dashboard-index")).content.decode()
-        self.assertIn("My tasks", body)
-        # And the overdue one is in the queue, ranked from when it fell due.
-        self.assertIn("Run cabling", body)
+
+        dashboard = self.client.get(reverse("dashboard-index")).content.decode()
+        self.assertIn("My tasks", dashboard)
+        self.assertIn("waiting on you", dashboard)
+
+        # Named where work is listed: their own work screen,
+        mine = self.client.get(reverse("dashboard-my-tasks")).content.decode()
+        self.assertIn("Run cabling", mine)
+
+        # and the queue of everything blocked on them.
+        waiting = self.client.get(reverse("dashboard-attention")).content.decode()
+        self.assertIn("Run cabling", waiting)
 
     def test_a_task_reaches_the_assignees_phone(self):
         self.client.force_login(self.tech)

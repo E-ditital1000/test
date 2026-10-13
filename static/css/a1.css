@@ -170,6 +170,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
    -------------------------------------------------------------------------- */
 .a1-app { display: flex; min-height: 100vh; }
 
+/* The mobile drawer's scrim, which only exists below 900px.
+   Every rule for it used to live inside that media query, so on a desktop
+   it had no styles at all and rendered as what it is — an empty <button>
+   in normal flow, sitting above the app and pushing the whole page down by
+   its own height. A visible strip above the header, from an element that
+   was never meant to be seen at this width. */
+.nav-scrim { display: none; }
+
 .a1-side {
   width: var(--sidebar-w); flex: none; background: var(--navy);
   padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
@@ -1375,6 +1383,7 @@ input[type=checkbox], input[type=radio] {
   /* The scrim. Tapping anywhere off the drawer closes it, which is what
      every phone user tries first. */
   .nav-scrim {
+    display: block;
     position: fixed;
     inset: 0;
     z-index: 59;

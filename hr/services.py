@@ -35,7 +35,29 @@ def _late_policy():
         hour, minute = (int(part) for part in start_raw.split(":")[:2])
         return time(hour, minute), int(grace_raw)
     except (ValueError, TypeError):
+        # Failing open is right — a missing policy must not mark a workforce
+        # late. Failing open SILENTLY is what hid this on the live system
+        # for days: the grace period had been given "8:30" instead of a
+        # number of minutes, int() raised, and lateness switched itself off
+        # for everybody with nothing anywhere saying so.
+        logger.warning(
+            "Lateness is not being judged: workday start %r and grace %r "
+            "cannot be read. The grace period is a number of MINUTES.",
+            start_raw, grace_raw,
+        )
         return None, 0
+
+
+def lateness_is_judged():
+    """
+    Whether the roll-call's "late" column means anything today.
+
+    The screens that show lateness ask this, so a policy nobody can parse
+    reads as "not being judged" on the screen rather than as a workforce
+    that is never late.
+    """
+    start, _grace = _late_policy()
+    return start is not None
 
 
 def effective_events(employee=None, since=None, until=None):

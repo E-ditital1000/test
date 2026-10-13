@@ -24,6 +24,15 @@
 {% block content %}
   {% include "shell/_hr_nav.html" with active="roll_call" %}
 
+  {% if not lateness_judged %}
+    <div class="msg msg-error">
+      <b>Nobody is being marked late.</b> The workday start or the grace
+      period in Settings &rarr; Policy cannot be read, so lateness is not
+      being judged at all and everyone who clocks in reads as present. The
+      grace period is a number of <b>minutes</b> — 30, not 08:30.
+    </div>
+  {% endif %}
+
   <div class="mrow">
     <div class="metric ok"><span>In on time</span><b>{{ counts.present }}</b><em>clocked in within the grace period</em></div>
     <div class="metric {% if counts.late %}alert{% endif %}"><span>Late</span><b>{{ counts.late }}</b><em>after the grace period</em></div>

@@ -328,6 +328,10 @@ def roll_call(request):
             # recoverable — saying they are still on the clock three days
             # later invites somebody to wait for a clock-out that cannot come.
             "viewing_today": on_date == timezone.localdate(),
+            # Said on the screen, because a policy nobody can parse means
+            # nobody is ever late and the column quietly stops meaning
+            # anything.
+            "lateness_judged": services.lateness_is_judged(),
         },
     )
 

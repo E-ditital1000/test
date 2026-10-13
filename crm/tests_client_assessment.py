@@ -327,6 +327,24 @@ class TheMenuWorksOnAPhone(TestCase):
             "hiding the sidebar outright is what left the phone with no menu",
         )
 
+    def test_the_scrim_is_invisible_above_the_breakpoint(self):
+        """
+        It is a <button>. Styled only inside the mobile media query, it
+        rendered on desktop as an empty box in normal flow, above the app,
+        pushing the whole page down — a visible strip above the header from
+        an element nobody was meant to see at that width.
+        """
+        css = (ROOT / "static" / "css" / "a1.css").read_text(encoding="utf-8")
+        breakpoint_at = css.index("@media (max-width: 900px)")
+        base, mobile = css[:breakpoint_at], css[breakpoint_at:]
+
+        self.assertIn(
+            ".nav-scrim { display: none; }", base,
+            "without a base rule the scrim takes up space on every desktop page",
+        )
+        rule = mobile[mobile.index(".nav-scrim {"):]
+        self.assertIn("display: block;", rule[:220], "and it must come back below 900px")
+
     def test_the_page_carries_the_scrim_and_a_focusable_drawer(self):
         base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
         self.assertIn('id="nav-scrim"', base)
