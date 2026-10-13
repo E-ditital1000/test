@@ -18,7 +18,7 @@ from fieldjobs.models import Assessment, FieldJob
 from projects.models import Project
 
 from .search import search
-from .services import attention_queue
+from .services import attention_count, attention_queue
 
 
 def _tile(label, value, url_name, hint="", tone=""):
@@ -123,20 +123,58 @@ def index(request):
             )
         )
 
+    from . import charts
     from .birthdays import is_birthday_today, upcoming_birthdays
 
-    queue = attention_queue(user)
+    # The dashboard shows the shape of the work, not a list of it. The
+    # queue moved to its own screen: ranked red text ageing for ever read
+    # as an emergency nobody could clear, and taught people to stop looking
+    # at the first screen they see every morning.
+    week = {"days": [], "headcount": 0, "max": 0}
+    columns = []
+    if user_has_permission(user, "view_attendance_records"):
+        week = charts.attendance_week(user)
+        columns = charts.attendance_columns(week)
+
+    fortnight = {"has_data": False, "total_raised": 0, "total_closed": 0}
+    lines = {}
+    if user_has_permission(user, "view_ticket_status"):
+        fortnight = charts.tickets_fortnight()
+        lines = charts.ticket_lines(fortnight)
+
     return render(
         request,
         "dashboard/index.html",
         {
             "tiles": tiles,
-            "queue": queue,
+            "week": week,
+            "columns": columns,
+            "fortnight": fortnight,
+            "lines": lines,
+            "waiting_count": attention_count(user),
             "birthdays": upcoming_birthdays(),
             "my_birthday": is_birthday_today(user),
             "today": timezone.localdate(),
             "is_executive": user_has_permission(user, "view_executive_dashboard"),
         },
+    )
+
+
+@require_permission("view_dashboard")
+def attention(request):
+    """
+    Everything blocked on this person, on a screen of its own.
+
+    It used to sit under the dashboard's metrics, ranked by how long each
+    thing had waited and coloured red. A-1 asked for it off there, and they
+    were right twice over: a list that ages for ever reads as an emergency
+    nobody can clear, and the first screen somebody sees each morning should
+    tell them how the work is going rather than hand them a backlog.
+    """
+    return render(
+        request,
+        "dashboard/attention.html",
+        {"queue": attention_queue(request.user)},
     )
 
 

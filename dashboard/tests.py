@@ -138,12 +138,44 @@ class AttentionQueueTests(TestCase):
 
     # -- the screens ------------------------------------------------------
 
-    def test_the_dashboard_shows_the_queue(self):
+    def test_the_queue_has_its_own_screen(self):
+        """
+        It used to be listed on the dashboard. A-1 asked for it off there —
+        a ranked red list ageing for ever reads as an emergency nobody can
+        clear, on the first screen people open each morning.
+        """
         self._ticket("TKT-0001", days_old=3)
         self.client.force_login(self.supervisor)
-        response = self.client.get(reverse("dashboard-index"))
+        response = self.client.get(reverse("dashboard-attention"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("TKT-0001", response.content.decode())
+
+    def test_the_dashboard_counts_what_is_waiting_without_listing_it(self):
+        self._ticket("TKT-0001", days_old=3)
+        self.client.force_login(self.supervisor)
+        body = self.client.get(reverse("dashboard-index")).content.decode()
+        self.assertNotIn("TKT-0001", body, "the list belongs on its own screen")
+        self.assertIn("waiting on you", body, "but the dashboard still says so")
+        self.assertIn(reverse("dashboard-attention"), body)
+
+    def test_the_dashboard_draws_rather_than_lists(self):
+        self.client.force_login(self.supervisor)
+        body = self.client.get(reverse("dashboard-index")).content.decode()
+        self.assertIn("Who was in", body)
+        self.assertIn("Tickets in and out", body)
+
+    def test_a_chart_carries_its_numbers_for_anybody_it_does_not_serve(self):
+        """A picture is not the only way the figures can be read."""
+        self.client.force_login(self.supervisor)
+        body = self.client.get(reverse("dashboard-index")).content.decode()
+        self.assertIn("The numbers behind this", body)
+
+    def test_identity_is_never_colour_alone(self):
+        """Every series is named in a legend beside its swatch."""
+        self.client.force_login(self.supervisor)
+        body = self.client.get(reverse("dashboard-index")).content.decode()
+        for label in ("Worked", "Late", "On leave", "Absent"):
+            self.assertIn(label, body)
 
     def test_the_command_view_is_executive_only(self):
         self.client.force_login(self.supervisor)

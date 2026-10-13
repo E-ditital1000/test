@@ -168,30 +168,18 @@ def attention_queue(user, limit=12):
                 )
             )
 
-    # -- attendance exceptions on this supervisor's team -----------------
-    if user_has_permission(user, "correct_attendance"):
-        from hr.models import AttendanceDay, Employee
-
-        team = apply_scope(
-            Employee.objects.filter(is_active=True).select_related("user"),
-            user,
-            "correct_attendance",
-            own_team_filter=Q(supervisor__user=user),
-        )
-        stuck = AttendanceDay.objects.filter(
-            employee__in=team, still_clocked_in=True, date__lt=timezone.localdate()
-        ).select_related("employee__user")
-        for day in stuck:
-            items.append(
-                Item(
-                    kind="Attendance",
-                    label=f"{day.employee.full_name} never clocked out",
-                    detail=f"Still on the clock from {day.date}",
-                    waiting_since=day.first_in or timezone.now(),
-                    url=reverse("hr-employee-attendance", args=[day.employee.pk]),
-                    tone="over",
-                )
-            )
+    # Attendance exceptions are deliberately NOT here.
+    #
+    # A day somebody forgot to clock out of used to sit in this queue ageing
+    # for ever — "waiting 4d 5h", in red, next to things that genuinely
+    # block somebody. Nothing is waiting: the day closed with the day, it
+    # cannot be reopened, and only a correction settles it. Ranking it by
+    # how long it has been there measured the wrong thing entirely, and four
+    # of thirteen forgetting on one day turned the dashboard into a wall of
+    # red that teaches people to stop reading it.
+    #
+    # Where it belongs is the roll-call, which is the screen for judging a
+    # day, and it is on there as a quiet note beside the state.
 
     # -- your own overdue work ------------------------------------------
     # No permission gate: this is the person's own task, the same way their
@@ -297,18 +285,9 @@ def attention_count(user):
             if invoice.days_overdue > 0
         )
 
-    if user_has_permission(user, "correct_attendance"):
-        from hr.models import AttendanceDay, Employee
-
-        team = apply_scope(
-            Employee.objects.filter(is_active=True),
-            user,
-            "correct_attendance",
-            own_team_filter=Q(supervisor__user=user),
-        )
-        total += AttendanceDay.objects.filter(
-            employee__in=team, still_clocked_in=True, date__lt=timezone.localdate()
-        ).count()
+    # Attendance exceptions are not counted here either — see the queue
+    # above. The badge has to agree with the list or it sends somebody
+    # looking for something that is not there.
 
     from projects.models import Task
 

@@ -1,0 +1,84 @@
+{% load a1 %}
+{% comment %}
+Who was in, over the last working week.
+
+A stacked column per day rather than four lines, because the question is
+composition — how the team split — not four independent trends. Worked sits
+at the bottom so the eye reads up from what went right to what did not, and
+the columns share one scale: the headcount.
+
+Rest days are not drawn at all. A Sunday column of zeroes is not information
+about attendance, it is a hole somebody has to learn to ignore.
+{% endcomment %}
+
+<div class="card">
+  <div class="hd">
+    <b>Who was in</b>
+    <span class="meta">Last {{ columns|length }} working day{{ columns|length|pluralize }} · {{ week.headcount }} on the register</span>
+  </div>
+
+  {% if columns %}
+    <figure class="viz-figure" style="margin:0">
+      <svg class="viz" viewBox="0 0 560 170" role="img"
+           aria-label="Attendance for the last working week, by day">
+        {# A baseline and one midline. More grid than that competes with the data. #}
+        <line class="grid" x1="0" y1="132" x2="560" y2="132"></line>
+        <line class="grid" x1="0" y1="66" x2="560" y2="66" stroke-dasharray="2 4"></line>
+
+        {% for column in columns %}
+          <g class="col" transform="translate({{ column.x }}, 0)">
+            {% for segment in column.segments %}
+              <rect x="20" y="{{ segment.y }}" width="26" height="{{ segment.height }}"
+                    fill="{{ segment.colour }}">
+                <title>{{ column.date|a1date }} — {{ segment.label }}: {{ segment.value }} of {{ week.headcount }}</title>
+              </rect>
+            {% endfor %}
+            <text class="axis" x="33" y="150" text-anchor="middle">{{ column.date|date:"D" }}</text>
+            <text class="axis" x="33" y="163" text-anchor="middle" opacity=".7">{{ column.date|date:"j M" }}</text>
+          </g>
+        {% endfor %}
+      </svg>
+
+      {# Identity is never colour alone. #}
+      <figcaption class="viz-legend">
+        <span><i style="background:var(--viz-good)"></i>Worked</span>
+        <span><i style="background:var(--viz-warning)"></i>Late</span>
+        <span><i style="background:var(--viz-neutral)"></i>On leave</span>
+        <span><i style="background:var(--viz-critical)"></i>Absent</span>
+      </figcaption>
+    </figure>
+
+    <details class="viz-table">
+      <summary>The numbers behind this</summary>
+      <div class="scroll-x">
+        <table style="min-width:420px">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col" class="num">Worked</th>
+              <th scope="col" class="num">Late</th>
+              <th scope="col" class="num">On leave</th>
+              <th scope="col" class="num">Absent</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for column in columns %}
+              <tr>
+                <td>{{ column.date|a1date }}</td>
+                <td class="num mono">{{ column.worked }}</td>
+                <td class="num mono">{{ column.late|default:"—" }}</td>
+                <td class="num mono">{{ column.leave|default:"—" }}</td>
+                <td class="num mono">{{ column.absent|default:"—" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  {% else %}
+    <div class="note">
+      Nobody is on the employee register yet, so there is no attendance to
+      show. This fills in on its own once people are clocking.
+    </div>
+  {% endif %}
+</div>

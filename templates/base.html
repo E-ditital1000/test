@@ -84,7 +84,7 @@ inert above 900px, where the sidebar is a sidebar again.
       </span>
 
       {# The bell is the attention queue's count, not a decoration. #}
-      <a class="a1-bell" href="{% url 'dashboard-index' %}#attention"
+      <a class="a1-bell" href="{% url 'dashboard-attention' %}"
          aria-label="{{ attention_count }} item{{ attention_count|pluralize }} waiting on you">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
           <path d="M9 0a1.4 1.4 0 0 1 1.4 1.2A5.6 5.6 0 0 1 14.6 6.6v3l1.2 2.2a1 1 0 0 1-.9 1.5H3.1a1 1 0 0 1-.9-1.5l1.2-2.2v-3A5.6 5.6 0 0 1 7.6 1.2 1.4 1.4 0 0 1 9 0zM6.8 14.6h4.4a2.2 2.2 0 0 1-4.4 0z"/>

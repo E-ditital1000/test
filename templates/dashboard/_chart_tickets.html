@@ -1,0 +1,63 @@
+{% load a1 %}
+{% comment %}
+Raised against closed, over a fortnight.
+
+Two series on one scale, never two y-axes — the measures are the same thing
+counted twice and belong on one axis. Two lines rather than a single net
+line, because "three in, five out" and "nothing happened at all" both net to
+minus two and say entirely different things about a week.
+{% endcomment %}
+
+<div class="card">
+  <div class="hd">
+    <b>Tickets in and out</b>
+    <span class="meta">Last 14 days · {{ fortnight.total_raised }} raised, {{ fortnight.total_closed }} closed</span>
+  </div>
+
+  {% if fortnight.has_data %}
+    <figure class="viz-figure" style="margin:0">
+      <svg class="viz" viewBox="-6 -8 578 150" role="img"
+           aria-label="Tickets raised and closed per day over the last fortnight">
+        <line class="grid" x1="0" y1="120" x2="560" y2="120"></line>
+        <line class="grid" x1="0" y1="60" x2="560" y2="60" stroke-dasharray="2 4"></line>
+        <text class="axis" x="-4" y="12" text-anchor="end">{{ lines.ceiling }}</text>
+        <text class="axis" x="-4" y="124" text-anchor="end">0</text>
+
+        <polyline points="{{ lines.closed }}" stroke="var(--viz-2)"></polyline>
+        <polyline points="{{ lines.raised }}" stroke="var(--viz-1)"></polyline>
+
+        {% for marker in lines.markers %}
+          {% if marker.closed %}
+            <circle cx="{{ marker.x }}" cy="{{ marker.closed_y }}" r="4" fill="var(--viz-2)">
+              <title>{{ marker.date|a1date }} — {{ marker.closed }} closed</title>
+            </circle>
+          {% endif %}
+          {% if marker.raised %}
+            <circle cx="{{ marker.x }}" cy="{{ marker.raised_y }}" r="4" fill="var(--viz-1)">
+              <title>{{ marker.date|a1date }} — {{ marker.raised }} raised</title>
+            </circle>
+          {% endif %}
+        {% endfor %}
+      </svg>
+
+      <figcaption class="viz-legend">
+        <span><i style="background:var(--viz-1)"></i>Raised</span>
+        <span><i style="background:var(--viz-2)"></i>Closed</span>
+        <span class="cap">
+          {% if fortnight.direction == "grew" %}
+            The list grew by {{ fortnight.net }} this fortnight.
+          {% elif fortnight.direction == "shrank" %}
+            The list shrank by {{ fortnight.net }} this fortnight.
+          {% else %}
+            As many closed as were raised.
+          {% endif %}
+        </span>
+      </figcaption>
+    </figure>
+  {% else %}
+    <div class="note">
+      No tickets have been raised or closed in the last fortnight, so there is
+      nothing to plot yet. This draws itself once the work starts coming in.
+    </div>
+  {% endif %}
+</div>

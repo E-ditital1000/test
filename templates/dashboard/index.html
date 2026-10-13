@@ -26,56 +26,49 @@
   {% endif %}
 
   {% comment %}
-  One list of everything blocked on this person, ranked by how long it has
-  waited — not grouped by type. The oldest blocked thing is always first,
-  because that is the one costing money. Each row links straight to the item.
-  {% endcomment %}
-  <div class="card">
-    <div class="hd">
-      <b>Needs your attention</b>
-      <span class="meta">Ranked by how long it has been waiting</span>
-    </div>
+  The shape of the work, not a list of it.
 
-    {% for item in queue %}
-      <a class="row-i" href="{{ item.url }}" style="text-decoration:none;color:inherit">
-        <div class="two g">
-          <b>{{ item.label }}</b>
-          <span>{{ item.detail }}</span>
+  A ranked list of everything blocked, in red, ageing for ever, used to sit
+  here. A-1 asked for it off the dashboard and they were right: the first
+  screen somebody opens in the morning should tell them how the work is
+  going. The bell in the header carries the count and leads to the list.
+
+  Two charts rather than six. A dashboard that shows everything is read as
+  wallpaper; these answer the two questions people actually open this
+  screen asking — who is in today, and is the ticket list growing.
+  {% endcomment %}
+
+  {% if not tiles %}
+    {# No tiles at all means no module permissions, not an empty database. #}
+    <div class="card">
+      <div class="blank" style="padding:32px">
+        <div class="ill">
+          <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-me"></use></svg>
         </div>
-        <span class="{% if item.tone == 'over' %}bad{% else %}warn{% endif %} t-small" style="width:120px">
-          waiting {{ item.waiting_since|a1waited }}
-        </span>
-        <span class="pill {% if item.tone == 'over' %}p-over{% else %}p-wait{% endif %}">
-          <i></i>{{ item.kind }}
-        </span>
-      </a>
-    {% empty %}
-      {% if tiles %}
-        <div class="blank" style="padding:32px">
-          <div class="ill">
-            <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-dashboard"></use></svg>
-          </div>
-          <h6>Nothing is waiting on you</h6>
-          <p>
-            No assessment, ticket, requisition or attendance exception is
-            blocked on your decision right now. Anything that becomes blocked
-            appears here, oldest first.
-          </p>
-        </div>
-      {% else %}
-        {# No tiles at all means no module permissions, not an empty database. #}
-        <div class="blank" style="padding:32px">
-          <div class="ill">
-            <svg width="34" height="34" viewBox="0 0 18 18" aria-hidden="true"><use href="#i-me"></use></svg>
-          </div>
-          <h6>Nothing is assigned to your account yet</h6>
-          <p>
-            Your role does not yet reach any module with figures on it. An Admin
-            grants access in Settings &rarr; Roles &amp; permissions.
-          </p>
-        </div>
-      {% endif %}
-    {% endfor %}
+        <h6>Nothing is assigned to your account yet</h6>
+        <p>
+          Your role does not yet reach any module with figures on it. An Admin
+          grants access in Settings &rarr; Roles &amp; permissions.
+        </p>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if waiting_count %}
+    <div class="msg msg-info">
+      {{ waiting_count }} thing{{ waiting_count|pluralize }}
+      {{ waiting_count|pluralize:"is,are" }} waiting on you.
+      <a href="{% url 'dashboard-attention' %}">Open the list</a>.
+    </div>
+  {% endif %}
+
+  <div class="cols">
+    {% if perms_held.view_attendance_records %}
+      <div style="flex:1;min-width:0">{% include "dashboard/_chart_attendance.html" %}</div>
+    {% endif %}
+    {% if perms_held.view_ticket_status %}
+      <div style="flex:1;min-width:0">{% include "dashboard/_chart_tickets.html" %}</div>
+    {% endif %}
   </div>
 
   {% comment %}

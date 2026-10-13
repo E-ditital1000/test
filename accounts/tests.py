@@ -77,6 +77,7 @@ ENDPOINTS = {
     # Wave 3 / shell
     "global-search": "view_dashboard",
     "dashboard-my-tasks": "view_dashboard",
+    "dashboard-attention": "view_dashboard",
     # Attendance codes
     "hr-codes": "manage_attendance_codes",
     "hr-code-create": "manage_attendance_codes",

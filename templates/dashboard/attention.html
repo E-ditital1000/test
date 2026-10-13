@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Needs your attention — A1 360{% endblock %}
+
+{% block page_title %}Needs your attention{% endblock %}
+{% block page_sub %}Everything blocked on you, oldest first{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-sec" href="{% url 'dashboard-index' %}">Dashboard</a>
+{% endblock %}
+
+{% comment %}
+One list of everything blocked on this particular person, ranked by how long
+it has waited — not grouped by type. The oldest blocked thing is first,
+because that is the one costing money. Each row links straight to the item.
+
+It lived on the dashboard until A-1 asked for it off there, and they were
+right twice over. A list that ages for ever reads as an emergency nobody can
+clear, and the first screen somebody opens in the morning should tell them
+how the work is going rather than hand them a backlog. The bell in the
+header carries the count and comes here.
+
+Attendance exceptions are deliberately absent. A day somebody forgot to
+clock out of closed with the day and cannot be reopened, so ranking it by
+how long it has been waiting measured the wrong thing entirely — nothing is
+waiting. It belongs on the roll-call, which is the screen for judging a day.
+{% endcomment %}
+
+{% block content %}
+  <div class="card">
+    <div class="hd">
+      <b>{{ queue|length }} item{{ queue|length|pluralize }}</b>
+      <span class="meta">Ranked by how long it has been waiting</span>
+    </div>
+
+    {% for item in queue %}
+      <a class="row-i" href="{{ item.url }}" style="text-decoration:none;color:inherit">
+        <div class="two g">
+          <b>{{ item.label }}</b>
+          <span>{{ item.detail }}</span>
+        </div>
+        <span class="{% if item.tone == 'over' %}bad{% else %}warn{% endif %} t-small" style="width:120px">
+          waiting {{ item.waiting_since|a1waited }}
+        </span>
+        <span class="pill {% if item.tone == 'over' %}p-over{% else %}p-wait{% endif %}">
+          <i></i>{{ item.kind }}
+        </span>
+      </a>
+    {% empty %}
+      {% include "shell/_empty.html" with icon="dashboard" heading="Nothing is waiting on you" body="No assessment, ticket, requisition or leave request is blocked on your decision right now. Anything that becomes blocked appears here, oldest first, and the bell in the header carries the count." %}
+    {% endfor %}
+  </div>
+{% endblock %}
