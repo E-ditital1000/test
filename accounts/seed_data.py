@@ -83,6 +83,9 @@ ROLE_GRANTS = {
         ("manage_leave", SCOPE_ALL),
         ("manage_leave_types", SCOPE_ALL),
         ("view_leave_reports", SCOPE_ALL),
+        # Correcting and removing operational records, by A-1's instruction.
+        # Not the finance ones: those stay with Finance.
+        ("manage_records", SCOPE_ALL),
         # The floor, because HR takes people on and a role can only be
         # granted by somebody holding every permission in it. Without these
         # four, HR cannot create an Employee at all — which is how this was

@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Start a project — A1 360{% endblock %}
+{% block title %}{% if project %}Edit project{% else %}Start a project{% endif %} — A1 360{% endblock %}
 
-{% block page_title %}Start a project{% endblock %}
-{% block page_sub %}For work that did not come in as a ticket{% endblock %}
+{% block page_title %}{% if project %}Edit {{ project.reference }}{% else %}Start a project{% endif %}{% endblock %}
+{% block page_sub %}{% if project %}Correcting a project already under way{% else %}For work that did not come in as a ticket{% endif %}{% endblock %}
 
 {% comment %}
 Most projects are converted from a ticket, and that route is unchanged — it
@@ -38,4 +38,39 @@ six-month job.
 
 {% block body_extra %}
   {% include "crm/_site_picker_script.html" %}
+
+  {% if project and perms_held.manage_records %}
+    {% comment %}
+    A project goes only while nothing that records what happened depends on
+    it. A requisition, a visit, an expense, an invoice or a quotation each
+    hold it back, and the refusal names which — so the person removing knows
+    whether to go and deal with that first or leave the project alone.
+    {% endcomment %}
+    <form method="post" action="{% url 'projects-remove' project.pk %}"
+          style="max-width:760px;margin-top:20px"
+          onsubmit="return confirm('Remove {{ project.reference }}? Its stages, crew, documents and tasks go with it.')">
+      {% csrf_token %}
+      <div class="card">
+        <div class="hd">
+          <b>Remove this project</b>
+          <span class="meta">Its stages, crew, documents and tasks go with it</span>
+        </div>
+        <div class="stack">
+          <div class="fld wide">
+            <label for="reason">Why it is being removed</label>
+            <input type="text" id="reason" name="reason"
+                   placeholder="Created twice by mistake">
+            <span class="help">
+              Anything that is a record of what happened — a requisition, a
+              visit, money — will stop this and say so. Those are kept on
+              purpose.
+            </span>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-sec" type="submit">Remove the project</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
 {% endblock %}

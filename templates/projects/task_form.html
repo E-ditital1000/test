@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Edit task — A1 360{% endblock %}
+
+{% block page_title %}Edit task{% endblock %}
+{% block page_sub %}{{ task.project.reference }} · {{ task.project.name }}{% endblock %}
+
+{% comment %}
+A task could be created and ticked complete, and nothing else. A typo in the
+title, the wrong person, a date entered in the wrong month — all of it was
+permanent. A record nobody can correct is one people stop trusting and start
+working around, which is how a task list ends up describing a week that
+never happened.
+{% endcomment %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:720px">
+    {% csrf_token %}
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        The times are optional. Leave them empty and the day is the whole
+        answer; give a due time and overdue is counted to the minute rather
+        than at midnight.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'projects-detail' task.project_id %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save the task</button>
+    </div>
+  </form>
+
+  {% if perms_held.manage_records %}
+    <form method="post" action="{% url 'projects-task-remove' task.pk %}"
+          style="max-width:720px;margin-top:20px"
+          onsubmit="return confirm('Remove this task? It goes for good.')">
+      {% csrf_token %}
+      <div class="card">
+        <div class="hd"><b>Remove this task</b><span class="meta">It goes for good</span></div>
+        <div class="stack">
+          <div class="fld wide">
+            <label for="reason">Why it is being removed</label>
+            <input type="text" id="reason" name="reason"
+                   placeholder="Raised against the wrong project">
+            <span class="help">
+              Nothing in the system points at a task, so this one genuinely
+              goes. The reason is the only trace left, in the audit log.
+            </span>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-sec" type="submit">Remove the task</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

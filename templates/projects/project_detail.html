@@ -8,6 +8,9 @@
 {% endblock %}
 
 {% block page_actions %}
+  {% if perms_held.manage_project or perms_held.manage_records %}
+    <a class="btn btn-sec" href="{% url 'projects-edit' project.pk %}">Edit project</a>
+  {% endif %}
   <a class="btn btn-sec" href="{% url 'projects-list' %}">All projects</a>
   {% if perms_held.schedule_field_job %}
     <a class="btn btn-sec" href="{% url 'fieldjobs-schedule-for-project' project.pk %}">Schedule a field job</a>
@@ -99,6 +102,12 @@
                 {% endif %}
                 <button class="btn btn-gho btn-sm" type="submit">{% if task.is_complete %}Reopen{% else %}Mark done{% endif %}</button>
               </form>
+            {% endif %}
+            {% comment %} Correcting a task was impossible: a typo in the title or
+               the wrong person on it was permanent, and a record nobody can
+               fix is one people work around. {% endcomment %}
+            {% if can_manage or perms_held.manage_records %}
+              <a class="btn btn-gho btn-sm" href="{% url 'projects-task-edit' task.pk %}">Edit</a>
             {% endif %}
           </div>
         {% empty %}

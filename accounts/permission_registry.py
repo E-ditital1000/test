@@ -17,6 +17,17 @@ PERMISSIONS = [
     ("manage_status_lists", "settings", "Manage ticket/project status option lists"),
     ("manage_company_details", "settings", "Edit company details shown across the system"),
     ("view_audit_log", "settings", "View the system audit log"),
+    # The right to correct or remove a record somebody else created.
+    #
+    # A-1 asked for it directly: an Admin or HR must be able to fix a project
+    # with the wrong customer on it, reschedule a field job booked for the
+    # wrong day, or take out a task created by mistake. None of that was
+    # possible — those three had no edit screen at all, let alone a delete.
+    #
+    # Deliberately not money. Invoices, payments and quotations stay with the
+    # finance permissions, so the person who records a payment is not also
+    # the person who can make it disappear.
+    ("manage_records", "settings", "Correct or remove any operational record"),
 
     # Dashboard
     ("view_dashboard", "dashboard", "View the role-aware dashboard landing screen"),

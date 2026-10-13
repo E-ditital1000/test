@@ -7,6 +7,12 @@ urlpatterns = [
     path("projects/new/", views.project_create, name="projects-create"),
     path("projects/<int:pk>/", views.project_detail, name="projects-detail"),
     path("projects/<int:pk>/advance/", views.project_advance, name="projects-advance"),
+    # Correcting and removing. A project could be created and advanced and
+    # never edited; a task could be ticked complete and nothing else.
+    path("projects/<int:pk>/edit/", views.project_edit, name="projects-edit"),
+    path("projects/<int:pk>/remove/", views.project_remove, name="projects-remove"),
+    path("tasks/<int:pk>/edit/", views.task_edit, name="projects-task-edit"),
+    path("tasks/<int:pk>/remove/", views.task_remove, name="projects-task-remove"),
     path("projects/<int:pk>/tasks/new/", views.task_create, name="projects-task-create"),
     path("tasks/<int:pk>/toggle/", views.task_toggle, name="projects-task-toggle"),
     path("projects/<int:pk>/crew/add/", views.crew_add, name="projects-crew-add"),

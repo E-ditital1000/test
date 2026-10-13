@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load a1 %}
+{% block title %}Edit {{ job.reference }} — A1 360{% endblock %}
+
+{% block page_title %}Edit {{ job.reference }}{% endblock %}
+{% block page_sub %}Rescheduling or reassigning a visit{% endblock %}
+
+{% comment %}
+A visit booked for the wrong day, or put on the wrong technician, used to be
+permanent — there was no edit screen at all. The crew either travelled, or
+the office kept a second list on paper, which is the thing this system
+exists to replace.
+{% endcomment %}
+
+{% block content %}
+  <form method="post" style="display:flex;flex-direction:column;gap:20px;max-width:760px">
+    {% csrf_token %}
+    {% for error in form.non_field_errors %}<div class="msg msg-error">{{ error }}</div>{% endfor %}
+
+    <div class="card">
+      <div class="stack">{% include "shell/_form_fields.html" %}</div>
+      <div class="note">
+        Whoever is on the visit sees the change on their own job list. A
+        technician already marked as away on approved leave is shown as such
+        in the picker rather than hidden from it — somebody can be recalled,
+        and a form that refuses gets worked around.
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <a class="btn btn-sec" href="{% url 'fieldjobs-job-detail' job.pk %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">Save the visit</button>
+    </div>
+  </form>
+
+  {% if perms_held.manage_records %}
+    <form method="post" action="{% url 'fieldjobs-job-remove' job.pk %}"
+          style="max-width:760px;margin-top:20px"
+          onsubmit="return confirm('Remove {{ job.reference }}?')">
+      {% csrf_token %}
+      <div class="card">
+        <div class="hd">
+          <b>Remove this visit</b>
+          <span class="meta">Only while nobody has been there</span>
+        </div>
+        <div class="stack">
+          <div class="fld wide">
+            <label for="reason">Why it is being removed</label>
+            <input type="text" id="reason" name="reason"
+                   placeholder="Booked twice for the same day">
+            <span class="help">
+              A check-in or a submitted assessment is the record of somebody
+              having been somewhere, and will stop this. The message says
+              which — those are kept on purpose.
+            </span>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-sec" type="submit">Remove the visit</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

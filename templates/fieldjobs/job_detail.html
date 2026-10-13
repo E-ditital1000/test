@@ -16,6 +16,9 @@ on the crew and who has turned up is one question asked twice.
 {% block page_sub %}{{ job.customer.name }}{% if job.site %} · {{ job.site.name }}{% endif %}{% endblock %}
 
 {% block page_actions %}
+  {% if perms_held.schedule_field_job or perms_held.manage_records %}
+    <a class="btn btn-sec" href="{% url 'fieldjobs-job-edit' job.pk %}">Edit visit</a>
+  {% endif %}
   {% comment %} Back where you came from: the office came from the board. {% endcomment %}
   {% if on_the_job %}
     <a class="btn btn-sec" href="{% url 'fieldjobs-my-jobs' %}">Back to today</a>

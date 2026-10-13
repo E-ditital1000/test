@@ -14,6 +14,7 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 | `manage_status_lists` | settings | ✅ |  |  |  |  |  |  |  |  |
 | `manage_company_details` | settings | ✅ |  |  |  |  |  |  |  |  |
 | `view_audit_log` | settings | ✅ |  |  |  |  |  |  |  |  |
+| `manage_records` | settings | ✅ |  |  | ✅ |  |  |  |  |  |
 | `view_dashboard` | dashboard | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `view_executive_dashboard` | dashboard | ✅ | ✅ |  |  |  |  |  |  |  |
 | `view_customers` | crm | ✅ | ✅ |  |  | ✅ | ✅ | ✅ |  |  |
@@ -69,6 +70,7 @@ Scope: ✅ all · 👥 own team · 📁 own projects · blank = not granted.
 - `manage_status_lists` — Manage ticket/project status option lists
 - `manage_company_details` — Edit company details shown across the system
 - `view_audit_log` — View the system audit log
+- `manage_records` — Correct or remove any operational record
 ### dashboard
 
 - `view_dashboard` — View the role-aware dashboard landing screen

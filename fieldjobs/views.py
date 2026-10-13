@@ -30,8 +30,9 @@ from accounts.decorators import (
     require_permission,
     user_has_permission,
 )
+from accounts import audit
 from accounts.templatetags.a1 import a1datetime
-from config import notifications
+from config import notifications, removal
 from config.pagination import paginate
 from config.references import next_reference
 from projects.forms import RequisitionItemFormSet, RequisitionRequestForm
@@ -648,3 +649,66 @@ def schedule(request, project_pk=None):
         "fieldjobs/schedule_form.html",
         {"form": form, "project": project},
     )
+
+
+# --------------------------------------------------------------------------
+# Correcting and removing a visit
+#
+# A job booked for the wrong day, or put on the wrong technician, was
+# permanent: there was no edit screen at all. The crew either travelled or
+# the office kept a second list on paper, which is the thing this system
+# exists to replace.
+# --------------------------------------------------------------------------
+
+@require_any_permission("schedule_field_job", "manage_records")
+@transaction.atomic
+def job_edit(request, pk):
+    """Reschedule or reassign a visit."""
+    job = get_object_or_404(FieldJob.objects.select_related("project"), pk=pk)
+    form = FieldJobForm(request.POST or None, instance=job, project=job.project)
+
+    fields = ["customer", "site", "service_type", "assigned_to", "scheduled_for", "notes"]
+    if request.method == "POST" and form.is_valid():
+        before = audit.snapshot(job, fields=fields)
+        saved = form.save()
+        audit.record_change(
+            actor=request.user,
+            action="fieldjob.corrected",
+            target=saved,
+            before=before,
+            after=audit.snapshot(saved, fields=fields),
+        )
+        messages.success(request, f"{saved.reference} updated.")
+        return redirect("fieldjobs-job-detail", pk=saved.pk)
+
+    return render(request, "fieldjobs/job_form.html", {"form": form, "job": job})
+
+
+@require_permission("manage_records")
+@transaction.atomic
+def job_remove(request, pk):
+    """
+    Take a visit out.
+
+    It goes while nobody has checked in to it and no assessment has been
+    submitted against it. Both of those are the record of somebody having
+    been somewhere, and the database refuses to lose them — the message says
+    which is in the way.
+    """
+    job = get_object_or_404(FieldJob, pk=pk)
+    if request.method != "POST":
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    try:
+        label = removal.remove(
+            job,
+            actor=request.user,
+            reason=(request.POST.get("reason") or "").strip(),
+            audit_action="fieldjob.removed",
+        )
+    except removal.CannotRemove as error:
+        messages.error(request, str(error))
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    messages.success(request, f"{label} removed.")
+    return redirect("fieldjobs-board")

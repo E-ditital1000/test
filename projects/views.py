@@ -17,10 +17,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from accounts.templatetags.a1 import a1daterange
-from config import notifications
+from accounts import audit
+from config import notifications, removal
 from config.pagination import paginate
 from config.references import next_reference
-from accounts.decorators import require_permission, user_has_permission
+from accounts.decorators import (
+    require_any_permission,
+    require_permission,
+    user_has_permission,
+)
 from accounts.scoping import apply_scope
 
 from .forms import (
@@ -260,7 +265,7 @@ def task_toggle(request, pk):
     if not (is_mine or leads_the_visit):
         if not user_has_permission(request.user, "manage_project"):
             raise PermissionDenied("missing permission: manage_project")
-        get_object_or_404(_visible_projects(request.user), pk=task.project_id)
+        get_object_or_404(_correctable_projects(request.user), pk=task.project_id)
 
     if request.method == "POST":
         from django.utils import timezone
@@ -393,3 +398,144 @@ def project_create(request):
         )
         return redirect("projects-detail", pk=project.pk)
     return render(request, "projects/project_form.html", {"form": form})
+
+
+# --------------------------------------------------------------------------
+# Correcting and removing
+#
+# A-1 asked for these directly: an Admin or HR must be able to fix a project
+# with the wrong customer on it and take out a task created by mistake.
+# Neither was possible — a project could be created and advanced through its
+# stages but never edited, and a task could be ticked complete and nothing
+# else. A record you cannot correct is one people work around.
+#
+# `manage_records` carries the right. Whoever already manages the project can
+# correct it too; removing is the stronger act and asks for the explicit
+# permission.
+# --------------------------------------------------------------------------
+
+def _correctable_projects(user):
+    """
+    The projects somebody may correct.
+
+    Scope decides what you can *see* — a project manager reads their own.
+    `manage_records` is the right to fix anything, so it has to reach
+    everything: HR holds `view_projects` at own-projects scope and is crewed
+    on none of them, which filtered every project out and answered 404 to
+    the person the permission was created for.
+    """
+    if user_has_permission(user, "manage_records"):
+        return Project.objects.all()
+    return _visible_projects(user)
+
+
+@require_any_permission("manage_project", "manage_records")
+@transaction.atomic
+def project_edit(request, pk):
+    """Fix a project. Everything about it except the stage it is at, which
+    moves through `project_advance` so each move stays an event."""
+    project = get_object_or_404(_correctable_projects(request.user), pk=pk)
+    form = ProjectForm(request.POST or None, instance=project)
+
+    if request.method == "POST" and form.is_valid():
+        before = audit.snapshot(project, fields=["name", "customer", "site", "manager",
+                                                 "start_date", "target_end_date", "description"])
+        saved = form.save()
+        audit.record_change(
+            actor=request.user,
+            action="project.corrected",
+            target=saved,
+            before=before,
+            after=audit.snapshot(saved, fields=["name", "customer", "site", "manager",
+                                                "start_date", "target_end_date", "description"]),
+        )
+        messages.success(request, f"{saved.reference} updated.")
+        return redirect("projects-detail", pk=saved.pk)
+
+    return render(
+        request, "projects/project_form.html", {"form": form, "project": project}
+    )
+
+
+@require_permission("manage_records")
+@transaction.atomic
+def project_remove(request, pk):
+    """
+    Take a project out entirely.
+
+    It goes only while nothing that is a record of what happened depends on
+    it: a requisition, a visit, an expense, an invoice or a quotation all
+    hold it back, and the refusal says which. Its own stages, crew, documents
+    and tasks are part of it and go with it.
+    """
+    project = get_object_or_404(_correctable_projects(request.user), pk=pk)
+    if request.method != "POST":
+        return redirect("projects-detail", pk=project.pk)
+
+    try:
+        label = removal.remove(
+            project,
+            actor=request.user,
+            reason=(request.POST.get("reason") or "").strip(),
+            audit_action="project.removed",
+        )
+    except removal.CannotRemove as error:
+        messages.error(request, str(error))
+        return redirect("projects-detail", pk=project.pk)
+
+    messages.success(request, f"{label} removed.")
+    return redirect("projects-list")
+
+
+@require_any_permission("manage_project", "manage_records")
+@transaction.atomic
+def task_edit(request, pk):
+    """Correct a task: what it says, who has it, and when it runs."""
+    task = get_object_or_404(
+        Task.objects.select_related("project"), pk=pk
+    )
+    get_object_or_404(_visible_projects(request.user), pk=task.project_id)
+
+    fields = ["title", "assignee", "field_job", "start_date", "start_time",
+              "due_date", "due_time", "description"]
+    form = TaskForm(request.POST or None, instance=task, project=task.project)
+
+    if request.method == "POST" and form.is_valid():
+        before = audit.snapshot(task, fields=fields)
+        saved = form.save()
+        audit.record_change(
+            actor=request.user,
+            action="task.corrected",
+            target=saved,
+            before=before,
+            after=audit.snapshot(saved, fields=fields),
+        )
+        messages.success(request, "Task updated.")
+        return redirect("projects-detail", pk=task.project_id)
+
+    return render(request, "projects/task_form.html", {"form": form, "task": task})
+
+
+@require_permission("manage_records")
+@transaction.atomic
+def task_remove(request, pk):
+    """
+    Take a task out. Nothing in the system points at a task, so this always
+    succeeds — which is why a task created by mistake is simply gone rather
+    than retired into a list somebody has to read past.
+    """
+    task = get_object_or_404(Task.objects.select_related("project"), pk=pk)
+    project_id = task.project_id
+    get_object_or_404(_correctable_projects(request.user), pk=project_id)
+
+    if request.method != "POST":
+        return redirect("projects-detail", pk=project_id)
+
+    label = removal.remove(
+        task,
+        actor=request.user,
+        reason=(request.POST.get("reason") or "").strip(),
+        audit_action="task.removed",
+    )
+    messages.success(request, f"Task “{label}” removed.")
+    return redirect("projects-detail", pk=project_id)

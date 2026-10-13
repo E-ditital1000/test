@@ -6,6 +6,9 @@ urlpatterns = [
     # The technician's own surfaces.
     path("field-jobs/", views.my_jobs, name="fieldjobs-my-jobs"),
     path("field-jobs/<int:pk>/", views.job_detail, name="fieldjobs-job-detail"),
+    # A visit booked for the wrong day or the wrong person was permanent.
+    path("field-jobs/<int:pk>/edit/", views.job_edit, name="fieldjobs-job-edit"),
+    path("field-jobs/<int:pk>/remove/", views.job_remove, name="fieldjobs-job-remove"),
     path("field-jobs/<int:pk>/check-in/", views.check_in, name="fieldjobs-check-in"),
     path("field-jobs/<int:pk>/requisition/", views.job_requisition, name="fieldjobs-job-requisition"),
     path("field-jobs/<int:pk>/assessment/", views.assessment_form, name="fieldjobs-assessment"),
