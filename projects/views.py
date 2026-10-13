@@ -222,7 +222,21 @@ def task_create(request, pk):
             else:
                 messages.success(request, "Task added, unassigned for now.")
         else:
-            messages.error(request, "That task could not be saved.")
+            # The form knows exactly what is wrong. Saying only "could not be
+            # saved" throws that away and leaves somebody guessing at a date
+            # they cannot see any more, which is how a form stops being used.
+            problems = "; ".join(
+                error
+                if field == "__all__"
+                else f"{form.fields[field].label or field}: {error}"
+                for field, errors in form.errors.items()
+                for error in errors
+            )
+            messages.error(
+                request,
+                f"That task could not be saved. {problems}" if problems
+                else "That task could not be saved.",
+            )
     return redirect("projects-detail", pk=project.pk)
 
 

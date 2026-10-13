@@ -149,7 +149,7 @@ title was something it is not.
               <p class="t-body-b">{{ task.title }}</p>
               <p class="t-m-meta dim">
                 {% if task.project %}{{ task.project.reference }}{% else %}No project{% endif %}
-                {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
+                {% if task.start_date or task.due_date %} · {% a1span task.start_date task.start_time task.due_date task.due_time %}{% endif %}
               </p>
               {% if task.description %}
                 <p class="t-m-meta dim2">{{ task.description|truncatechars:120 }}</p>

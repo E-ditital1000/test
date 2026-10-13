@@ -67,7 +67,7 @@
                 {% if task.field_job %}
                   · on <a href="{% url 'fieldjobs-job-detail' task.field_job.pk %}">{{ task.field_job.reference }}</a>
                 {% endif %}
-                {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
+                {% if task.start_date or task.due_date %} · {% a1span task.start_date task.start_time task.due_date task.due_time %}{% endif %}
                 {% if task.assigned_by %} · set by {{ task.assigned_by|a1name }}{% endif %}
                 {% if task.is_complete %} · done {{ task.completed_at|a1date }}{% if task.completed_by %} by {{ task.completed_by|a1name }}{% endif %}{% endif %}
               </span>

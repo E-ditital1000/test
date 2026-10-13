@@ -145,19 +145,28 @@ class ForgettingToClockOutTests(TestCase):
         self.client.force_login(supervisor)
         response = self.client.get("/hr/roll-call/", {"date": yesterday.isoformat()})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No clock-out")
         self.assertNotContains(response, "Still clocked in")
+        # The day still says what happened — they were here, and early
+        # enough not to be late. The missing end is a quiet note beside it,
+        # not a red pill replacing it.
+        self.assertContains(response, "Present")
+        self.assertContains(response, "no clock-out")
 
     def test_clocking_out_with_nothing_open_is_still_refused(self):
         with self.assertRaises(services.ClockError) as caught:
             self._clock(AttendanceEvent.CLOCK_OUT, self._at(timezone.localdate(), 17))
         self.assertIn("not clocked in", str(caught.exception))
 
-    def test_the_unclosed_day_is_surfaced_rather_than_forgotten(self):
+    def test_the_unclosed_day_is_known_without_nagging_the_employee(self):
         """
-        The employee is not blocked, but somebody still has a day on record
-        with no end to it. Only a supervisor correction can settle it, so it
-        has to be visible.
+        The service still knows — the refusal message for a late clock-out
+        depends on it, and so does the supervisor's roll-call.
+
+        The employee's own screen says nothing about it. A banner used to
+        tell them to go and ask their supervisor, which asked for an action
+        that does not exist: the day cannot be reopened. Their last seven
+        days are on that screen and the missing end shows as a dash, which is
+        how their supervisor sees it too.
         """
         today = timezone.localdate()
         yesterday = today - timedelta(days=1)
@@ -170,7 +179,8 @@ class ForgettingToClockOutTests(TestCase):
         self.client.force_login(self.worker)
         response = self.client.get("/hr/clock/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "never clocked out")
+        self.assertNotContains(response, "never clocked out")
+        self.assertNotContains(response, "ask your supervisor to correct")
 
     def test_todays_open_shift_is_not_reported_as_stale(self):
         today = timezone.localdate()

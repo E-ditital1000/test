@@ -356,6 +356,26 @@ body.nav-collapsed .a1-brand { padding: 6px 0 14px; justify-content: center; }
   .a1-top { padding: 10px 16px; gap: 10px; }
   .a1-search { max-width: none; }
   .a1-search .kbd, .a1-datechip span, .a1-user .who-name { display: none; }
+
+  /* The Ctrl K hint is hidden on the line above — but the input was still
+     reserving 74px of right padding for it, and 42px on the left for the
+     icon. On a phone that is 116px of padding in a box about 130px wide, so
+     what somebody typed scrolled straight out of the sliver that was left
+     and the search looked broken. Reported exactly that way: "when you are
+     typing, you can't see the letter being typed."
+
+     There is no Ctrl key on a phone, so the space goes back to the text. */
+  .a1-search input[type="search"] {
+    padding-right: 14px;
+    /* 16px or iOS zooms the whole page in when the field takes focus, and
+       the person has to pinch back out to see what they searched for. */
+    font-size: 16px;
+  }
+
+  /* The spacer carries flex: 1, so it was splitting the free width with the
+     search box and taking half of it. The search needs the room more than
+     the gap does. */
+  .a1-top .spacer { display: none; }
 }
 .a1-bar {
   min-height: var(--topbar-h); flex: none; background: var(--card);

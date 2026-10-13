@@ -18,21 +18,38 @@ User = get_user_model()
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ["title", "assignee", "field_job", "start_date", "due_date", "description"]
+        fields = [
+            "title", "assignee", "field_job",
+            "start_date", "start_time", "due_date", "due_time",
+            "description",
+        ]
         widgets = {
             "start_date": forms.DateInput(attrs={"type": "date"}),
             "due_date": forms.DateInput(attrs={"type": "date"}),
+            # A native time input: a phone offers its own picker, and nobody
+            # has to be taught a format.
+            "start_time": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
+            "due_time": forms.TimeInput(attrs={"type": "time"}, format="%H:%M"),
             "description": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {
             "description": "What needs doing",
             "field_job": "On which visit",
             "start_date": "Starts",
+            "start_time": "Start time",
             "due_date": "Due",
+            "due_time": "Due time",
         }
         help_texts = {
             "start_date": "The day it can begin. Leave empty if it can start now.",
             "due_date": "The day it must be finished by. Overdue is counted from here.",
+            # The times are the optional half of the answer. Work here runs
+            # from twenty minutes to a fortnight, and a form that only holds
+            # days makes "today to today" the answer for something needed
+            # before a ten o'clock visit.
+            "start_time": "Optional. Leave empty if the day is enough.",
+            "due_time": "Optional. Given one, overdue is counted to the minute "
+                        "rather than at midnight.",
             "description": "Read on a phone by whoever picks it up. Which client, "
                            "what to bring, what finished looks like.",
         }
@@ -119,11 +136,34 @@ class TaskForm(forms.ModelForm):
         A range that ends before it starts is a typo, and saved it would show
         as "12–3 Sept" and count overdue from a day the work could not have
         begun. Caught here rather than left to whoever reads it later.
+
+        The times are checked in the same place, because they are the same
+        question asked more precisely.
         """
         cleaned = super().clean()
-        start, due = cleaned.get("start_date"), cleaned.get("due_date")
-        if start and due and start > due:
-            self.add_error("due_date", "The due date cannot be before the start date.")
+        start_date = cleaned.get("start_date")
+        start_time = cleaned.get("start_time")
+        due_date = cleaned.get("due_date")
+        due_time = cleaned.get("due_time")
+
+        # A time with no day is a time on no particular day, which the
+        # system cannot act on and nobody can read.
+        if start_time and not start_date:
+            self.add_error("start_date", "Give the day this starts, or clear the start time.")
+        if due_time and not due_date:
+            self.add_error("due_date", "Give the day this is due, or clear the due time.")
+
+        if start_date and due_date:
+            if due_date < start_date:
+                self.add_error("due_date", "The due date cannot be before the start date.")
+            elif (
+                due_date == start_date
+                and start_time and due_time and due_time < start_time
+            ):
+                self.add_error(
+                    "due_time",
+                    "On the same day, the due time cannot be before the start time.",
+                )
         return cleaned
 
 

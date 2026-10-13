@@ -95,7 +95,7 @@ find the job.
           {% if task.start_date or task.due_date %}
             <span class="{% if task.is_overdue %}bad{% else %}dim{% endif %} t-small mono"
                   style="width:150px">
-              {{ task.start_date|a1daterange:task.due_date }}
+              {% a1span task.start_date task.start_time task.due_date task.due_time %}
             </span>
           {% else %}
             <span class="dim t-small" style="width:150px">no date</span>

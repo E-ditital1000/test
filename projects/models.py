@@ -191,6 +191,17 @@ class Task(TimeStampedModel):
     # same thing here, on the dashboard and in the attention queue.
     start_date = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
+    # Optional times, because the work is not all one size. A task can run a
+    # fortnight or twenty minutes, and forcing the second into a field that
+    # only holds days makes "today to today" the answer for a job somebody
+    # needed done before the 10 o'clock visit.
+    #
+    # Separate TimeFields rather than turning the dates into datetimes: a
+    # task with no time is genuinely a different thing from one at midnight,
+    # and a DateTimeField cannot tell those apart. Blank means the day is
+    # the whole answer.
+    start_time = models.TimeField(null=True, blank=True)
+    due_time = models.TimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     completed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -240,14 +251,48 @@ class Task(TimeStampedModel):
         return self.completed_at is not None
 
     @property
+    def starts_at(self):
+        """The moment it can begin, when a time was given."""
+        from datetime import datetime
+
+        if self.start_date and self.start_time:
+            return datetime.combine(self.start_date, self.start_time)
+        return None
+
+    @property
+    def due_at(self):
+        from datetime import datetime
+
+        if self.due_date and self.due_time:
+            return datetime.combine(self.due_date, self.due_time)
+        return None
+
+    @property
+    def has_times(self):
+        return bool(self.start_time or self.due_time)
+
+    @property
     def is_overdue(self):
+        """
+        Past when it was due. Judged to the minute when a time was given,
+        and to the day when one was not.
+
+        Without that split, a task due at 10 this morning reads as on time
+        until midnight — which is most of a working day spent looking fine
+        while the visit it was for has already happened.
+        """
+        from datetime import datetime
+
         from django.utils import timezone
 
-        return (
-            not self.is_complete
-            and self.due_date is not None
-            and self.due_date < timezone.localdate()
-        )
+        if self.is_complete or self.due_date is None:
+            return False
+        if self.due_time is None:
+            return self.due_date < timezone.localdate()
+        deadline = datetime.combine(self.due_date, self.due_time)
+        if timezone.is_naive(deadline):
+            deadline = timezone.make_aware(deadline)
+        return timezone.now() > deadline
 
     def __str__(self):
         return self.title

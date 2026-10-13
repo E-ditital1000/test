@@ -79,6 +79,67 @@ def a1daterange(start, end):
     return f"{a1date(start)} – {a1date(end)}"
 
 
+@register.simple_tag
+def a1span(start_date, start_time, end_date, end_time):
+    """
+    A stretch of work that may or may not carry times.
+
+        {% a1span task.start_date task.start_time task.due_date task.due_time %}
+
+        3–12 Sept                 days only, as before
+        3 Sept, 09:00–11:30       one day, both times
+        3 Sept from 09:00         one day, start only
+        3 Sept by 11:30           one day, end only
+        3 Sept 09:00 – 5 Sept 17:00   across days, both times
+
+    A tag rather than a filter because it takes four values, and one place
+    rather than four templates because a span written three ways is how a
+    reader stops trusting any of them.
+    """
+    if start_date is None and end_date is None:
+        return ""
+
+    def clock(value):
+        return a1time(value)
+
+    # The whole thing on one day is the common case and reads best said once.
+    if start_date and end_date and start_date == end_date:
+        day = a1date(start_date)
+        if start_time and end_time:
+            return f"{day}, {clock(start_time)}–{clock(end_time)}"
+        if start_time:
+            return f"{day} from {clock(start_time)}"
+        if end_time:
+            return f"{day} by {clock(end_time)}"
+        return day
+
+    if not (start_time or end_time):
+        return a1daterange(start_date, end_date)
+
+    left = ""
+    if start_date:
+        left = a1date(start_date) + (f" {clock(start_time)}" if start_time else "")
+    right = ""
+    if end_date:
+        right = a1date(end_date) + (f" {clock(end_time)}" if end_time else "")
+
+    if left and right:
+        return f"{left} – {right}"
+    return f"from {left}" if left else f"due {right}"
+
+
+@register.filter
+def a1time(value):
+    """
+    `09:00`. A 24-hour clock, because a crew reading a job on a phone in
+    sunlight should not have to parse am/pm, and because the rest of the
+    system already writes times this way.
+    """
+    if value is None:
+        return ""
+    return value.strftime("%H:%M")
+
+
 @register.filter
 def a1datetime(value):
     """`3 Sept 11:42` — the form every event timestamp takes."""

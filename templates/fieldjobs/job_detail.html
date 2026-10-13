@@ -90,7 +90,7 @@ on the crew and who has turned up is one question asked twice.
                 <b {% if task.is_complete %}style="text-decoration:line-through;color:var(--muted)"{% endif %}>{{ task.title }}</b>
                 <span class="t-m-meta dim">
                   {% if task.assignee %}{{ task.assignee|a1name }}{% else %}Anyone on site{% endif %}
-                  {% if task.start_date or task.due_date %} · {{ task.start_date|a1daterange:task.due_date }}{% endif %}
+                  {% if task.start_date or task.due_date %} · {% a1span task.start_date task.start_time task.due_date task.due_time %}{% endif %}
                 </span>
                 {% if task.description %}
                   <span class="t-m-meta dim2">{{ task.description }}</span>

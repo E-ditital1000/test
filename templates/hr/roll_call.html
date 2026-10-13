@@ -34,7 +34,7 @@
     they never clocked out and no hours were recorded for them — a thing to
     correct, not a thing still running.
     {% endcomment %}
-    <div class="metric {% if counts.still_in %}alert{% endif %}">
+    <div class="metric {% if counts.still_in and viewing_today %}alert{% endif %}">
       <span>{% if viewing_today %}Still clocked in{% else %}No clock-out{% endif %}</span>
       <b>{{ counts.still_in }}</b>
       <em>{% if viewing_today %}on the clock now{% else %}no hours recorded for the day{% endif %}</em>
@@ -86,18 +86,20 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if row.day and row.day.still_clocked_in %}
-                    {% if viewing_today %}
-                      <span class="pill p-prog"><i></i>Still clocked in</span>
-                    {% else %}
-                      {% comment %}
-                      The day is closed. They never clocked out, so no hours
-                      were recorded for it and none can be — only a
-                      correction can settle what was worked.
-                      {% endcomment %}
-                      <span class="pill p-over"><i></i>No clock-out</span>
-                      <br><span class="dim2 t-small">no hours recorded</span>
-                    {% endif %}
+                  {% comment %}
+                  A day that was never clocked out of still says what
+                  happened: they were present, or they were late. The
+                  missing end shows as a dash in the clock-out and hours
+                  columns, and as a quiet note here — not as a red alarm
+                  replacing the state.
+
+                  Four of thirteen forgot on one day. Turning that into four
+                  red rows makes the roll-call read like an emergency and
+                  trains people to ignore the colour that is supposed to mean
+                  something.
+                  {% endcomment %}
+                  {% if row.day and row.day.still_clocked_in and viewing_today %}
+                    <span class="pill p-prog"><i></i>Still clocked in</span>
                   {% elif row.worked_while_on_leave %}
                     {% comment %}
                     An exception worth seeing: they were granted the day off
@@ -114,6 +116,9 @@
                     <span class="pill p-wait"><i></i>Late</span>
                   {% else %}
                     <span class="pill p-over"><i></i>Absent</span>
+                  {% endif %}
+                  {% if row.day and row.day.still_clocked_in and not viewing_today %}
+                    <br><span class="dim2 t-small">no clock-out</span>
                   {% endif %}
                 </td>
                 <td class="acts">
