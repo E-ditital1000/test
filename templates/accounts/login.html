@@ -32,13 +32,13 @@ reach the address.
       {% csrf_token %}
 
       {% comment %}
-      The cut-out mark, not the full lockup: the lockup carries its own navy
-      ground and would disappear into this panel now that the panel is navy
-      too. The mark is transparent outside its circle, so it sits on
-      anything.
+      The full lockup, white on transparent. The ring text carries the
+      company's name and A-1 asked for it back, so this is the version with
+      the navy keyed out rather than the circle-only mark — the "A" shows
+      the panel through its own cut-out, which is how the artwork reads.
       {% endcomment %}
-      <img class="logo-full" src="{% static 'img/a1-mark.png' %}"
-           alt="A-1 Technical Engineering Solutions">
+      <img class="logo-full" src="{% static 'img/a1-logo.png' %}"
+           alt="A-1 Technical Engineering Solutions LTD">
 
       <div class="fbox-head">
         {% if locked %}

@@ -192,13 +192,15 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand-lockup { display: flex; align-items: center; gap: 12px; }
 .brand-lockup img { width: 44px; height: 44px; display: block; }
 .brand-lockup b { font-size: 24px; font-weight: 700; color: #fff; }
-/* The full lockup, for light grounds only — now because it carries its own
-   navy ground, which would vanish against the navy sign-in panel. (It used
-   to be the opposite reason: the old artwork had navy ring text.) Sized to
-   sit above the form as an identity line, not as a hero — signing in is the
-   job of this screen. */
+/* The full lockup, white on transparent, so the ring text reads on the navy
+   panel and the "A" shows that navy through its own cut-out — exactly as
+   the artwork intends. An opaque version would have sat on the panel as a
+   visible square. */
 .logo-full {
-  width: 72px; height: 72px; display: block; margin: 0 auto;
+  /* Large enough that the ring text — the company's full name — can
+     actually be read. At 72px it was four pixels tall and may as well not
+     have been drawn. */
+  width: 112px; height: 112px; display: block; margin: 0 auto;
   object-fit: contain;
 }
 .a1-brand b { display: block; font-size: 16px; font-weight: 600; color: #fff; line-height: 1.2; }
@@ -1031,21 +1033,31 @@ input[type=checkbox], input[type=radio] {
   justify-content: center; padding: 32px 24px;
 }
 .fbox {
-  width: 100%; max-width: 400px; background: var(--navy700); border: 1px solid rgba(255, 255, 255, .14);
-  border-radius: var(--r-card); padding: 32px; display: flex; flex-direction: column; gap: 18px;
-  /* A shadow needs something lighter to fall on. Lifted a step above the
-     panel instead, which is what makes it still read as a card. */
+  width: 100%; max-width: 400px; padding: 32px;
+  display: flex; flex-direction: column; gap: 18px;
+  /* No card. The form sits straight on the panel, so the sign-in screen is
+     one unbroken navy and nothing draws a box around the thing somebody is
+     trying to fill in. */
+  background: none;
+  border: 0;
   box-shadow: none;
 
   /* The ink, restated for a dark ground. Everything inside is written
-     against these tokens — the heading, the labels, the help text, the
-     field errors — so the form markup needs no changes at all and no
-     screen grows a second set of colours to keep in step. */
+     against these tokens — the labels, the help text, the field errors — so
+     the form markup needs no changes and no screen grows a second set of
+     colours to keep in step. */
   --text: #FFFFFF;
   --text2: rgba(255, 255, 255, .74);
   --muted: rgba(255, 255, 255, .62);
   /* The brand red is tuned for white and goes muddy here. */
   --red: #FF9F90;
+
+  /* Declared, not just redefined. `body` resolves `var(--text)` to dark
+     once and children inherit that COMPUTED colour — so an element with no
+     colour rule of its own, like the "Sign in" heading, kept the dark ink
+     and all but disappeared while the labels beside it turned white.
+     Restating the token is not enough; something has to use it here. */
+  color: var(--text);
 }
 /* The inputs keep a light face. They inherit --text above, and white type in
    a white box is an empty box — which is exactly the bug A-1 reported about
@@ -1093,7 +1105,7 @@ input[type=checkbox], input[type=radio] {
   .login .lft-say p { display: none; }
   .login .lft h5 { font-size: 22px; line-height: 1.3; margin-bottom: 0; }
   .login .rgt { padding: 24px 16px 40px; }
-  .fbox { padding: 24px 20px; border: 0; background: none; }
+  .fbox { padding: 24px 20px; }
 }
 /* The reference on the server-error page: read out over the phone. */
 .err-ref { border-radius: 10px; }
