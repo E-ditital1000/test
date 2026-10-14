@@ -31,7 +31,13 @@ reach the address.
     <form class="fbox {% if locked %}is-locked{% endif %}" method="post" novalidate>
       {% csrf_token %}
 
-      <img class="logo-full" src="{% static 'img/a1-logo.png' %}"
+      {% comment %}
+      The cut-out mark, not the full lockup: the lockup carries its own navy
+      ground and would disappear into this panel now that the panel is navy
+      too. The mark is transparent outside its circle, so it sits on
+      anything.
+      {% endcomment %}
+      <img class="logo-full" src="{% static 'img/a1-mark.png' %}"
            alt="A-1 Technical Engineering Solutions">
 
       <div class="fbox-head">

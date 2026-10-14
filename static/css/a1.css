@@ -1023,14 +1023,55 @@ input[type=checkbox], input[type=radio] {
    gradient, so the technician above them is not read through type. */
 .login .lft-say { max-width: 40ch; }
 
+/* Navy on this side too, so the whole sign-in screen is one ground and the
+   gold button is the only thing on it that is not navy, white or the
+   photograph. */
 .login .rgt {
-  flex: 1; background: var(--page); display: flex; align-items: center;
+  flex: 1; background: var(--navy); display: flex; align-items: center;
   justify-content: center; padding: 32px 24px;
 }
 .fbox {
-  width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--border);
+  width: 100%; max-width: 400px; background: var(--navy700); border: 1px solid rgba(255, 255, 255, .14);
   border-radius: var(--r-card); padding: 32px; display: flex; flex-direction: column; gap: 18px;
-  box-shadow: 0 24px 60px -32px rgba(17, 4, 58, .3);
+  /* A shadow needs something lighter to fall on. Lifted a step above the
+     panel instead, which is what makes it still read as a card. */
+  box-shadow: none;
+
+  /* The ink, restated for a dark ground. Everything inside is written
+     against these tokens — the heading, the labels, the help text, the
+     field errors — so the form markup needs no changes at all and no
+     screen grows a second set of colours to keep in step. */
+  --text: #FFFFFF;
+  --text2: rgba(255, 255, 255, .74);
+  --muted: rgba(255, 255, 255, .62);
+  /* The brand red is tuned for white and goes muddy here. */
+  --red: #FF9F90;
+}
+/* The inputs keep a light face. They inherit --text above, and white type in
+   a white box is an empty box — which is exactly the bug A-1 reported about
+   the search field, and not one worth shipping twice. */
+.fbox input, .fbox select, .fbox textarea {
+  background: #FFFFFF;
+  color: #1A1D26;
+  border-color: rgba(255, 255, 255, .22);
+}
+.fbox input::placeholder { color: #646B80; }
+/* The same applies to anything inside the card that paints its OWN light
+   surface — the gold note, the white refusal panel, the message chips. They
+   set a background and inherit their ink, so the white above would land
+   white-on-pale. Restating the tokens here restores everything beneath
+   them, including the red a message carries. */
+.fbox .note, .fbox .deny, .fbox .msg {
+  --text: #1A1D26;
+  --text2: #5C6377;
+  --muted: #646B80;
+  --red: #C4321E;
+  color: var(--text);
+}
+/* Focus has to be visible against navy, where the light focus ring is not. */
+.fbox input:focus, .fbox select:focus, .fbox textarea:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 203, 0, .28);
 }
 .fbox-head { display: flex; flex-direction: column; gap: 4px; }
 .fbox-head h1 { margin: 0; }
@@ -1039,7 +1080,7 @@ input[type=checkbox], input[type=radio] {
   font-size: 11px; font-weight: 600; letter-spacing: .08em;
   text-transform: uppercase; color: var(--red);
 }
-.fbox.is-locked { border-color: var(--red); }
+.fbox.is-locked { border-color: #FF9F90; }
 
 /* On a phone the panel becomes a header: the picture and the name, no
    sales lines above a form somebody is trying to reach. */
@@ -1052,7 +1093,7 @@ input[type=checkbox], input[type=radio] {
   .login .lft-say p { display: none; }
   .login .lft h5 { font-size: 22px; line-height: 1.3; margin-bottom: 0; }
   .login .rgt { padding: 24px 16px 40px; }
-  .fbox { padding: 24px 20px; box-shadow: none; }
+  .fbox { padding: 24px 20px; border: 0; background: none; }
 }
 /* The reference on the server-error page: read out over the phone. */
 .err-ref { border-radius: 10px; }
