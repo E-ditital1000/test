@@ -362,12 +362,49 @@ class ProjectForm(forms.ModelForm):
                                "at when it will actually finish.",
         }
 
+    # Who is on it, asked on the page where the project is made.
+    #
+    # A-1's fifth item: "Creating project you should add the crew on the same
+    # page." Crew was a second screen you reached after saving, and the cost
+    # of that was not only the extra click — the task form narrows its
+    # assignee list to the crew, so a project created with nobody on it
+    # offered every account in the company and the four people actually on
+    # the job were buried.
+    crew = forms.ModelMultipleChoiceField(
+        queryset=Employee.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Crew on this project",
+        help_text="Who is on the job. Tasks are assigned from this list, and "
+                  "they see the project on their own. Leave empty and add "
+                  "people later from the project itself.",
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         from config.models import ServiceType, StatusOption
         from crm.models import Customer
 
         self.fields["customer"].queryset = Customer.objects.filter(is_active=True)
+        self.fields["crew"].queryset = (
+            Employee.objects.filter(is_active=True)
+            .select_related("user")
+            .order_by("staff_id")
+        )
+        # Editing an existing project shows who is already on it, so the box
+        # is the current crew rather than an empty list that would read as
+        # "nobody" and strip them on the next save.
+        if self.instance.pk:
+            self.fields["crew"].initial = list(
+                self.instance.crew.values_list("employee_id", flat=True)
+            )
+        # Marked, not filtered — the rule every other picker here follows.
+        # Somebody on leave next week can still be crewed on a six-month
+        # contract, and a form that refuses gets worked around.
+        away = leave.away_labels()
+        self.fields["crew"].label_from_instance = lambda employee: leave.mark_away(
+            f"{employee.staff_id} · {employee.full_name}", employee.user_id, away
+        )
         self.fields["service_type"].queryset = ServiceType.objects.filter(is_active=True)
 
         statuses = StatusOption.objects.filter(kind=StatusOption.PROJECT, is_active=True)
@@ -393,6 +430,35 @@ class ProjectForm(forms.ModelForm):
         limit_sites_to_customer(
             self.fields["site"], customer_id, prompt="Which site?"
         )
+
+    def sync_crew(self, project, *, actor):
+        """
+        Make the project's crew match what the form says, and report the
+        change so the screen can say what happened.
+
+        A row removed here is an assignment, not a record of work: the tasks
+        somebody was given stay on them, and the requisitions they raised
+        stay on the project. Taking somebody off the crew stops them seeing
+        a project they are no longer on, and nothing else.
+        """
+        chosen = list(self.cleaned_data.get("crew") or [])
+        chosen_ids = {employee.pk for employee in chosen}
+        existing = {row.employee_id: row for row in project.crew.all()}
+
+        removed = 0
+        for employee_id, row in existing.items():
+            if employee_id not in chosen_ids:
+                row.delete()
+                removed += 1
+
+        added = 0
+        for employee in chosen:
+            if employee.pk not in existing:
+                ProjectCrew.objects.create(
+                    project=project, employee=employee, assigned_by=actor
+                )
+                added += 1
+        return added, removed
 
     def site_picker(self):
         from crm.forms import site_picker_data

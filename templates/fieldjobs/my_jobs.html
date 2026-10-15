@@ -44,6 +44,9 @@ title was something it is not.
             <p class="t-m-body n3">
               {{ next_job.customer.name }}{% if next_job.site %}, {{ next_job.site.name }}{% endif %}
               · {{ next_job.scheduled_for|date:"H:i" }}
+              {% comment %} A visit that runs for days says so here, or the crew
+                 find out on the second morning. {% endcomment %}
+              {% if next_job.runs_past_its_day %} · on site until {{ next_job.last_day|a1date }}{% endif %}
               {% if next_job.crew_size > 1 %} · {{ next_job.crew_size }} on site{% endif %}
               {% if next_job.to_do %} · {{ next_job.to_do }} to do{% endif %}
             </p>
@@ -64,6 +67,7 @@ title was something it is not.
                 <p class="t-body-b">{{ job.reference }} · {{ job.service_type.name }}</p>
                 <p class="t-m-meta dim">
                   {{ job.customer.name }} · {{ job.scheduled_for|date:"H:i" }}
+                  {% if job.runs_past_its_day %} · until {{ job.last_day|a1date }}{% endif %}
                   {% if job.to_do %} · {{ job.to_do }} to do{% endif %}
                 </p>
                 <span class="pill p-open"><i></i>Scheduled</span>
@@ -154,11 +158,26 @@ title was something it is not.
               {% if task.description %}
                 <p class="t-m-meta dim2">{{ task.description|truncatechars:120 }}</p>
               {% endif %}
-              {% if task.is_overdue %}
-                <span class="pill p-over"><i></i>Overdue</span>
-              {% else %}
-                <span class="pill p-open"><i></i>Open</span>
-              {% endif %}
+              {% comment %}
+              The pill said whether it was late and offered nothing to do
+              about it. This is the screen a technician works from, so it is
+              where "done" has to be pressable — A-1's first item was that
+              there was nowhere to press it.
+              {% endcomment %}
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                {% if task.is_overdue %}
+                  <span class="pill p-over"><i></i>Overdue</span>
+                {% else %}
+                  <span class="pill p-open"><i></i>Open</span>
+                {% endif %}
+                <form method="post" action="{% url 'projects-task-toggle' task.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{% url 'fieldjobs-my-jobs' %}">
+                  <button class="btn btn-gho btn-sm" type="submit" style="min-height:44px">
+                    Mark done
+                  </button>
+                </form>
+              </div>
             </div>
           {% endfor %}
         {% endif %}
@@ -179,7 +198,11 @@ title was something it is not.
                 {{ job.customer.name }}{% if job.site %}, {{ job.site.name }}{% endif %}
               </p>
               <p class="t-m-meta dim">
-                {{ job.scheduled_for|a1datetime }}
+                {% if job.expected_end %}
+                  {% a1visitspan job.scheduled_for job.expected_end %}
+                {% else %}
+                  {{ job.scheduled_for|a1datetime }}
+                {% endif %}
                 {% if job.crew_size > 1 %} · {{ job.crew_size }} on site{% endif %}
                 {% if job.to_do %} · {{ job.to_do }} to do{% endif %}
               </p>

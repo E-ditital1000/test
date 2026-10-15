@@ -561,7 +561,7 @@ def _settings_edit(request, *, model, form_class, template, redirect_to, action,
     instance = get_object_or_404(model, pk=pk) if pk else None
     form = form_class(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(instance, fields=fields)
+        before = audit.snapshot_stored(instance, fields=fields)
         saved = form.save()
         audit.record_change(
             actor=request.user,

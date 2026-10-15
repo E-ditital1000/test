@@ -35,6 +35,7 @@ find the job.
               <th scope="col">Expected</th>
               <th scope="col">Waiting</th>
               <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -61,6 +62,18 @@ find the job.
                   {{ ticket.created_at|a1waited }}
                 </td>
                 <td><span class="pill p-prog"><i></i>{{ ticket.status.label }}</span></td>
+                {% comment %}
+                And the same for a ticket. Before this the technician could
+                read the ticket they had been given and had nothing anywhere
+                to say the work was done.
+                {% endcomment %}
+                <td class="acts">
+                  <form method="post" action="{% url 'crm-ticket-close' ticket.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'dashboard-my-tasks' %}">
+                    <button class="btn btn-gho btn-sm" type="submit">Mark finished</button>
+                  </form>
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -75,13 +88,24 @@ find the job.
         <b>Open</b>
         <span class="meta">Soonest due first · overdue at the top</span>
       </div>
+      {% comment %}
+      The row was a single link and nothing more. This is the screen that
+      says it holds everything handed to you, and A-1's first item was that
+      a technician could not click complete anywhere — so the row has to
+      carry the action, not just a route to a page that might carry it.
+
+      A form cannot live inside an anchor, so the link is the title rather
+      than the whole row.
+      {% endcomment %}
       {% for task in open_tasks %}
-        {% comment %} A task on a visit that has no project of its own is read on
-           the visit — there is no project page to send it to. {% endcomment %}
-        <a class="row-i" style="text-decoration:none;color:inherit"
-           href="{% if task.project_id %}{% url 'projects-detail' task.project_id %}#tasks{% else %}{% url 'fieldjobs-job-detail' task.field_job_id %}{% endif %}">
+        <div class="row-i">
           <div class="two g">
-            <b>{{ task.title }}</b>
+            {% comment %} A task on a visit that has no project of its own is read on
+               the visit — there is no project page to send it to. {% endcomment %}
+            <b>
+              <a style="text-decoration:none;color:inherit"
+                 href="{% if task.project_id %}{% url 'projects-detail' task.project_id %}#tasks{% else %}{% url 'fieldjobs-job-detail' task.field_job_id %}{% endif %}">{{ task.title }}</a>
+            </b>
             <span>
               {% if task.project %}{{ task.project.reference }} · {{ task.project.customer.name }}
               {% else %}{{ task.field_job.customer.name }}{% endif %}
@@ -105,7 +129,16 @@ find the job.
           {% else %}
             <span class="pill p-open"><i></i>Open</span>
           {% endif %}
-        </a>
+          <form method="post" action="{% url 'projects-task-toggle' task.pk %}"
+                style="display:flex;gap:6px;align-items:center">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'dashboard-my-tasks' %}">
+            <input type="text" name="completion_note" placeholder="What was done (optional)"
+                   aria-label="What was done on {{ task.title }}"
+                   style="min-height:36px;max-width:200px;font-size:13px">
+            <button class="btn btn-gho btn-sm" type="submit">Mark done</button>
+          </form>
+        </div>
       {% endfor %}
     </div>
   {% elif not my_tickets %}

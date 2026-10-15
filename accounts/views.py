@@ -188,7 +188,7 @@ def user_edit(request, pk=None):
 
     if request.method == "POST" and form.is_valid():
         tracked = ["first_name", "last_name", "email", "is_active"]
-        before = audit.snapshot(instance, fields=tracked)
+        before = audit.snapshot_stored(instance, fields=tracked)
         user = form.save(commit=False)
         temporary = None
         if instance is None:

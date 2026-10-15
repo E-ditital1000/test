@@ -36,16 +36,32 @@ class FieldJobForm(forms.ModelForm):
             "service_type",
             "assigned_to",
             "scheduled_for",
+            "expected_end",
             "instructions",
         ]
         widgets = {
-            "scheduled_for": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "scheduled_for": forms.DateTimeInput(
+                attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"
+            ),
+            "expected_end": forms.DateTimeInput(
+                attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"
+            ),
             "instructions": forms.Textarea(attrs={"rows": 3}),
         }
-        labels = {"assigned_to": "Lead technician"}
+        labels = {
+            "assigned_to": "Lead technician",
+            "scheduled_for": "Starts",
+            "expected_end": "Expected to finish",
+        }
         help_texts = {
             "service_type": "Decides which assessment questions appear on the phone.",
             "assigned_to": "Accountable for the visit, and the only one who submits its assessment.",
+            # A-1 asked for this directly: a visit from the 15th to the 17th
+            # had nowhere to say so, and read on the board as one morning.
+            "expected_end": "Only for work that runs past the day it starts — "
+                            "15 to 17 October. Leave empty for a single day, and "
+                            "the job stays on the crew's screen for every day it "
+                            "covers.",
         }
 
     crew = forms.ModelMultipleChoiceField(
@@ -145,6 +161,22 @@ class FieldJobForm(forms.ModelForm):
             # not, the single site picked above still stands.
             if project.site_id:
                 self.fields["site"].initial = project.site_id
+
+    def clean(self):
+        """
+        A visit that ends before it starts is a typo. Saved, it would read on
+        the board as "17–15 October" and the day filter would never match it,
+        so the crew would lose the job off their own screen.
+        """
+        cleaned = super().clean()
+        starts, ends = cleaned.get("scheduled_for"), cleaned.get("expected_end")
+        if starts and ends and ends <= starts:
+            self.add_error(
+                "expected_end",
+                "A visit cannot be expected to finish before it starts. "
+                "Leave this empty if it is a single day.",
+            )
+        return cleaned
 
     def site_picker(self):
         """

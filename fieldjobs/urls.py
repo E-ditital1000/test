@@ -10,6 +10,8 @@ urlpatterns = [
     path("field-jobs/<int:pk>/edit/", views.job_edit, name="fieldjobs-job-edit"),
     path("field-jobs/<int:pk>/remove/", views.job_remove, name="fieldjobs-job-remove"),
     path("field-jobs/<int:pk>/check-in/", views.check_in, name="fieldjobs-check-in"),
+    # Finishing a visit by hand, for the work that produces no assessment.
+    path("field-jobs/<int:pk>/complete/", views.job_complete, name="fieldjobs-job-complete"),
     path("field-jobs/<int:pk>/requisition/", views.job_requisition, name="fieldjobs-job-requisition"),
     path("field-jobs/<int:pk>/assessment/", views.assessment_form, name="fieldjobs-assessment"),
     path("field-jobs/<int:pk>/assessment/submit/", views.assessment_submit, name="fieldjobs-assessment-submit"),

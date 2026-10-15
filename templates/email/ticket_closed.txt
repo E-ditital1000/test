@@ -1,0 +1,17 @@
+{{ ticket.reference }} has been marked finished by {{ closed_by }}.
+
+  Customer   {{ ticket.customer.name }}{% if ticket.site %}
+  Site       {{ ticket.site.name }}{% endif %}
+  Service    {{ ticket.service_type.name }}
+  Raised     {{ ticket.created_at|date:"j M Y, H:i" }}
+{% if note %}
+What they said was done
+{{ note }}
+{% endif %}
+What was reported
+{{ ticket.description }}
+{% if url %}
+Open it: {{ url }}
+{% endif %}
+The technician the ticket was assigned to closed it. Reopen it from the
+ticket if the customer says otherwise.

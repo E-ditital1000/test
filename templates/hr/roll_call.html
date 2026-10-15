@@ -84,14 +84,29 @@
                 <td class="t-small">
                   {% comment %}
                   This column was headed Location and showed hours worked.
-                  It now shows where the clock event was judged to be.
+                  Then it showed the verdict — "At the office" — which is a
+                  judgement with no evidence under it. A-1 asked to see where
+                  somebody actually signed in, so the coordinate is here, as
+                  a link to the map, with how far out it was.
                   {% endcomment %}
                   {% if row.location_check == "near_enough" %}
                     <span class="pill p-wait"><i></i>Edge of the area</span>
                   {% elif row.location_check == "at_the_place" %}
                     <span class="dim2">At the office</span>
+                  {% elif row.arrival.location_unavailable %}
+                    <span class="dim2">No fix</span>
                   {% else %}
                     <span class="dim2">—</span>
+                  {% endif %}
+                  {% if row.arrival and row.arrival.has_location %}
+                    <br>
+                    <a class="mono dim2" style="font-size:12px"
+                       href="{{ row.arrival|a1mapurl }}"
+                       target="_blank" rel="noreferrer noopener"
+                       title="Where {{ row.employee.full_name }} clocked in">{{ row.arrival|a1coords }}</a>
+                    {% if row.arrival.distance_m is not None %}
+                      <span class="dim2" style="font-size:12px"> · {{ row.arrival.distance_m }} m out</span>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td>

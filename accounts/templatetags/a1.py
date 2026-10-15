@@ -128,6 +128,32 @@ def a1span(start_date, start_time, end_date, end_time):
     return f"from {left}" if left else f"due {right}"
 
 
+@register.simple_tag
+def a1visitspan(starts, ends):
+    """
+    A field job's stretch, from two datetimes:
+
+        {% a1visitspan job.scheduled_for job.expected_end %}
+
+        15 Oct from 09:00          one day, the usual case
+        15 Oct 09:00 – 17 Oct 17:00   a visit that runs for three days
+
+    A thin wrapper over a1span rather than a fourth way of writing a range.
+    A visit stores two moments where a task stores dates and optional times,
+    and the difference belongs here and not in four templates.
+    """
+    if starts is None and ends is None:
+        return ""
+    starts = _as_local(starts) if starts is not None else None
+    ends = _as_local(ends) if ends is not None else None
+    return a1span(
+        starts.date() if starts else None,
+        starts.time() if starts else None,
+        ends.date() if ends else None,
+        ends.time() if ends else None,
+    )
+
+
 @register.filter
 def a1time(value):
     """
@@ -239,6 +265,45 @@ def a1metres(value):
         return f"± {round(float(value))} m"
     except (TypeError, ValueError):
         return ""
+
+
+@register.filter
+def a1coords(value):
+    """
+    `6.300774, -10.797160` — the fix as it was recorded, from anything
+    carrying latitude and longitude.
+
+    A-1 asked to see where somebody signed in, not only whether the system
+    approved of it. The verdict alone ("At the office") is a judgement
+    nobody can check; the pair of numbers is the evidence behind it, and it
+    was being stored on every clock event and shown on no screen at all.
+
+    Six decimal places, which is roughly a tenth of a metre — the precision
+    the column is stored at, and well past anything a handset can promise.
+    """
+    if value is None:
+        return ""
+    latitude = getattr(value, "latitude", None)
+    longitude = getattr(value, "longitude", None)
+    if latitude is None or longitude is None:
+        return ""
+    return f"{float(latitude):.6f}, {float(longitude):.6f}"
+
+
+@register.filter
+def a1mapurl(value):
+    """
+    A link to the recorded fix on a map.
+
+    Nothing is sent anywhere by rendering this — it is an href, and the
+    coordinates travel only if somebody clicks it. That is the point: a
+    supervisor asking "where was he when he clocked in" can answer it
+    without reading two decimals off a screen and typing them somewhere.
+    """
+    pair = a1coords(value)
+    if not pair:
+        return ""
+    return f"https://www.google.com/maps?q={pair.replace(' ', '')}"
 
 
 @register.filter

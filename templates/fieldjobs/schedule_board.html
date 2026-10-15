@@ -78,7 +78,19 @@ person in the office who can, and "the office sent you" is not an answer.
                     <span>{{ job.site.name|default:"No site" }}</span>
                   </div>
                 </td>
-                <td class="mono t-small">{{ job.scheduled_for|a1datetime }}</td>
+                {% comment %}
+                A visit with a length reads as a stretch. Before this a job
+                booked from the 15th to the 17th showed as "15 Oct 09:00" and
+                was gone from the board on the 16th while the crew were still
+                on the site.
+                {% endcomment %}
+                <td class="mono t-small">
+                  {% if job.expected_end %}
+                    {% a1visitspan job.scheduled_for job.expected_end %}
+                  {% else %}
+                    {{ job.scheduled_for|a1datetime }}
+                  {% endif %}
+                </td>
                 <td>
                   <div class="two">
                     <b>{{ job.assigned_to|a1name }}</b>

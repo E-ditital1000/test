@@ -26,14 +26,40 @@
                 {{ event.get_kind_display }} · <span class="mono">{{ event.device_timestamp|a1datetime }}</span>
                 {% if event.is_voided %}<span class="pill p-clos"><i></i>Voided</span>{% endif %}
               </b>
+              {% comment %}
+              Where it was recorded, which A-1 asked for in these words:
+              "if they sign in in the field the GPS coordinate should
+              indicate where they sign in." The fix was captured on every
+              event from the start and shown on no screen — the margin of
+              error was all this said, which answers how good the reading
+              was and not where the person stood.
+              {% endcomment %}
               <span>
                 {% if event.location_unavailable %}
-                  Location unavailable
+                  Location unavailable — the clock was not blocked on it
+                {% elif event.has_location %}
+                  <a class="mono" href="{{ event|a1mapurl }}"
+                     target="_blank" rel="noreferrer noopener"
+                     title="Open this fix on a map">{{ event|a1coords }}</a>
+                  · {{ event.accuracy_m|a1metres }}
+                  {% if event.distance_m is not None %}
+                    · {{ event.distance_m }} m from the office
+                  {% endif %}
                 {% else %}
-                  {{ event.accuracy_m|a1metres }}
+                  No fix recorded
                 {% endif %}
                 · synced {{ event.server_received_at|a1datetime }}
               </span>
+              {% if event.location_check == "near_enough" %}
+                <span class="pend" style="font-size:12px">
+                  Outside the boundary but inside the handset's own margin of
+                  error. Recorded and flagged rather than refused.
+                </span>
+              {% elif event.location_check == "not_checked" and not event.location_unavailable %}
+                <span class="dim2 t-small">
+                  Not judged — no office location was set when this was recorded.
+                </span>
+              {% endif %}
 
               {% for correction in event.corrections.all %}
                 {# The original stays visible above; this is what changed it. #}

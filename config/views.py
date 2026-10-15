@@ -47,7 +47,7 @@ def service_type_edit(request, pk=None):
     instance = get_object_or_404(ServiceType, pk=pk) if pk else None
     form = ServiceTypeForm(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(instance, fields=["code", "name", "is_active"])
+        before = audit.snapshot_stored(instance, fields=["code", "name", "is_active"])
         obj = form.save()
         audit.record_change(
             actor=request.user,
@@ -159,7 +159,7 @@ def status_edit(request, pk=None):
     instance = get_object_or_404(StatusOption, pk=pk) if pk else None
     form = StatusOptionForm(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(instance, fields=["kind", "code", "label", "is_active"])
+        before = audit.snapshot_stored(instance, fields=["kind", "code", "label", "is_active"])
         obj = form.save()
         audit.record_change(
             actor=request.user,
@@ -182,7 +182,7 @@ def company_details(request):
     company = CompanyDetail.get()
     form = CompanyDetailForm(request.POST or None, request.FILES or None, instance=company)
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(company)
+        before = audit.snapshot_stored(company)
         obj = form.save()
         audit.record_change(
             actor=request.user,

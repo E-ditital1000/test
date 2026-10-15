@@ -703,18 +703,26 @@ def roll_call(supervisor_employee=None, on_date=None, team=None):
     # derived day row deliberately does not carry it.
     from .models import AttendanceEvent
 
-    flags = {}
-    for employee_id, check in (
-        AttendanceEvent.objects.filter(
-            employee__in=people, device_timestamp__date=on_date
-        )
-        .exclude(location_check=AttendanceEvent.NOT_CHECKED)
-        .values_list("employee_id", "location_check")
-    ):
-        # A flagged event outranks a clean one: the exception is the thing
-        # worth seeing.
-        if check == AttendanceEvent.NEAR_ENOUGH or employee_id not in flags:
-            flags[employee_id] = check
+    # The same query also carries each person's arrival, because A-1 asked
+    # to see *where* somebody signed in and not merely whether it passed:
+    # "if they sign in in the field the GPS coordinate should indicate where
+    # they sign in." The verdict without the coordinate is a yes/no nobody
+    # can check, and a supervisor querying it had nothing to look at.
+    flags, arrivals = {}, {}
+    for event in AttendanceEvent.objects.filter(
+        employee__in=people, device_timestamp__date=on_date
+    ).order_by("device_timestamp"):
+        if event.location_check != AttendanceEvent.NOT_CHECKED:
+            # A flagged event outranks a clean one: the exception is the
+            # thing worth seeing.
+            if (
+                event.location_check == AttendanceEvent.NEAR_ENOUGH
+                or event.employee_id not in flags
+            ):
+                flags[event.employee_id] = event.location_check
+        if event.kind == AttendanceEvent.CLOCK_IN:
+            # The first one. Somebody who clocks in twice arrived once.
+            arrivals.setdefault(event.employee_id, event)
 
     rows = []
     for person in people:
@@ -744,6 +752,8 @@ def roll_call(supervisor_employee=None, on_date=None, team=None):
                 "leave_type": leave_type,
                 "worked_while_on_leave": worked_while_on_leave,
                 "location_check": flags.get(person.pk),
+                # The clock-in itself, so the screen can say where they were.
+                "arrival": arrivals.get(person.pk),
             }
         )
 

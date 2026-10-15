@@ -14,10 +14,11 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 from django.utils import timezone
 
-from config import notifications
+from accounts import audit
+from config import notifications, removal
+from config.redirects import back_to
 from projects.services import notify_project_manager
 from config.pagination import paginate
 from accounts.templatetags.a1 import a1daterange
@@ -274,6 +275,11 @@ def ticket_detail(request, pk):
             "can_convert": project is None and user_has_permission(
                 request.user, "convert_ticket_to_project"
             ),
+            # Whoever may say this is finished: the office, or the person it
+            # was handed to. Matched to what the route will actually accept,
+            # so nothing on this screen is a button that answers 403.
+            "can_close": user_has_permission(request.user, "close_ticket")
+            or ticket.assigned_to_id == request.user.pk,
         },
     )
 
@@ -356,7 +362,7 @@ def ticket_assign(request, pk):
     form = TicketAssignForm(request.POST)
     if not form.is_valid():
         messages.error(request, "Choose a technician to assign this ticket to.")
-        return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))
+        return back_to(request, "crm-ticket-detail", ticket.pk)
 
     assign_ticket(
         ticket,
@@ -368,7 +374,7 @@ def ticket_assign(request, pk):
 
     messages.success(request, f"{ticket.reference} assigned to {ticket.assigned_to.get_full_name() or ticket.assigned_to.email}.")
     _warn_about_leave(request, ticket)
-    return redirect(request.POST.get("next") or reverse("crm-ticket-detail", args=[ticket.pk]))
+    return back_to(request, "crm-ticket-detail", ticket.pk)
 
 
 @require_permission("view_ticket_status")
@@ -393,12 +399,25 @@ def ticket_update(request, pk):
     return redirect("crm-ticket-detail", pk=ticket.pk)
 
 
-@require_permission("close_ticket")
+@require_any_permission("close_ticket", "view_own_job_list")
 @transaction.atomic
 def ticket_close(request, pk):
+    """
+    Finish a ticket.
+
+    Whoever holds `close_ticket` closes any of them. The person it was given
+    to closes their own, which is the rule `task_toggle` already follows and
+    which A-1 reported as missing: a technician could open the ticket handed
+    to them and had nothing on the screen to say the work was done. Who
+    pressed it is in the activity log either way.
+    """
     ticket = get_object_or_404(Ticket, pk=pk)
     if request.method != "POST":
         return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    if not user_has_permission(request.user, "close_ticket"):
+        if ticket.assigned_to_id != request.user.pk:
+            raise PermissionDenied("not your ticket")
 
     if ticket.closed_at:
         messages.info(request, f"{ticket.reference} is already closed.")
@@ -419,7 +438,63 @@ def ticket_close(request, pk):
     ticket.closed_at = timezone.now()
     ticket.save(update_fields=["status", "closed_at"])
     ticket.log(request.user, "Ticket closed", request.POST.get("reason", ""))
+
+    # Tell the office a technician has finished one. They are the people
+    # who answer the customer, and a ticket that closed itself overnight
+    # with nobody told is how a customer hears it from the technician.
+    if not user_has_permission(request.user, "close_ticket"):
+        notifications.send(
+            to=notifications.recipients_holding("close_ticket", exclude=request.user),
+            subject=f"Ticket finished — {ticket.reference}",
+            template="ticket_closed",
+            context={
+                "ticket": ticket,
+                "closed_by": request.user.get_full_name() or request.user.email,
+                "note": request.POST.get("reason", ""),
+                "url": notifications.link("crm-ticket-detail", ticket.pk),
+            },
+        )
+
     messages.success(request, f"{ticket.reference} closed.")
+    return back_to(request, "crm-ticket-detail", ticket.pk)
+
+
+@require_permission("close_ticket")
+@transaction.atomic
+def ticket_reopen(request, pk):
+    """
+    Put a closed ticket back.
+
+    Needed the moment the person doing the work could close one: a
+    technician who marks the wrong ticket done, or a customer who rings back
+    the next day, both left the office with a record it could not touch.
+    The reopening is an event like everything else, so the history shows the
+    ticket closed and reopened rather than quietly never having closed.
+    """
+    ticket = get_object_or_404(Ticket, pk=pk)
+    if request.method != "POST":
+        return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    if not ticket.closed_at:
+        messages.info(request, f"{ticket.reference} is already open.")
+        return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    reopened = StatusOption.objects.filter(
+        kind=StatusOption.TICKET, is_terminal=False, is_active=True
+    ).order_by("-is_default", "order", "id").first()
+    if reopened is None:
+        messages.error(
+            request,
+            "Every ticket status is marked as closing, so there is nothing to "
+            "reopen this into. An Admin can fix that in Settings → Status lists.",
+        )
+        return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    ticket.status = reopened
+    ticket.closed_at = None
+    ticket.save(update_fields=["status", "closed_at"])
+    ticket.log(request.user, "Ticket reopened", request.POST.get("reason", ""))
+    messages.success(request, f"{ticket.reference} reopened.")
     return redirect("crm-ticket-detail", pk=ticket.pk)
 
 
@@ -484,3 +559,88 @@ def ticket_convert(request, pk):
         f"{ticket.reference} converted to {project.reference}. Both records stay linked.",
     )
     return redirect("projects-detail", pk=project.pk)
+
+
+# --------------------------------------------------------------------------
+# Correcting and removing a ticket
+#
+# A-1's third item, in their own words: "Super admin can't delete or edit
+# ticket, field job." The field job had both by then. The ticket had neither
+# — it could be raised, assigned, updated and closed, and a ticket raised
+# against the wrong customer or with the wrong site on it stayed that way
+# for good, carrying the mistake into the project and the invoice through
+# the job reference.
+#
+# `manage_records` carries the right, the same permission that corrects a
+# project or a visit. Removing is the stronger act and the database decides
+# what will actually go: a ticket a project grew out of is PROTECTed, and
+# the refusal says so.
+# --------------------------------------------------------------------------
+
+@require_permission("manage_records")
+@transaction.atomic
+def ticket_edit(request, pk):
+    """
+    Fix a ticket. Not its status, which moves through the status form, and
+    not its assignment, which goes through `assign_ticket` so the trail and
+    the technician's email stay identical whichever door it came through.
+    """
+    ticket = get_object_or_404(
+        Ticket.objects.select_related("customer", "site", "service_type"), pk=pk
+    )
+    form = TicketForm(request.POST or None, instance=ticket, actor=request.user)
+    # Assignment has its own screen, its own service and its own trail entry.
+    # Offering it here would give the same act two doors and two behaviours.
+    for name in TicketForm.ASSIGNMENT_FIELDS:
+        form.fields.pop(name, None)
+
+    fields = ["customer", "site", "service_type", "priority", "description"]
+    if request.method == "POST" and form.is_valid():
+        before = audit.snapshot_stored(ticket, fields=fields)
+        saved = form.save()
+        after = audit.snapshot(saved, fields=fields)
+        audit.record_change(
+            actor=request.user, action="ticket.corrected", target=saved,
+            before=before, after=after,
+        )
+        # The activity log is what anybody reading the ticket sees. An audit
+        # row in Settings is not where they will look.
+        changed = [name for name in fields if before.get(name) != after.get(name)]
+        saved.log(
+            request.user, "Ticket corrected",
+            ", ".join(changed) if changed else "no fields changed",
+        )
+        messages.success(request, f"{saved.reference} updated.")
+        return redirect("crm-ticket-detail", pk=saved.pk)
+
+    return render(request, "crm/ticket_form.html", {"form": form, "ticket": ticket})
+
+
+@require_permission("manage_records")
+@transaction.atomic
+def ticket_remove(request, pk):
+    """
+    Take a ticket out.
+
+    It goes while nothing grew out of it. A project, a field job or an
+    invoice carrying this ticket's job reference is the record of work that
+    happened, and the database refuses to lose it — the message names what
+    is in the way.
+    """
+    ticket = get_object_or_404(Ticket, pk=pk)
+    if request.method != "POST":
+        return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    try:
+        label = removal.remove(
+            ticket,
+            actor=request.user,
+            reason=(request.POST.get("reason") or "").strip(),
+            audit_action="ticket.removed",
+        )
+    except removal.CannotRemove as error:
+        messages.error(request, str(error))
+        return redirect("crm-ticket-detail", pk=ticket.pk)
+
+    messages.success(request, f"{label} removed.")
+    return redirect("crm-tickets")

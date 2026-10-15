@@ -59,7 +59,19 @@ on the crew and who has turned up is one question asked twice.
         <p class="t-label">This visit</p>
         <div class="fdl">
           <div class="kvr"><span>Service</span><b>{{ job.service_type.name }}</b></div>
-          <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
+          {% comment %}
+          A visit that runs past its own day says so, rather than showing a
+          start time and leaving the crew to find out on the second morning
+          that the job is still theirs.
+          {% endcomment %}
+          {% if job.expected_end %}
+            <div class="kvr">
+              <span>Runs</span>
+              <b class="mono">{% a1visitspan job.scheduled_for job.expected_end %}</b>
+            </div>
+          {% else %}
+            <div class="kvr"><span>Scheduled</span><b class="mono">{{ job.scheduled_for|date:"H:i" }}</b></div>
+          {% endif %}
           {% if job.scheduled_by %}
             {% comment %} More than one person in the office can send you somewhere.
                This says which of them did. {% endcomment %}
@@ -201,6 +213,64 @@ on the crew and who has turned up is one question asked twice.
           <p class="t-m-meta dim2">
             {{ job.assigned_to|a1name }} fills this in for the visit. If something
             needs recording that they have not seen, tell them before they submit.
+          </p>
+        </div>
+      {% endif %}
+
+      {% comment %}
+      Finishing the visit. Submitting an assessment already closes a job, so
+      this is for the work that produces none — a delivery, a part fitted, a
+      return trip. Without it those stayed In progress for ever, which is
+      A-1's first item: the technician had nothing to press.
+
+      Shown as a quiet button and not a gold one: on a job that takes an
+      assessment, the assessment is still the thing to do.
+      {% endcomment %}
+      {% if job.state == "completed" %}
+        <div class="mc ok">
+          <p class="t-label" style="color:var(--green)">Visit finished</p>
+          <p class="t-m-action">{{ job.completed_at|a1datetime }}</p>
+          <p class="t-m-meta dim2">
+            {% if job.completed_by %}
+              Closed by {{ job.completed_by|a1name }}.
+            {% else %}
+              Closed by its assessment.
+            {% endif %}
+          </p>
+          {% if can_finish and not assessment %}
+            <form method="post" action="{% url 'fieldjobs-job-complete' job.pk %}">
+              {% csrf_token %}
+              <button class="btn btn-gho btn-sm" type="submit" style="min-height:44px">
+                Reopen this visit
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      {% elif can_finish %}
+        <form method="post" action="{% url 'fieldjobs-job-complete' job.pk %}" class="mc" style="gap:10px">
+          {% csrf_token %}
+          <p class="t-label">Finished here?</p>
+          <input type="text" name="reason" maxlength="300"
+                 placeholder="What was done (optional)"
+                 aria-label="What was done on this visit"
+                 style="min-height:44px">
+          <button class="btn btn-sec" type="submit" style="min-height:48px">
+            Mark this visit finished
+          </button>
+          {% if open_task_count %}
+            <p class="t-m-meta dim2">
+              {{ open_task_count }} thing{{ open_task_count|pluralize }} on the list
+              {{ open_task_count|pluralize:"is,are" }} still open. Finishing the
+              visit does not tick them off.
+            </p>
+          {% endif %}
+        </form>
+      {% elif on_the_job %}
+        <div class="mc" style="gap:6px">
+          <p class="t-label">Finishing this visit</p>
+          <p class="t-m-meta dim2">
+            {{ job.assigned_to|a1name }} leads this visit and closes it. Tell
+            them when the work is done.
           </p>
         </div>
       {% endif %}

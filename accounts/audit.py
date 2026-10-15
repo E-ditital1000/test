@@ -16,6 +16,33 @@ def snapshot(instance, fields=None):
     return {key: _jsonable(value) for key, value in data.items()}
 
 
+def snapshot_stored(instance, fields=None):
+    """
+    The record as the database still has it, rather than as a form has
+    already left it.
+
+    `ModelForm.is_valid()` writes cleaned data onto `form.instance` during
+    `_post_clean`, long before anybody calls `save()`. So the natural
+    reading —
+
+        if request.method == "POST" and form.is_valid():
+            before = snapshot(instance)          # the NEW values
+            after = snapshot(form.save())        # the same new values
+
+    — takes both halves of the change after the change, and every edit in
+    the system was audited as "nothing changed". It is the same object.
+
+    Re-reading costs one SELECT on a screen somebody is already waiting on,
+    and cannot be got wrong by moving a line. Use this for `before` on any
+    edit that goes through a form; `snapshot` is still right for `after`,
+    and for a `before` taken before anything has touched the instance.
+    """
+    if instance is None or instance.pk is None:
+        return None
+    stored = instance.__class__._default_manager.filter(pk=instance.pk).first()
+    return snapshot(stored, fields=fields)
+
+
 def _jsonable(value):
     if value is None or isinstance(value, (str, int, float, bool)):
         return value

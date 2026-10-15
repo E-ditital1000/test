@@ -111,7 +111,7 @@ def employee_edit(request, pk=None):
     form = EmployeeForm(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
         tracked = ["staff_id", "job_title", "department", "phone", "is_active"]
-        before = audit.snapshot(instance, fields=tracked)
+        before = audit.snapshot_stored(instance, fields=tracked)
         employee = form.save()
         audit.record_change(
             actor=request.user,
@@ -531,7 +531,7 @@ def department_edit(request, pk=None):
     instance = get_object_or_404(Department, pk=pk) if pk else None
     form = DepartmentForm(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(instance, fields=["name", "order", "is_active"])
+        before = audit.snapshot_stored(instance, fields=["name", "order", "is_active"])
         department = form.save()
         audit.record_change(
             actor=request.user,

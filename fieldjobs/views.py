@@ -33,6 +33,7 @@ from accounts.decorators import (
 from accounts import audit
 from accounts.templatetags.a1 import a1datetime
 from config import notifications, removal
+from config.redirects import back_to
 from config.pagination import paginate
 from config.references import next_reference
 from projects.forms import RequisitionItemFormSet, RequisitionRequestForm
@@ -92,11 +93,13 @@ def schedule_board(request):
     # what is coming, and reads soonest first.
     order = ("scheduled_for", "reference")
     if active_filter == "today":
-        rows = rows.filter(scheduled_for__date=today)
+        # Every visit occupying today, not only the ones that begin on it.
+        # A job running the 15th to the 17th is work on the 16th.
+        rows = rows.on_day(today)
     elif active_filter == "upcoming":
-        rows = rows.filter(scheduled_for__date__gt=today)
+        rows = rows.starting_after(today)
     elif active_filter == "unfinished":
-        rows = rows.exclude(state=FieldJob.COMPLETED)
+        rows = rows.unfinished()
     elif active_filter == "completed":
         rows = rows.filter(state=FieldJob.COMPLETED)
         order = ("-scheduled_for", "reference")
@@ -119,8 +122,8 @@ def schedule_board(request):
             "query": query,
             "filter": active_filter,
             "filters": SCHEDULE_FILTERS,
-            "today_count": everything.filter(scheduled_for__date=today).count(),
-            "unfinished_count": everything.exclude(state=FieldJob.COMPLETED).count(),
+            "today_count": everything.on_day(today).count(),
+            "unfinished_count": everything.unfinished().count(),
             "completed_count": everything.filter(state=FieldJob.COMPLETED).count(),
             "total_count": everything.count(),
             "can_schedule": user_has_permission(request.user, "schedule_field_job"),
@@ -159,10 +162,11 @@ def my_jobs(request):
             to_do=Count("tasks", filter=Q(tasks__completed_at__isnull=True), distinct=True)
         )
     )
-    todays = list(mine.filter(scheduled_for__date=today).order_by("scheduled_for"))
-    upcoming = list(
-        mine.filter(scheduled_for__date__gt=today).order_by("scheduled_for")[:5]
-    )
+    # Every visit that covers today, not only the ones starting on it — a
+    # crew on the middle day of a three-day job were being shown an empty
+    # screen and told nothing was assigned.
+    todays = list(mine.on_day(today).order_by("scheduled_for"))
+    upcoming = list(mine.starting_after(today).order_by("scheduled_for")[:5])
 
     outstanding = [job for job in todays if job.state != FieldJob.COMPLETED]
 
@@ -307,6 +311,12 @@ def job_detail(request, pk):
             "open_task_count": job.tasks.open().count(),
             # Crew can be on site and check in; the assessment is the lead's.
             "can_assess": is_lead and user_has_permission(request.user, "submit_assessment"),
+            # Closing the visit, for the work that leaves no assessment behind.
+            # The lead, who is accountable for the day, or the office — a lead
+            # who has gone home should not hold the board open.
+            "can_finish": is_lead
+            or user_has_permission(request.user, "schedule_field_job")
+            or user_has_permission(request.user, "manage_records"),
             "tab_active": "field",
         },
     )
@@ -667,9 +677,15 @@ def job_edit(request, pk):
     job = get_object_or_404(FieldJob.objects.select_related("project"), pk=pk)
     form = FieldJobForm(request.POST or None, instance=job, project=job.project)
 
-    fields = ["customer", "site", "service_type", "assigned_to", "scheduled_for", "notes"]
+    # `notes` was in this list and FieldJob has no such field, so
+    # `model_to_dict` dropped it without a word and every rescheduling was
+    # audited with the instructions missing from both sides of the change.
+    fields = [
+        "customer", "site", "service_type", "assigned_to",
+        "scheduled_for", "expected_end", "instructions",
+    ]
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(job, fields=fields)
+        before = audit.snapshot_stored(job, fields=fields)
         saved = form.save()
         audit.record_change(
             actor=request.user,
@@ -682,6 +698,85 @@ def job_edit(request, pk):
         return redirect("fieldjobs-job-detail", pk=saved.pk)
 
     return render(request, "fieldjobs/job_form.html", {"form": form, "job": job})
+
+
+# --------------------------------------------------------------------------
+# Finishing a visit
+#
+# A-1's first item: "Technicians can't click complete task in the system.
+# Both field jobs, project or ticket." On a field job it was literally true.
+# The only thing that ever set a visit to Completed was an assessment
+# arriving, so a visit that produces no assessment — a delivery, a meter
+# swap, a return trip for a part — stayed In progress for ever and the
+# board's "Not finished" count only grew.
+#
+# The lead closes it, for the same reason the lead submits the assessment:
+# one person is accountable for the visit. The office can close one too,
+# because a lead who has gone home sick should not hold the board open.
+# --------------------------------------------------------------------------
+
+@require_any_permission("view_own_job_list", "schedule_field_job", "manage_records")
+@transaction.atomic
+def job_complete(request, pk):
+    """Mark a visit finished, or reopen one finished by mistake."""
+    job = _readable_job(request, pk)
+    if request.method != "POST":
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    from_the_office = user_has_permission(
+        request.user, "schedule_field_job"
+    ) or user_has_permission(request.user, "manage_records")
+    if not (job.is_led_by(request.user) or from_the_office):
+        messages.error(
+            request,
+            f"{job.assigned_to.get_full_name() or job.assigned_to.email} leads this "
+            "visit and closes it. Tell them it is done and they can finish it "
+            "from their own phone.",
+        )
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    if job.state == FieldJob.COMPLETED:
+        # An assessment is the record of what happened on site. Reopening the
+        # visit would invite a second one, and the office reviews assessments
+        # through the approvals queue — returning one is how that is undone.
+        if job.assessments.filter(state=Assessment.SUBMITTED).exists():
+            messages.error(
+                request,
+                f"{job.reference} was completed by its assessment. Return the "
+                "assessment from the review queue if it needs doing again.",
+            )
+            return redirect("fieldjobs-job-detail", pk=job.pk)
+        job.state = FieldJob.IN_PROGRESS if job.check_ins.exists() else FieldJob.SCHEDULED
+        job.completed_at, job.completed_by = None, None
+        job.save(update_fields=["state", "completed_at", "completed_by"])
+        audit.record_change(
+            actor=request.user, action="fieldjob.reopened", target=job,
+            before={"state": FieldJob.COMPLETED}, after={"state": job.state},
+        )
+        messages.success(request, f"{job.reference} reopened.")
+        return redirect("fieldjobs-job-detail", pk=job.pk)
+
+    job.state = FieldJob.COMPLETED
+    job.completed_at = timezone.now()
+    job.completed_by = request.user
+    job.save(update_fields=["state", "completed_at", "completed_by"])
+    audit.record_change(
+        actor=request.user, action="fieldjob.completed", target=job,
+        before={"state": FieldJob.IN_PROGRESS}, after={"state": FieldJob.COMPLETED},
+        reason=(request.POST.get("reason") or "").strip(),
+    )
+
+    # Said, not refused. A crew leaving a site with two things undone is
+    # ordinary and often right; a crew who forgot they were on the list is
+    # not, and the difference is whether anybody told them.
+    outstanding = job.tasks.open().count()
+    note = ""
+    if outstanding == 1:
+        note = " One thing on its list is still open."
+    elif outstanding:
+        note = f" {outstanding} things on its list are still open."
+    messages.success(request, f"{job.reference} marked finished.{note}")
+    return back_to(request, "fieldjobs-job-detail", job.pk)
 
 
 @require_permission("manage_records")

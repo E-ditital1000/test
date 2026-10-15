@@ -14,11 +14,11 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse
 
 from accounts.templatetags.a1 import a1daterange
 from accounts import audit
 from config import notifications, removal
+from config.redirects import back_to
 from config.pagination import paginate
 from config.references import next_reference
 from accounts.decorators import (
@@ -285,12 +285,10 @@ def task_toggle(request, pk):
             update_fields=["completed_at", "completed_by", "completion_note"]
         )
 
-    if request.POST.get("next"):
-        return redirect(request.POST["next"])
     # A task on a visit with no project of its own belongs to the visit.
     if task.project_id:
-        return redirect("projects-detail", pk=task.project_id)
-    return redirect("fieldjobs-job-detail", pk=task.field_job_id)
+        return back_to(request, "projects-detail", task.project_id)
+    return back_to(request, "fieldjobs-job-detail", task.field_job_id)
 
 
 @require_permission("manage_project")
@@ -390,11 +388,17 @@ def project_create(request):
             request.user,
             note="Started directly — not converted from a ticket",
         )
+        # Crew, chosen on this same page. Asking for it on a second screen
+        # meant most projects were created with nobody on them, and the task
+        # form — which narrows its assignee list to the crew — then offered
+        # every account in the company.
+        added, _removed = form.sync_crew(project, actor=request.user)
         notify_project_manager(project, actor=request.user)
         messages.success(
             request,
-            f"{project.reference} started. Schedule its field jobs from here, "
-            "one for each site it covers.",
+            f"{project.reference} started"
+            + (f" with {added} on the crew." if added else ".")
+            + " Schedule its field jobs from here, one for each site it covers.",
         )
         return redirect("projects-detail", pk=project.pk)
     return render(request, "projects/project_form.html", {"form": form})
@@ -438,8 +442,8 @@ def project_edit(request, pk):
     form = ProjectForm(request.POST or None, instance=project)
 
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(project, fields=["name", "customer", "site", "manager",
-                                                 "start_date", "target_end_date", "description"])
+        before = audit.snapshot_stored(project, fields=["name", "customer", "site", "manager",
+                                                        "start_date", "target_end_date", "description"])
         saved = form.save()
         audit.record_change(
             actor=request.user,
@@ -449,7 +453,16 @@ def project_edit(request, pk):
             after=audit.snapshot(saved, fields=["name", "customer", "site", "manager",
                                                 "start_date", "target_end_date", "description"]),
         )
-        messages.success(request, f"{saved.reference} updated.")
+        added, removed = form.sync_crew(saved, actor=request.user)
+        crew_note = ""
+        if added or removed:
+            parts = []
+            if added:
+                parts.append(f"{added} added to the crew")
+            if removed:
+                parts.append(f"{removed} taken off")
+            crew_note = " " + ", ".join(parts).capitalize() + "."
+        messages.success(request, f"{saved.reference} updated.{crew_note}")
         return redirect("projects-detail", pk=saved.pk)
 
     return render(
@@ -501,7 +514,7 @@ def task_edit(request, pk):
     form = TaskForm(request.POST or None, instance=task, project=task.project)
 
     if request.method == "POST" and form.is_valid():
-        before = audit.snapshot(task, fields=fields)
+        before = audit.snapshot_stored(task, fields=fields)
         saved = form.save()
         audit.record_change(
             actor=request.user,

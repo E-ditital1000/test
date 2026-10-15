@@ -10,11 +10,26 @@
 
 {% block page_actions %}
   <a class="btn btn-sec" href="{% url 'crm-tickets' %}">All tickets</a>
-  {% if ticket.is_open and perms_held.close_ticket %}
+  {% comment %}
+  A-1's first item: the person the ticket was given to had nothing on this
+  screen that said the work was done. They do now — their own ticket, and
+  the activity log records who pressed it.
+  {% endcomment %}
+  {% if ticket.is_open and can_close %}
     <form method="post" action="{% url 'crm-ticket-close' ticket.pk %}" style="display:inline">
       {% csrf_token %}
-      <button class="btn btn-sec" type="submit">Close ticket</button>
+      <button class="btn btn-sec" type="submit">
+        {% if perms_held.close_ticket %}Close ticket{% else %}Mark finished{% endif %}
+      </button>
     </form>
+  {% elif not ticket.is_open and perms_held.close_ticket %}
+    <form method="post" action="{% url 'crm-ticket-reopen' ticket.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button class="btn btn-sec" type="submit">Reopen</button>
+    </form>
+  {% endif %}
+  {% if perms_held.manage_records %}
+    <a class="btn btn-sec" href="{% url 'crm-ticket-edit' ticket.pk %}">Edit ticket</a>
   {% endif %}
   {% if can_convert %}
     <form method="post" action="{% url 'crm-ticket-convert' ticket.pk %}" style="display:inline">
@@ -168,7 +183,14 @@
         </div>
       {% endif %}
 
-      {% if ticket.is_open %}
+      {% comment %}
+      This card was rendered for everybody who could reach the ticket, and
+      the route behind it asks for view_ticket_status. A technician reading
+      the job handed to them was shown an Update button that answered 403 —
+      which is the shape of A-1's complaint: controls on the screen that do
+      nothing when pressed.
+      {% endcomment %}
+      {% if ticket.is_open and perms_held.view_ticket_status %}
         <div class="card">
           <div class="hd"><b>Status &amp; priority</b></div>
           <form method="post" action="{% url 'crm-ticket-update' ticket.pk %}">
@@ -176,6 +198,26 @@
             <div class="stack">
               {% include "shell/_form_fields.html" with form=status_form %}
               <button class="btn btn-sec btn-wide" type="submit">Update</button>
+            </div>
+          </form>
+        </div>
+      {% elif ticket.is_open and can_close %}
+        {% comment %} What the person doing the work can actually do here. {% endcomment %}
+        <div class="card">
+          <div class="hd"><b>When it is done</b></div>
+          <form method="post" action="{% url 'crm-ticket-close' ticket.pk %}">
+            {% csrf_token %}
+            <div class="stack">
+              <div class="fld wide">
+                <label for="close-reason">What was done (optional)</label>
+                <input type="text" id="close-reason" name="reason" maxlength="300"
+                       placeholder="Replaced the inverter fuse">
+                <span class="help">
+                  The office is told you have finished this, and what you
+                  wrote here goes with it.
+                </span>
+              </div>
+              <button class="btn btn-pri btn-wide" type="submit">Mark finished</button>
             </div>
           </form>
         </div>

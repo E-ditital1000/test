@@ -26,12 +26,18 @@ six-month job.
         Work that spans several sites records each one on its own field job,
         scheduled from the project once it exists. The main site above is
         where the work is centred, if anywhere.
+        {% comment %} A-1 asked for the crew here rather than on a second
+           screen. It is not only the extra click: a project created with
+           nobody on it makes the task form offer every account in the
+           company, because that form narrows its list to the crew. {% endcomment %}
+        Crew can be changed at any time from the project itself, and taking
+        somebody off leaves the tasks they were given on them.
       </div>
     </div>
 
     <div class="form-actions">
-      <a class="btn btn-sec" href="{% url 'projects-list' %}">Cancel</a>
-      <button class="btn btn-pri" type="submit">Start the project</button>
+      <a class="btn btn-sec" href="{% if project %}{% url 'projects-detail' project.pk %}{% else %}{% url 'projects-list' %}{% endif %}">Cancel</a>
+      <button class="btn btn-pri" type="submit">{% if project %}Save the project{% else %}Start the project{% endif %}</button>
     </div>
   </form>
 {% endblock %}

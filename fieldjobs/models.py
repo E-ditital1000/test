@@ -18,6 +18,32 @@ from config.mixins import (
 )
 
 
+class FieldJobQuerySet(models.QuerySet):
+    """
+    The questions the board and the phone both ask, answered once.
+
+    A visit now has a length, so "today's jobs" stopped being a question about
+    one column. A job running the 15th to the 17th is work on the 16th, and a
+    filter that only compares `scheduled_for` leaves a crew's own screen empty
+    on the middle day of their own job.
+    """
+
+    def on_day(self, day):
+        """Every visit that occupies this day — starting, ending or spanning."""
+        from django.db.models import Q
+
+        return self.filter(
+            Q(scheduled_for__date=day)
+            | Q(scheduled_for__date__lte=day, expected_end__date__gte=day)
+        )
+
+    def starting_after(self, day):
+        return self.filter(scheduled_for__date__gt=day)
+
+    def unfinished(self):
+        return self.exclude(state=FieldJob.COMPLETED)
+
+
 class FieldJob(JobLineageModel, TimeStampedModel):
     """A visit to a site, carrying the lineage of the ticket/project it serves."""
 
@@ -68,9 +94,36 @@ class FieldJob(JobLineageModel, TimeStampedModel):
         related_name="field_jobs_scheduled",
     )
     scheduled_for = models.DateTimeField()
+    # When the visit is expected to be finished, which for plenty of A-1's
+    # work is not the same day it starts: "from October 15 to October 17" was
+    # how the client put it, and a job that only knows when it begins reads
+    # on the board as a single morning and then vanishes for two days while
+    # the crew are still on the site.
+    #
+    # Optional, because most visits are an afternoon and being made to say
+    # when a two-hour call-out ends would be answered with an invented time.
+    # Blank means the job is the day it starts.
+    expected_end = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the visit is expected to finish, if it runs past the day it starts.",
+    )
     state = models.CharField(max_length=20, choices=STATES, default=SCHEDULED)
     instructions = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Who said it was finished, for a visit closed by hand rather than by an
+    # assessment arriving. Nullable: jobs completed before there was a button
+    # were completed by the assessment, and inventing an author is worse than
+    # an honest blank.
+    completed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    objects = FieldJobQuerySet.as_manager()
 
     class Meta:
         ordering = ["scheduled_for"]
@@ -78,6 +131,25 @@ class FieldJob(JobLineageModel, TimeStampedModel):
             models.Index(fields=["assigned_to", "scheduled_for"]),
             models.Index(fields=["job_ref"]),
         ]
+
+    @property
+    def runs_past_its_day(self):
+        """True where this visit occupies more than the day it starts on."""
+        if self.expected_end is None:
+            return False
+        from django.utils import timezone
+
+        return timezone.localtime(self.expected_end).date() > timezone.localtime(
+            self.scheduled_for
+        ).date()
+
+    @property
+    def last_day(self):
+        """The final day the crew are expected on site."""
+        from django.utils import timezone
+
+        end = self.expected_end or self.scheduled_for
+        return timezone.localtime(end).date()
 
     @property
     def crew_size(self):
