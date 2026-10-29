@@ -76,6 +76,17 @@ harder. The activity log says who pressed it, and reopening is an event of
 its own — so the history shows a ticket closed and reopened, not a ticket
 that quietly never closed.
 
+## Project work
+
+**The manager and the people assigned to it** — project crew, task assignees,
+and people assigned to its field jobs — can mark the operational work
+complete. The action records who closed it and when, and can be reopened if
+work needs to continue.
+
+This is deliberately separate from the project lifecycle. Finishing the work
+does not move the project to Invoice, change its stage history, or imply that
+the customer has been billed. That remains an office decision.
+
 ## What was deliberately not done
 
 **Technicians were not given `close_ticket`.** That permission is scoped

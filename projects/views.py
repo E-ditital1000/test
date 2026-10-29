@@ -50,7 +50,13 @@ def _visible_projects(user):
         Project.objects.select_related("customer", "site", "service_type", "status", "manager"),
         user,
         "view_projects",
-        own_projects_filter=Q(manager=user) | Q(crew__employee__user=user),
+        own_projects_filter=(
+            Q(manager=user)
+            | Q(crew__employee__user=user)
+            | Q(tasks__assignee=user)
+            | Q(field_jobs__assigned_to=user)
+            | Q(field_jobs__crew__employee__user=user)
+        ),
     )
 
 
@@ -130,6 +136,7 @@ def project_detail(request, pk):
             "can_see_cost": can_see_cost,
             "cost": project_cost(project) if can_see_cost else None,
             "can_manage": user_has_permission(request.user, "manage_project"),
+            "can_complete_work": _can_complete_project_work(request.user, project),
             "task_form": TaskForm(project=project),
             "crew_form": ProjectCrewForm(project=project),
             "document_form": ProjectDocumentForm(),
@@ -166,6 +173,53 @@ def _next_stage(project):
         return None
     code = Project.STAGE_ORDER[index + 1]
     return {"code": code, "label": dict(Project.STAGES)[code]}
+
+
+def _can_complete_project_work(user, project):
+    """Only people assigned to this project's work can close its work."""
+    return (
+        project.manager_id == user.pk
+        or project.crew.filter(employee__user=user).exists()
+        or project.tasks.filter(assignee=user).exists()
+        or project.field_jobs.filter(
+            Q(assigned_to=user) | Q(crew__employee__user=user)
+        ).exists()
+    )
+
+
+@require_permission("view_projects")
+@transaction.atomic
+def project_work_toggle(request, pk):
+    """Record or reopen operational completion without advancing billing stages."""
+    project = get_object_or_404(_visible_projects(request.user), pk=pk)
+    if not _can_complete_project_work(request.user, project):
+        raise PermissionDenied("only people assigned to this project's work can complete it")
+    if request.method != "POST":
+        return redirect("projects-detail", pk=project.pk)
+
+    from django.utils import timezone
+
+    before = audit.snapshot(project, fields=["work_completed_at", "work_completed_by"])
+    if project.work_completed_at:
+        project.work_completed_at = None
+        project.work_completed_by = None
+        action = "project.work_reopened"
+        message = f"{project.reference} work reopened."
+    else:
+        project.work_completed_at = timezone.now()
+        project.work_completed_by = request.user
+        action = "project.work_completed"
+        message = f"{project.reference} work marked complete."
+    project.save(update_fields=["work_completed_at", "work_completed_by"])
+    audit.record_change(
+        actor=request.user,
+        action=action,
+        target=project,
+        before=before,
+        after=audit.snapshot(project, fields=["work_completed_at", "work_completed_by"]),
+    )
+    messages.success(request, message)
+    return redirect("projects-detail", pk=project.pk)
 
 
 @require_permission("manage_project")

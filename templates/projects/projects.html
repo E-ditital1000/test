@@ -68,6 +68,9 @@
                   {% else %}
                     <span class="pill p-open"><i></i>{{ project.status.label }}</span>
                   {% endif %}
+                  {% if project.work_completed_at %}
+                    <div class="t-small good">Work complete</div>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}

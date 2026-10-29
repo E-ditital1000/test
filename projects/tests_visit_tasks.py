@@ -54,8 +54,10 @@ class VisitTaskTestCase(TestCase):
         cls.manager = make_user("pm@t.local", ["Project Manager"])
         cls.lead = make_user("lead@t.local", ["Technician"])
         cls.mate = make_user("mate@t.local", ["Technician"])
+        cls.employee_user = make_user("employee@t.local", ["Employee"])
         cls.lead_employee = Employee.objects.create(user=cls.lead, staff_id="A1-001")
         cls.mate_employee = Employee.objects.create(user=cls.mate, staff_id="A1-002")
+        cls.staff_employee = Employee.objects.create(user=cls.employee_user, staff_id="A1-003")
 
         cls.project = Project.objects.create(
             reference="PRJ-0001", name="Yard solar", customer=cls.customer, site=cls.site,
@@ -63,6 +65,7 @@ class VisitTaskTestCase(TestCase):
         )
         ProjectCrew.objects.create(project=cls.project, employee=cls.lead_employee)
         ProjectCrew.objects.create(project=cls.project, employee=cls.mate_employee)
+        ProjectCrew.objects.create(project=cls.project, employee=cls.staff_employee)
 
         cls.visit = FieldJob.objects.create(
             reference="FJ-0001", project=cls.project, customer=cls.customer, site=cls.site,
@@ -193,13 +196,79 @@ class TheCrewReadsItOnTheVisitTests(VisitTaskTestCase):
 
     def test_somebody_on_neither_the_visit_nor_the_task_cannot(self):
         outsider = make_user("outsider@t.local", ["Technician"])
-        Employee.objects.create(user=outsider, staff_id="A1-003")
+        Employee.objects.create(user=outsider, staff_id="A1-004")
         self.client.force_login(outsider)
 
         response = self.client.post(reverse("projects-task-toggle", args=[self.task.pk]), {})
         self.assertEqual(response.status_code, 403)
         self.task.refresh_from_db()
         self.assertFalse(self.task.is_complete)
+
+
+class ProjectWorkCompletionTests(VisitTaskTestCase):
+    def test_employee_can_complete_an_assigned_task(self):
+        task = Task.objects.create(
+            project=self.project, title="Fit isolator", assignee=self.employee_user
+        )
+        self.client.force_login(self.employee_user)
+
+        response = self.client.post(
+            reverse("projects-task-toggle", args=[task.pk]),
+            {"completion_note": "Isolator fitted and tested."},
+        )
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertTrue(task.is_complete)
+        self.assertEqual(task.completed_by, self.employee_user)
+
+    def test_employee_can_complete_project_work_without_advancing_lifecycle(self):
+        self.client.force_login(self.employee_user)
+        detail = self.client.get(reverse("projects-detail", args=[self.project.pk]))
+        self.assertContains(detail, "Mark project work complete")
+
+        response = self.client.post(
+            reverse("projects-work-complete", args=[self.project.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.project.refresh_from_db()
+        self.assertIsNotNone(self.project.work_completed_at)
+        self.assertEqual(self.project.work_completed_by, self.employee_user)
+        self.assertEqual(self.project.stage, Project.REQUEST)
+        self.assertIsNone(self.project.completed_at)
+
+    def test_technician_can_reopen_completed_project_work(self):
+        from django.utils import timezone
+
+        self.project.work_completed_at = timezone.now()
+        self.project.work_completed_by = self.manager
+        self.project.save(update_fields=["work_completed_at", "work_completed_by"])
+        self.client.force_login(self.mate)
+
+        response = self.client.post(
+            reverse("projects-work-complete", args=[self.project.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.project.refresh_from_db()
+        self.assertIsNone(self.project.work_completed_at)
+        self.assertIsNone(self.project.work_completed_by)
+
+    def test_assigned_task_worker_can_access_and_complete_project_work(self):
+        worker = make_user("task-worker@t.local", ["Technician"])
+        Task.objects.create(project=self.project, title="Install isolator", assignee=worker)
+        self.client.force_login(worker)
+
+        self.assertEqual(
+            self.client.get(reverse("projects-detail", args=[self.project.pk])).status_code,
+            200,
+        )
+        response = self.client.post(
+            reverse("projects-work-complete", args=[self.project.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.work_completed_by, worker)
 
 
 class OneListNotTwoTests(VisitTaskTestCase):

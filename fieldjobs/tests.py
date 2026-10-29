@@ -73,11 +73,13 @@ class FieldWorkTests(TestCase):
         cls.finance = make_user("fin@test.local", ["Finance"])
         cls.technician = make_user("tech@test.local", ["Technician"])
         cls.other_tech = make_user("tech2@test.local", ["Technician"])
+        cls.employee_user = make_user("employee@test.local", ["Employee"])
 
         # The supervisor's own team, for the scoping test.
         sup_employee = Employee.objects.create(user=cls.supervisor, staff_id="A1-001")
         Employee.objects.create(user=cls.technician, staff_id="A1-002", supervisor=sup_employee)
         Employee.objects.create(user=cls.other_tech, staff_id="A1-003")
+        Employee.objects.create(user=cls.employee_user, staff_id="A1-004")
 
     # -- helpers ----------------------------------------------------------
 
@@ -350,6 +352,21 @@ class FieldWorkTests(TestCase):
         self.client.force_login(self.technician)
         self._submit(job, self._payload())
         self.assertEqual(Assessment.objects.filter(field_job=job).count(), 1)
+
+    def test_employee_can_submit_assessment_and_finish_assigned_visit(self):
+        job = self._job(technician=self.employee_user)
+        self.client.force_login(self.employee_user)
+
+        self.assertEqual(
+            self.client.get(reverse("fieldjobs-assessment", args=[job.pk])).status_code,
+            200,
+        )
+        response = self._submit(job, self._payload())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Assessment.objects.filter(field_job=job).count(), 1)
+        job.refresh_from_db()
+        self.assertEqual(job.state, FieldJob.COMPLETED)
+        self.assertIsNotNone(job.completed_at)
 
     def test_someone_on_neither_the_lead_nor_the_crew_cannot_see_it(self):
         job = self._job()          # no crew

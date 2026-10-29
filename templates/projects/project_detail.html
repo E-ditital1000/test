@@ -39,6 +39,34 @@
     </div>
   </div>
 
+  <div class="card compact">
+    <div class="hd">
+      <b>Project work</b>
+      {% if project.work_completed_at %}
+        <span class="pill p-appr"><i></i>Complete</span>
+      {% else %}
+        <span class="pill p-open"><i></i>In progress</span>
+      {% endif %}
+    </div>
+    {% if project.work_completed_at %}
+      <p class="dim">
+        Marked complete {{ project.work_completed_at|a1datetime }}
+        {% if project.work_completed_by %}by {{ project.work_completed_by|a1name }}{% endif %}.
+        This does not advance the project to invoicing.
+      </p>
+    {% else %}
+      <p class="dim">This is separate from the project's quote, handover and invoicing stages.</p>
+    {% endif %}
+    {% if can_complete_work %}
+      <form method="post" action="{% url 'projects-work-complete' project.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-sec" type="submit">
+          {% if project.work_completed_at %}Reopen project work{% else %}Mark project work complete{% endif %}
+        </button>
+      </form>
+    {% endif %}
+  </div>
+
   {% if can_see_cost %}
     <div class="mrow">
       <div class="metric"><span>Revenue booked</span><b>{{ cost.revenue|a1money }}</b><em>from linked invoices</em></div>

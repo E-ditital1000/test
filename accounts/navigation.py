@@ -78,6 +78,9 @@ NAV_ITEMS = [
         # the register sent them to a screen that refuses them -- the one
         # case the "first target they actually hold" rule exists to prevent.
         ("view_attendance_records", "hr-roll-call"),
+        # Staff asking for leave should land on their own leave screen, not
+        # the clock, which used to hide the request flow behind the HR module.
+        ("request_leave", "hr-leave-mine"),
         ("clock_in_out", "hr-clock"),
     )),
     NavItem("Settings", "settings", (

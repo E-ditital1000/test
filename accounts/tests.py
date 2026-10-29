@@ -748,6 +748,16 @@ class NavigationLandsSomewhereAllowedTests(TestCase):
                         f"{item.url_name}, and that page refuses them",
                     )
 
+    def test_employee_hr_link_opens_my_leave(self):
+        call_command("seed_permissions", verbosity=0)
+        employee = self._user_for("Employee")
+
+        hr_link = next(item for item in visible_items(employee) if item.label == "HR")
+        self.assertEqual(hr_link.url_name, "hr-leave-mine")
+
+        self.client.force_login(employee)
+        self.assertEqual(self.client.get(reverse(hr_link.url_name)).status_code, 200)
+
 
 class TemplateInheritanceTests(TestCase):
     """
