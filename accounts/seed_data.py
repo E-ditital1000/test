@@ -210,3 +210,46 @@ ROLE_GRANTS = {
 }
 
 SYSTEM_ROLE_NAMES = set(ROLE_GRANTS)
+
+
+# --------------------------------------------------------------------------
+# Floors: the grants a role must ALWAYS carry, re-asserted on every deploy.
+#
+# This exists because of a gap that has bitten A-1 three times. New grants on
+# an EXISTING role only ever arrive through a one-shot data migration — 0008
+# added the leave permissions, 0009 added the field-staff floor — and
+# `seed_permissions` deliberately leaves an existing role's grants alone so
+# that an admin's additions in Settings survive a deploy. The two together
+# leave a hole: a role created or edited by hand AFTER those migrations ran
+# never receives them, and the migration will not run again. The symptom is
+# an employee who cannot put in for leave, or a technician with no way to
+# tick a task done — reported by A-1 on exactly these roles.
+#
+# A floor is re-asserted every deploy and removes NOTHING. It is not
+# `--reset-system-roles`, which rewrites a role wholesale; it only guarantees
+# the documented minimum is present, so anything HR added stays. A grant the
+# role already holds at a different scope is left exactly as it is — widening
+# access silently is the one thing this must never do.
+#
+# Everybody may ask for leave: it is a floor like clocking in, which is why
+# migration 0008 gave `request_leave` to all nine pre-built roles.
+ROLE_FLOORS = {name: [("request_leave", SCOPE_ALL)] for name in ROLE_GRANTS}
+
+# Employee and Technician are the field-staff roles, and A-1 declared their
+# floor mandatory: "there is no way we have a technician who is not an
+# employee." These two must always be able to do the whole of the field job —
+# see their own list, clock in, check in on site, submit an assessment, raise
+# a requisition against their project, and put in for leave. Scoped grants
+# reach nothing for somebody not crewed on a project, which is what makes the
+# full set safe on a role every account can hold.
+for _field_role in ("Employee", "Technician"):
+    ROLE_FLOORS[_field_role] = [
+        ("view_dashboard", SCOPE_ALL),
+        ("clock_in_out", SCOPE_ALL),
+        ("request_leave", SCOPE_ALL),
+        ("view_own_job_list", SCOPE_ALL),
+        ("gps_check_in", SCOPE_ALL),
+        ("submit_assessment", SCOPE_ALL),
+        ("view_projects", SCOPE_OWN_PROJECTS),
+        ("raise_requisition", SCOPE_OWN_PROJECTS),
+    ]

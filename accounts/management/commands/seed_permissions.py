@@ -12,7 +12,7 @@ from django.db import transaction
 
 from accounts.models import Permission, Role, RolePermission
 from accounts.permission_registry import PERMISSIONS
-from accounts.seed_data import ROLE_GRANTS
+from accounts.seed_data import ROLE_FLOORS, ROLE_GRANTS
 
 
 class Command(BaseCommand):
@@ -78,3 +78,42 @@ class Command(BaseCommand):
             )
             verb = "created" if was_created else "reset"
             self._say(self.style.SUCCESS(f"  role '{role_name}' {verb} ({len(grants)} grants)."))
+
+        # Ensure the floor on every pre-built role, additively.
+        #
+        # This runs whether or not --reset-system-roles was passed, and
+        # removes nothing. It is what heals a role that drifted — created or
+        # edited by hand after the leave/field-staff migrations ran, and so
+        # silently missing `request_leave` or `view_own_job_list`, which is an
+        # employee who cannot ask for leave or tick a task done. See
+        # accounts.seed_data.ROLE_FLOORS for why this is separate from the
+        # reset above.
+        restored = 0
+        for role_name, floor in ROLE_FLOORS.items():
+            role = Role.objects.filter(name=role_name).first()
+            if role is None:
+                continue
+            for code, scope in floor:
+                permission = lookup.get(code)
+                if permission is None:
+                    continue
+                # get_or_create on (role, permission) alone: a role that holds
+                # this at another scope keeps it. Never widen silently.
+                _rp, made = RolePermission.objects.get_or_create(
+                    role=role, permission=permission, defaults={"scope": scope}
+                )
+                if made:
+                    restored += 1
+                    self._say(
+                        self.style.WARNING(
+                            f"  floor: restored '{code}' on '{role_name}' "
+                            "(was missing — a drifted role)."
+                        )
+                    )
+        if restored:
+            self._say(
+                self.style.SUCCESS(
+                    f"Floors: restored {restored} missing grant(s) so field "
+                    "staff can clock, ask for leave and finish their work."
+                )
+            )
