@@ -36,15 +36,32 @@ python manage.py collectstatic --noinput
 # is, so this gives up rather than retrying forever, and says which it was.
 echo "--> waiting for the database"
 for attempt in $(seq 1 20); do
+  # Exit 3 means settings refused to load (a missing SECRET_KEY or
+  # DATABASE_URL). No amount of waiting fixes that, and the "host will not
+  # resolve" advice below is wrong for it, so it stops here with the real
+  # message instead of retrying twenty times and blaming the network.
   if python -c "
 import django, os, sys
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inventoryproject.settings')
-django.setup()
+from django.core.exceptions import ImproperlyConfigured
+try:
+    django.setup()
+except ImproperlyConfigured as exc:
+    print(exc, file=sys.stderr)
+    sys.exit(3)
 from django.db import connection
 connection.ensure_connection()
 " 2>/tmp/dbwait.log; then
     echo "    reachable after ${attempt} attempt(s)"
     break
+  else
+    status=$?
+    if [ "$status" -eq 3 ]; then
+      echo "    the app's settings refuse to load, so nothing was tried against the database:"
+      sed 's/^/    /' /tmp/dbwait.log
+      echo "    Fix the variable named above on THIS service's Variables tab, then redeploy."
+      exit 1
+    fi
   fi
   if [ "$attempt" -eq 20 ]; then
     echo "    the database could not be reached after 20 attempts:"
@@ -76,6 +93,13 @@ python manage.py seed_permissions
 # raised allowance back to the statutory floor.
 echo "--> seeding leave policy"
 python manage.py seed_leave
+
+# The first account, so somebody can sign in on a fresh database. Reads
+# ADMIN_EMAIL and ADMIN_PASSWORD from this service's variables; with them
+# unset it does nothing and says so, and once the account exists it is left
+# untouched — so this is safe on every boot, not just the first.
+echo "--> ensuring the admin account"
+python manage.py create_admin
 
 echo "--> serving on ${PORT:-8000}"
 exec gunicorn inventoryproject.wsgi:application \
